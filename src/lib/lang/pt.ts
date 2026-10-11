@@ -16,7 +16,6 @@ export const pt: Record<string, string> = {
   Cancel: 'Cancelar',
   Categories: 'Categorias',
   'Change instance': 'Trocar instância',
-  'Choose who to play with. Each account has its own pixel head, derived from its name.': 'Escolha com quem jogar. Cada conta tem a sua cabeça de pixels, gerada a partir do nome.',
   'Coming soon': 'Em breve',
   Console: 'Console',
   Content: 'Conteúdo',
@@ -280,4 +279,10 @@ export const pt: Record<string, string> = {
   "Description": "Descrição",
   "Versions": "Versões",
   "Install {v}": "Instalar {v}",
+  "Update available": "Atualização disponível",
+  "PiumaLauncher {v} is ready to download.": "O PiumaLauncher {v} está pronto para baixar.",
+  "Download": "Baixar",
+  "Later": "Mais tarde",
+  "Check for updates": "Verificar atualizações",
+  "Looks on GitHub for a new version when the launcher starts.": "Procura uma nova versão no GitHub ao iniciar o launcher.",
 }

@@ -32,8 +32,8 @@
 
 <style>
   .wrap { position: relative; }
-  .menu { position: absolute; left: 0; bottom: calc(100% + 10px); z-index: 30; min-width: 190px; padding: 6px; display: grid; gap: 2px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 18px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); animation: pop 220ms var(--spring) both; transform-origin: bottom left; }
-  .opt { display: flex; align-items: center; justify-content: space-between; width: 100%; border-color: transparent; border-radius: 12px; padding: 9px 12px; text-align: left; animation: item 260ms var(--spring) both; animation-delay: calc(var(--n, 0) * 30ms); }
+  .menu { position: absolute; left: 0; bottom: calc(100% + 10px); z-index: 30; min-width: 190px; max-height: min(70vh, 460px); overflow-y: auto; padding: 6px; display: grid; gap: 2px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 18px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); animation: pop 220ms var(--spring) both; transform-origin: bottom left; }
+  .opt { display: flex; align-items: center; justify-content: space-between; width: 100%; border-color: transparent; border-radius: 12px; padding: 9px 12px; text-align: left; animation: item 260ms var(--spring) both; animation-delay: calc(var(--n, 0) * 18ms); }
   .opt[aria-checked='true'] { background: var(--surface-2); }
   .tick { display: inline-grid; }
   @keyframes pop { from { opacity: 0; transform: translateY(8px) scale(0.96); } }

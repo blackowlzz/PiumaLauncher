@@ -15,6 +15,16 @@
     fr: { hello: 'Bienvenue', pick: 'Choisis ta langue' },
     de: { hello: 'Willkommen', pick: 'Wähle deine Sprache' },
     pt: { hello: 'Bem-vindo', pick: 'Escolha seu idioma' },
+    sq: { hello: 'Mirë se vini', pick: 'Zgjidhni gjuhën tuaj' },
+    hu: { hello: 'Üdvözlünk', pick: 'Válaszd ki a nyelvet' },
+    ru: { hello: 'Добро пожаловать', pick: 'Выберите язык' },
+    bg: { hello: 'Добре дошли', pick: 'Изберете език' },
+    uk: { hello: 'Ласкаво просимо', pick: 'Оберіть мову' },
+    pl: { hello: 'Witamy', pick: 'Wybierz swój język' },
+    ro: { hello: 'Bun venit', pick: 'Alege limba' },
+    sr: { hello: 'Dobrodošli', pick: 'Izaberite jezik' },
+    el: { hello: 'Καλώς ήρθατε', pick: 'Επιλέξτε γλώσσα' },
+    tr: { hello: 'Hoş geldiniz', pick: 'Dilinizi seçin' },
   }
 
   let visible = $state(false)
@@ -197,8 +207,8 @@
   .lang { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr); align-items: center; padding: 30px clamp(36px, 7vw, 120px) 40px; animation: paneIn 700ms var(--spring) both; }
   .lang.gone { animation: paneOut 650ms 150ms var(--spring) forwards; }
   .menu { list-style: none; margin: 0; padding: 0; display: grid; }
-  .menu li { animation: rise 800ms var(--spring) both; animation-delay: calc(var(--n) * 70ms + 250ms); }
-  .item { position: relative; display: flex; align-items: center; gap: 18px; width: 100%; border: 0; border-radius: 0; background: transparent; padding: 0; font-size: clamp(40px, 9.2vh, 104px); font-weight: 650; letter-spacing: -0.055em; line-height: 1.04; text-align: left; color: var(--faint); transition: color 220ms, transform 450ms var(--spring); overflow: visible; }
+  .menu li { animation: rise 800ms var(--spring) both; animation-delay: calc(var(--n) * 45ms + 250ms); }
+  .item { position: relative; display: flex; align-items: center; gap: 18px; width: 100%; border: 0; border-radius: 0; background: transparent; padding: 0; font-size: clamp(24px, 5vh, 104px); font-weight: 650; letter-spacing: -0.055em; line-height: 1.04; text-align: left; color: var(--faint); transition: color 220ms, transform 450ms var(--spring); overflow: visible; }
   .item:hover:not(:disabled) { background: transparent; border: 0; }
   .item.on { color: var(--text); transform: translateX(18px); }
   .item .go { display: inline-grid; opacity: 0; transform: translateX(-14px); transition: opacity 250ms, transform 450ms var(--spring); }

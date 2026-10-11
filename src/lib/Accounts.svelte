@@ -62,7 +62,6 @@
 
 <header class="head">
   <h1>{t('Accounts')}</h1>
-  <p class="muted">{t('Choose who to play with. Each account has its own pixel head, derived from its name.')}</p>
 </header>
 
 <div class="grid">

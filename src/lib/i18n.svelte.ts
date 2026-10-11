@@ -1,9 +1,19 @@
 import { api } from './api'
+import { bg } from './lang/bg'
 import { de } from './lang/de'
+import { el } from './lang/el'
 import { es } from './lang/es'
 import { fr } from './lang/fr'
+import { hu } from './lang/hu'
 import { it } from './lang/it'
+import { pl } from './lang/pl'
 import { pt } from './lang/pt'
+import { ro } from './lang/ro'
+import { ru } from './lang/ru'
+import { sq } from './lang/sq'
+import { sr } from './lang/sr'
+import { tr } from './lang/tr'
+import { uk } from './lang/uk'
 
 export const LANGUAGES = [
   { code: 'en', name: 'English' },
@@ -12,10 +22,20 @@ export const LANGUAGES = [
   { code: 'fr', name: 'Français' },
   { code: 'de', name: 'Deutsch' },
   { code: 'pt', name: 'Português' },
+  { code: 'sq', name: 'Shqip' },
+  { code: 'hu', name: 'Magyar' },
+  { code: 'ru', name: 'Русский' },
+  { code: 'bg', name: 'Български' },
+  { code: 'uk', name: 'Українська' },
+  { code: 'pl', name: 'Polski' },
+  { code: 'ro', name: 'Română' },
+  { code: 'sr', name: 'Srpski' },
+  { code: 'el', name: 'Ελληνικά' },
+  { code: 'tr', name: 'Türkçe' },
 ] as const
 
 type Dict = Record<string, string>
-const dicts: Record<string, Dict> = { en: {}, it, es, fr, de, pt }
+const dicts: Record<string, Dict> = { en: {}, it, es, fr, de, pt, sq, hu, ru, bg, uk, pl, ro, sr, el, tr }
 
 export const i18n = $state({ lang: 'en', ready: false, chosen: false })
 
