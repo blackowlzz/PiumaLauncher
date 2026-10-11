@@ -2,6 +2,10 @@
 
 PiumaLauncher is a fast, lightweight and open source Minecraft launcher for Windows and Linux. It installs the right Java for you, plays on premium or offline accounts, and browses Modrinth for modpacks, mods, resource packs and shaders without leaving the app.
 
+<img width="1362" height="869" alt="immagine" src="https://github.com/user-attachments/assets/ce826c4c-c593-4f41-90ee-715c6dac8f88" />
+<img width="1358" height="865" alt="immagine" src="https://github.com/user-attachments/assets/513fd133-9442-4b01-8c07-ed2f6998f009" />
+
+
 ## Features
 
 **Accounts**
