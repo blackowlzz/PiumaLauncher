@@ -16,6 +16,7 @@
   import Accounts from './lib/Accounts.svelte'
   import Explore from './lib/Explore.svelte'
   import Settings from './lib/Settings.svelte'
+  import UpdateBanner from './lib/UpdateBanner.svelte'
   import TitleBar from './lib/TitleBar.svelte'
   import { maybeBench } from './lib/bench'
   import { smoothScroll } from './lib/smoothscroll'
@@ -143,6 +144,7 @@
   </nav>
 
   <div class="content">
+    <UpdateBanner />
     <main use:smoothScroll={app.settings.smoothScroll && !app.settings.reduceEffects}>
       {#key `${app.page}:${app.detailId ?? ''}`}
         <div class="page">

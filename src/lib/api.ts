@@ -44,6 +44,11 @@ export interface DeviceLogin {
   expiresIn: number
 }
 
+export interface UpdateInfo {
+  version: string
+  url: string
+}
+
 export interface AccountStore {
   accounts: Account[]
   active: string | null
@@ -90,6 +95,7 @@ export const api = {
   launch: (id: string) => call<void>('launch_instance', { id }),
   stop: (id: string) => call<void>('stop_instance', { id }),
   running: () => call<string[]>('running_instances'),
+  checkUpdate: () => call<UpdateInfo | null>('check_update'),
   thumbnail: (url: string, width: number) => call<string>('thumbnail', { url, width }),
   fetchSkin: (name: string) => call<SkinInfo | null>('fetch_skin', { name }),
   getSettings: () => call<Settings>('get_settings'),
@@ -264,6 +270,7 @@ export interface Settings {
   lookupSkins: boolean
   reduceEffects: boolean
   smoothScroll: boolean
+  checkUpdates: boolean
 }
 
 export const defaultSettings = (): Settings => ({
@@ -277,6 +284,7 @@ export const defaultSettings = (): Settings => ({
   lookupSkins: true,
   reduceEffects: false,
   smoothScroll: true,
+  checkUpdates: true,
 })
 
 export interface StorageInfo {

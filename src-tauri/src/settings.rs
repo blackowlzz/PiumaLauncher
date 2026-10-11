@@ -18,6 +18,7 @@ pub struct Settings {
     pub lookup_skins: bool,
     pub reduce_effects: bool,
     pub smooth_scroll: bool,
+    pub check_updates: bool,
 }
 
 impl Default for Settings {
@@ -33,6 +34,7 @@ impl Default for Settings {
             lookup_skins: true,
             reduce_effects: false,
             smooth_scroll: true,
+            check_updates: true,
         }
     }
 }

@@ -12,6 +12,7 @@ import {
   type ProjectType,
   type Session,
   type AccountStore,
+  type UpdateInfo,
   type GameStateEvent,
   type InstallProgress,
   type Instance,
@@ -45,6 +46,8 @@ export const app = $state({
   installingId: null as string | null,
   detail: null as ProjectHit | null,
   exploreIntent: null as { kind: ProjectType; targetId?: string } | null,
+  update: null as UpdateInfo | null,
+  updateDismissed: false,
 })
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined
@@ -78,6 +81,7 @@ export async function init() {
   await Promise.all([reloadInstances(), reloadAccounts()])
   app.loaded = true
   reloadStats()
+  setTimeout(() => api.checkUpdate().then((u) => (app.update = u)).catch(() => {}), 4000)
   stats.news().then((n) => (app.news = n)).catch(() => {})
   api.listVersions().then((v) => (app.versions = v)).catch((e) => notify(t('Version list unavailable: {error}', { error: e })))
   modrinth

@@ -113,6 +113,16 @@
         <span class="track"></span>
       </label>
     </div>
+    <div class="item">
+      <div class="txt">
+        <div class="n">{t('Check for updates')}</div>
+        <div class="d">{t('Looks on GitHub for a new version when the launcher starts.')}</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" bind:checked={app.settings.checkUpdates} onchange={saveSettings} aria-label={t('Check for updates')} />
+        <span class="track"></span>
+      </label>
+    </div>
   </section>
 
   <section class="group">

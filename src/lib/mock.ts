@@ -74,6 +74,8 @@ export async function mock(cmd: string, args: Record<string, unknown>): Promise<
     }
     case 'microsoft_login_cancel':
       return null
+    case 'check_update':
+      return new URLSearchParams(location.search).has('update') ? { version: '9.9.9', url: 'https://github.com/blackowlzz/PiumaLauncher/releases' } : null
     case 'thumbnail':
       return String(args.url)
     case 'list_mc_versions':
@@ -175,7 +177,7 @@ export async function mock(cmd: string, args: Record<string, unknown>): Promise<
       let lang: string | null = null
       try { saved = JSON.parse(localStorage.getItem('mock-settings') ?? '{}'); lang = localStorage.getItem('mock-lang') } catch {  }
       return {
-        theme: 'system', uiScale: 'auto', minimizeOnLaunch: false, defaultMemoryMaxMb: 2048,
+        theme: 'system', uiScale: 'auto', minimizeOnLaunch: false, checkUpdates: true, defaultMemoryMaxMb: 2048,
         defaultMemoryMinMb: 512, defaultFlagProfile: 'balanced', lookupSkins: true, reduceEffects: false, smoothScroll: true, ...saved,
         ...{ language: forced ?? (fresh ? null : lang) },
       }

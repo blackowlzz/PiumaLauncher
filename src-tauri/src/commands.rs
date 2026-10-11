@@ -14,6 +14,7 @@ use crate::settings;
 use crate::storage;
 use crate::skin;
 use crate::thumb;
+use crate::update;
 use crate::stats::{self, Session};
 use crate::library;
 use crate::loaders::{self, Loader};
@@ -307,6 +308,14 @@ pub fn restart_app(app: AppHandle) {
 #[tauri::command]
 pub async fn version_images() -> Result<std::collections::HashMap<String, String>> {
     news::version_images(&net::client()).await
+}
+
+#[tauri::command]
+pub async fn check_update() -> Option<update::UpdateInfo> {
+    if !settings::load().check_updates {
+        return None;
+    }
+    update::check(&net::client()).await
 }
 
 #[tauri::command]

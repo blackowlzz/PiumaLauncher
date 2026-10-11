@@ -20,6 +20,7 @@ mod skin;
 mod stats;
 mod storage;
 mod thumb;
+mod update;
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -91,6 +92,7 @@ pub fn run() {
             commands::get_settings,
             commands::fetch_skin,
             commands::thumbnail,
+            commands::check_update,
             commands::save_settings,
             commands::storage_info,
             commands::delete_runtime,
