@@ -30,7 +30,8 @@ PiumaLauncher is a fast, lightweight and open source Minecraft launcher for Wind
 
 **Interface**
 - Dark and light themes, a reduced-effects option and smooth scrolling
-- Available in English, Italian, Spanish, French, German and Portuguese
+- Available in 16 languages: English, Italian, Spanish, French, German, Portuguese, Albanian, Hungarian, Russian, Bulgarian, Ukrainian, Polish, Romanian, Serbian, Greek and Turkish
+- Tells you when a new version is out, so you can download it from the Releases page
 - Home page with weekly playtime and the latest Minecraft news
 
 ## Installation
@@ -68,6 +69,7 @@ You don't need to install Java. PiumaLauncher downloads Minecraft, its libraries
 - Sign-in tokens stay on your computer, in `microsoft.json` (owner-only permissions on Linux). They are not shown in the interface.
 - The game receives its access token through a private channel instead of the command line, so it does not appear in process lists or crash reports.
 - Downloads are limited to Mojang, Modrinth and the official Java distributors, and file checksums are verified.
+- At startup the launcher asks GitHub whether a newer release exists. Nothing else is sent, and you can turn it off in Settings under General.
 
 ## FAQ
 
@@ -76,6 +78,9 @@ In `~/.local/share/PiumaLauncher` on Linux and `%APPDATA%\PiumaLauncher` on Wind
 
 **Can I play on online servers with an offline account?**
 No. Servers that check accounts require a Microsoft sign-in. Offline accounts are for single player and offline servers.
+
+**How do I update?**
+When a new version is available, a banner appears at the top of the launcher with a Download button. Install the new version over the old one: your instances, accounts and settings are kept.
 
 **Does it support Forge or NeoForge?**
 Not yet. Fabric and Quilt are supported, and Quilt does not support Minecraft 26.x yet because its loader doesn't.
@@ -97,7 +102,7 @@ npm run tauri build
 
 ## Translating
 
-Interface texts are written in English and used as keys, for example `t('Library')`. To add a language, copy `src/lib/lang/it.ts`, translate the values and register it in `src/lib/i18n.svelte.ts`. Missing entries fall back to English.
+Interface texts are written in English and used as keys, for example `t('Library')`. To add a language, copy `src/lib/lang/it.ts`, translate the values and register it in `src/lib/i18n.svelte.ts`. Missing entries fall back to English. Translations can contain mistakes, so fixes are welcome.
 
 ## License
 
