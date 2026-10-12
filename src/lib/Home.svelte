@@ -4,6 +4,7 @@
   import Cover from './Cover.svelte'
   import Count from './Count.svelte'
   import Icon from './Icon.svelte'
+  import InstanceMenu from './InstanceMenu.svelte'
   import ProjectCard from './ProjectCard.svelte'
   import Strip from './Strip.svelte'
   import { reveal, spotlight } from './actions'
@@ -18,18 +19,15 @@
   const busy = $derived(isBusy(inst?.id ?? null))
   const samples = $derived(inst ? (app.stats[inst.id] ?? []) : [])
   const ram = $derived(running && samples.length ? samples[samples.length - 1] : null)
-  const others = $derived(app.instances.filter((i) => i.id !== inst?.id))
+  const shownInstances = $derived(app.instances.slice(0, 8))
   const account = $derived(activeAccount())
   const week = $derived(weeklyPlaytime())
   const weekTotal = $derived(week.reduce((n, d) => n + d.secs, 0))
   const weekMax = $derived(Math.max(1, ...week.map((d) => d.secs)))
-  const hour = new Date().getHours()
-  const greeting = $derived(hour < 6 ? t('Good night') : hour < 13 ? t('Good morning') : hour < 19 ? t('Good afternoon') : t('Good evening'))
   const dayName = (d: Date) => d.toLocaleDateString(locale(), { weekday: 'short' }).replace('.', '')
   const isToday = (d: Date) => d.toDateString() === new Date().toDateString()
   const words = $derived((inst?.name ?? t('Your Minecraft, lightweight.')).split(/\s+/))
-  const lead = $derived(app.news.find((n) => n.imageUrl) ?? app.news[0])
-  const rest = $derived(app.news.filter((n) => n !== lead).slice(0, 3))
+  const headlines = $derived(app.news.slice(0, 4))
 
   const slides = $derived(app.featured.filter((h) => h.bannerUrl).slice(0, 6))
   let slideIdx = $state(0)
@@ -70,17 +68,18 @@
     <div class="scrim"></div>
   </div>
   <div class="copy">
-    <p class="greet" use:reveal>{inst ? greeting : t('Welcome')}{account ? `, ${account.name}` : ''}</p>
+    <p class="greet" use:reveal>{#if inst}{t('Your instance')}{:else}{t('Welcome')}{account ? `, ${account.name}` : ''}{/if}</p>
     {#key inst?.id ?? 'none'}
-      <h1 class="display" aria-label={words.join(' ')}>
+      <h1 class="title" aria-label={words.join(' ')}>
         {#each words as w, i}<span class="w" aria-hidden="true"><span style:--i={i}>{w}</span></span>{' '}{/each}
       </h1>
     {/key}
 
     {#if inst}
       <ul class="facts" use:reveal={3}>
-        <li>Minecraft {inst.mcVersion}{inst.loader !== 'vanilla' ? ` · ${loaderNames[inst.loader]}` : ''}</li>
-        <li>{inst.memoryMaxMb} MB · {profileName(inst.flagProfile)}</li>
+        <li><Icon name="box" size={16} />Minecraft {inst.mcVersion}</li>
+        {#if inst.loader !== 'vanilla'}<li><Icon name="wrench" size={16} />{loaderNames[inst.loader]}</li>{/if}
+        <li><Icon name="cpu" size={16} />{inst.memoryMaxMb} MB · {profileName(inst.flagProfile)}</li>
         {#if ram !== null}<li class="live"><span class="dot"></span>{t('RAM in use: {ram} MB', { ram })}</li>{/if}
       </ul>
       <div class="cta" use:reveal={4}>
@@ -91,7 +90,7 @@
             <span class="ic"><Icon name="play" size={15} /></span>{game?.state === 'preparing' ? t('Preparing…') : t('Play')}
           </button>
         {/if}
-        <button class="big glass" onclick={() => openInstance(inst.id)}>{t('Details')}</button>
+        <button class="big glass" onclick={() => openInstance(inst.id)}><Icon name="settings" size={16} />{t('Manage instance')}</button>
       </div>
     {:else}
       <p class="lead" use:reveal={3}>{t('Create an instance or install a modpack: the launcher downloads the right Java for you.')}</p>
@@ -118,7 +117,7 @@
 <div class="cols">
   <div class="main">
     {#if app.featured.length}
-      <Strip title={t('Popular modpacks')} action={t('Explore all')} onAction={() => (app.page = 'explore')} cols="minmax(250px, 290px)">
+      <Strip icon="flame" title={t('Popular modpacks')} action={t('View all')} onAction={() => (app.page = 'explore')} cols="minmax(236px, 262px)">
         {#each app.featured as h, n (h.projectId)}
           <div use:reveal={n}>
             <ProjectCard hit={h} busy={app.installingId === h.projectId} disabled={app.installingId !== null} onInstall={() => installModpack(h.projectId, undefined, h.latestMc)} onOpen={() => openProject(h)} />
@@ -127,55 +126,62 @@
       </Strip>
     {/if}
 
-    {#if others.length}
-      <Strip title={t('Your instances')} action={t('See all')} onAction={() => (app.page = 'library')} cols="minmax(210px, 240px)">
-        {#each others as i, n (i.id)}
-          <button class="mini" use:spotlight use:reveal={n} onclick={() => openInstance(i.id)}>
-            <span class="thumb"><Cover inst={i} /></span>
-            <span class="mt">
-              <span class="mn">{i.name}</span>
-              <span class="muted small">{i.mcVersion}{i.loader !== 'vanilla' ? ` · ${loaderNames[i.loader]}` : ''}</span>
-            </span>
-          </button>
-        {/each}
-      </Strip>
+    {#if shownInstances.length}
+      <section>
+        <div class="shead">
+          <h2><Icon name="box" size={20} />{t('Your instances')}</h2>
+          <button class="ghost" onclick={() => (app.page = 'library')}>{t('View all')} →</button>
+        </div>
+        <div class="inst">
+          {#each shownInstances as i, n (i.id)}
+            {@const g = app.games[i.id]}
+            <div class="mini" class:sel={i.id === inst?.id} use:spotlight use:reveal={n}>
+              <button class="thumb" onclick={() => openInstance(i.id)} aria-label={t('Open {name}', { name: i.name })}><Cover inst={i} /></button>
+              <div class="mt">
+                <span class="mn">{i.name}</span>
+                <span class="muted small">{i.mcVersion}{i.loader !== 'vanilla' ? ` · ${loaderNames[i.loader]}` : ''}</span>
+                {#if g?.state === 'running'}
+                  <button class="sm stopb" onclick={() => stop(i.id)}>{t('Stop')}</button>
+                {:else}
+                  <button class="sm playb" onclick={() => play(i.id)} disabled={isBusy(i.id)}><Icon name="play" size={12} />{g?.state === 'preparing' ? t('Preparing…') : t('Play')}</button>
+                {/if}
+              </div>
+              <InstanceMenu inst={i} />
+            </div>
+          {/each}
+        </div>
+      </section>
     {/if}
   </div>
 
   <aside class="side">
     <section class="panel" use:reveal={1}>
-      <div class="phead"><h2>{t('Playtime')}</h2><span class="muted small">{t('Last 7 days')}</span></div>
+      <div class="phead"><h2><Icon name="clock" size={18} />{t('Playtime')}</h2><span class="muted small">{t('Last 7 days')}</span></div>
       <div class="total"><Count value={weekTotal} format={(n) => formatDuration(n)} /></div>
       <div class="bars" role="img" aria-label={t('Playtime over the last 7 days')}>
         {#each week as d, i}
-          <div class="bar" class:today={isToday(d.date)} title="{d.date.toLocaleDateString(locale())} · {formatDuration(d.secs)}">
+          <div class="bar" class:today={isToday(d.date)} class:l={i < 2} class:r={i > 4}>
             <div class="col"><div class="fill" style:--h="{d.secs ? Math.max(6, (d.secs / weekMax) * 100) : 0}%" style:--i={i}></div></div>
             <span class="lab">{dayName(d.date)}</span>
+            <span class="tip" role="tooltip"><span class="td">{d.date.toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'short' })}</span><span class="tv">{d.secs ? formatDuration(d.secs) : t('No playtime')}</span></span>
           </div>
         {/each}
       </div>
       {#if !weekTotal}<p class="muted small">{t('The chart fills in after your first game.')}</p>{/if}
     </section>
 
-    {#if lead}
-      <section class="newsblock" use:reveal={2}>
-        <h2 class="nh">{t('Minecraft news')}</h2>
-        <article class="feat">
-          {#if lead.imageUrl}<img use:thumb={{ src: lead.imageUrl, w: 960 }} alt="" decoding="async" />{/if}
-          <div class="veil"></div>
-          <div class="ft">
-            <div class="ftt">{lead.title}</div>
-            <div class="fts">{relativeTime(Date.parse(lead.date))} · {lead.kind === 'release' ? 'Release' : 'Snapshot'}</div>
-          </div>
-        </article>
+    {#if headlines.length}
+      <section class="panel newsblock" use:reveal={2}>
+        <div class="phead"><h2><Icon name="news" size={18} />{t('Minecraft news')}</h2></div>
         <ul class="news">
-          {#each rest as n}
+          {#each headlines as n}
             <li>
-              {#if n.imageUrl}<img use:thumb={{ src: n.imageUrl, w: 160 }} alt="" width="56" height="56" decoding="async" />{:else}<span class="nph"></span>{/if}
-              <div>
+              {#if n.imageUrl}<img use:thumb={{ src: n.imageUrl, w: 200 }} alt="" width="64" height="64" decoding="async" />{:else}<span class="nph"></span>{/if}
+              <div class="grow">
                 <div class="nt">{n.title}</div>
                 <div class="muted small">{relativeTime(Date.parse(n.date))} · {n.kind === 'release' ? 'Release' : 'Snapshot'}</div>
               </div>
+              <span class="go"><Icon name="chevron" size={15} /></span>
             </li>
           {/each}
         </ul>
@@ -185,73 +191,87 @@
 </div>
 
 <style>
-  .hero { position: relative; display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; min-height: 440px; padding: 44px; border-radius: 30px; overflow: hidden; border: 1px solid var(--line); flex: none; color: #fff; isolation: isolate; }
+  .hero { position: relative; display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; min-height: 270px; padding: 34px 38px; border-radius: 22px; overflow: hidden; border: 1px solid var(--line); flex: none; color: #fff; isolation: isolate; }
   .bg { position: absolute; inset: 0; z-index: -1; overflow: hidden; background: #000; }
   .slide { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 1600ms ease; }
   .slide.on { opacity: 1; }
   .credit { position: relative; align-self: flex-end; display: grid; gap: 2px; justify-items: end; text-align: right; }
   .ct { font-size: 15px; font-weight: 600; letter-spacing: -0.02em; }
   .cb { font-size: 12px; opacity: 0.7; margin-bottom: 10px; }
-  .scrim { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0, 0, 0, 0.86) 0%, rgba(0, 0, 0, 0.55) 45%, rgba(0, 0, 0, 0.1) 100%), linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent 45%); }
+  .scrim { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0, 0, 0, 0.82) 0%, rgba(0, 0, 0, 0.45) 50%, rgba(0, 0, 0, 0.05) 100%), linear-gradient(to top, rgba(0, 0, 0, 0.6), transparent 50%); }
   .hero:not(.photo) .scrim { background: linear-gradient(90deg, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.25) 50%, transparent 100%); }
   .hero :global(.art) { background: #000; color: #fff; --fade: #000; --glow: 255, 255, 255; }
-  .greet { font-size: 19px; font-weight: 500; letter-spacing: -0.02em; color: rgba(255, 255, 255, 0.82); }
-  .hero .facts { color: rgba(255, 255, 255, 0.72); }
+  .greet { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255, 255, 255, 0.75); }
+  .title { font-size: clamp(30px, 3.4vw, 46px); font-weight: 650; letter-spacing: -0.04em; line-height: 1.05; }
+  .hero .facts { color: rgba(255, 255, 255, 0.85); }
   .hero .live { color: #fff; }
   .hero .dot { background: #fff; }
   .hero button { --text: #fff; --line-strong: rgba(255, 255, 255, 0.35); --faint: rgba(255, 255, 255, 0.6); }
-  .hero button.primary { background: #fff; color: #000; border-color: #fff; }
-  .glass { background: rgba(255, 255, 255, 0.1); color: #fff; }
+  .hero button.primary { background: var(--inv-bg); color: var(--inv-text); border-color: var(--inv-bg); }
+  .glass { background: rgba(255, 255, 255, 0.1); color: #fff; backdrop-filter: blur(6px); }
   .glass:hover:not(:disabled) { background: rgba(255, 255, 255, 0.2); }
-  .copy { display: grid; gap: 22px; max-width: 760px; min-width: 0; align-content: end; }
+  .copy { display: grid; gap: 14px; max-width: 760px; min-width: 0; align-content: end; }
   .w { display: inline-block; overflow: hidden; vertical-align: top; padding: 0 0.04em 0.12em 0; margin-bottom: -0.12em; }
   .w > span { display: inline-block; transform: translateY(108%); animation: up 950ms var(--spring) forwards; animation-delay: calc(var(--i) * 90ms + 120ms); }
   @keyframes up { to { transform: none; } }
-  .facts { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; color: var(--muted); font-size: 15px; }
+  .facts { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 22px; color: var(--muted); font-size: 14px; }
+  .facts li { display: inline-flex; align-items: center; gap: 8px; }
   .live { display: inline-flex; align-items: center; gap: 8px; color: var(--text); }
   .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text); animation: pulse 1.4s infinite; }
   @keyframes pulse { 50% { opacity: 0.25; } }
-  .lead { font-size: 16px; max-width: 460px; line-height: 1.5; color: rgba(255, 255, 255, 0.75); }
-  .cta { display: flex; flex-wrap: wrap; gap: 12px; }
+  .lead { font-size: 15px; max-width: 460px; line-height: 1.5; color: rgba(255, 255, 255, 0.75); }
+  .cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 4px; }
   .cta button { display: inline-flex; align-items: center; gap: 9px; }
+  .cta .big { padding: 12px 30px; }
   .ic { display: inline-grid; }
   .cta .primary:not(:disabled)::after { animation: glint 5s ease-in-out 2s infinite; }
   .cta .primary:not(:disabled):hover::after { animation: none; }
   @keyframes glint { 0%, 70% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
 
-  .cols { display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: 28px; align-items: start; }
-  .main { display: grid; grid-template-columns: minmax(0, 1fr); gap: 34px; min-width: 0; }
+  .cols { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 26px; align-items: start; }
+  .main { display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; min-width: 0; }
   .side { display: grid; gap: 16px; }
-  .phead { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
-  .phead h2 { margin: 0; font-size: 14px; font-weight: 600; color: var(--text); }
+  .shead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .shead h2 { margin: 0; display: flex; align-items: center; gap: 10px; color: var(--text); font-size: 18px; font-weight: 600; letter-spacing: -0.03em; }
+  .phead { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+  .phead h2 { margin: 0; display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 600; color: var(--text); }
+  .panel { border-radius: 18px; }
   .total { font-size: 34px; font-weight: 650; letter-spacing: -0.05em; }
   .bars { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-top: 14px; }
-  .bar { display: grid; gap: 6px; justify-items: center; }
-  .col { height: 76px; width: 100%; display: flex; align-items: flex-end; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
-  .fill { width: 100%; height: var(--h); background: var(--faint); border-radius: 999px; transform-origin: bottom; animation: grow 900ms var(--spring) both; animation-delay: calc(var(--i) * 60ms + 300ms); }
+  .bar { position: relative; display: grid; gap: 6px; justify-items: center; cursor: default; }
+  .bar:hover .fill { background: var(--inv-bg); }
+  .bar:hover .lab { color: var(--text); }
+  .tip { position: absolute; bottom: calc(100% + 8px); left: 50%; z-index: 5; display: grid; gap: 1px; white-space: nowrap; padding: 7px 11px; border-radius: 10px; background: var(--inv-bg); color: var(--inv-text); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); opacity: 0; transform: translate(-50%, 4px); pointer-events: none; transition: opacity 140ms ease, transform 180ms var(--spring); }
+  .bar.l .tip { left: 0; transform: translate(0, 4px); }
+  .bar.r .tip { left: auto; right: 0; transform: translate(0, 4px); }
+  .bar:hover .tip { opacity: 1; transform: translate(-50%, 0); }
+  .bar.l:hover .tip, .bar.r:hover .tip { transform: none; }
+  .td { font-size: 11px; opacity: 0.7; text-transform: capitalize; }
+  .tv { font-size: 13px; font-weight: 650; }
+  .col { height: 84px; width: 100%; display: flex; align-items: flex-end; border-radius: 6px; overflow: hidden; }
+  .fill { width: 100%; height: var(--h); background: var(--faint); border-radius: 5px; transform-origin: bottom; animation: grow 900ms var(--spring) both; animation-delay: calc(var(--i) * 60ms + 300ms); }
   @keyframes grow { from { transform: scaleY(0); } }
-  .bar.today .fill { background: var(--text); }
+  .bar.today .fill { background: var(--inv-bg); }
   .lab { font-size: 11px; color: var(--muted); text-transform: capitalize; }
   .bar.today .lab { color: var(--text); }
-  .newsblock { display: grid; gap: 14px; }
-  .nh { margin: 0; font-size: 14px; font-weight: 600; color: var(--text); }
-  .feat { position: relative; aspect-ratio: 16 / 10; border-radius: 22px; overflow: hidden; isolation: isolate; color: #fff; border: 1px solid var(--line); background: #0a0a0a; }
-  .feat img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2; }
-  .veil { position: absolute; inset: 0; z-index: -1; background: linear-gradient(to top, rgba(0, 0, 0, 0.92), rgba(0, 0, 0, 0.1) 65%); }
-  .ft { position: absolute; left: 16px; right: 16px; bottom: 14px; display: grid; gap: 2px; }
-  .ftt { font-size: 18px; font-weight: 650; letter-spacing: -0.03em; line-height: 1.15; }
-  .fts { font-size: 12px; opacity: 0.7; }
-  .news { list-style: none; padding: 0; margin: 0; display: grid; gap: 14px; }
-  .news li { display: flex; gap: 12px; align-items: center; }
-  .news img, .nph { width: 56px; height: 56px; border-radius: 14px; object-fit: cover; flex: none; background: var(--surface-2); }
-  .nt { font-size: 13px; font-weight: 500; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .news { list-style: none; padding: 0; margin: 0; display: grid; }
+  .news li { display: flex; gap: 14px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
+  .news li:first-child { border-top: 0; padding-top: 2px; }
+  .news li:last-child { padding-bottom: 0; }
+  .news img, .nph { width: 64px; height: 64px; border-radius: 12px; object-fit: cover; flex: none; background: var(--surface-2); }
+  .nt { font-size: 13.5px; font-weight: 600; line-height: 1.35; margin-bottom: 6px; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .go { color: var(--faint); display: inline-grid; }
 
-  .mini { display: flex; align-items: center; gap: 12px; text-align: left; padding: 10px; border-radius: 20px; background: var(--surface); border-color: var(--line); }
-  .mini:hover:not(:disabled) { background: var(--surface); border-color: var(--line-strong); }
-  .thumb { position: relative; width: 52px; height: 52px; border-radius: 14px; overflow: hidden; flex: none; display: grid; place-items: center; border: 1px solid var(--line); }
-  .mt { display: grid; min-width: 0; }
-  .mn { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .inst { display: grid; grid-template-columns: repeat(auto-fill, minmax(236px, 1fr)); gap: 14px; }
+  .mini { display: flex; align-items: flex-start; gap: 12px; padding: 12px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); transition: border-color var(--ease); }
+  .mini:hover { border-color: var(--line-strong); }
+  .mini.sel { border-color: var(--inv-bg); }
+  .thumb { position: relative; width: 56px; height: 56px; padding: 0; border-radius: 12px; overflow: hidden; flex: none; display: grid; place-items: center; }
+  .mt { display: grid; gap: 2px; min-width: 0; flex: 1; justify-items: start; }
+  .mn { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .sm { display: inline-flex; align-items: center; gap: 6px; padding: 5px 16px; margin-top: 8px; font-size: 13px; }
+  .playb { background: var(--surface-2); }
 
   @media (max-width: 1150px) { .cols { grid-template-columns: minmax(0, 1fr); } }
-  @media (max-width: 900px) { .credit { display: none; } .hero { min-height: 300px; } }
+  @media (max-width: 900px) { .credit { display: none; } .hero { min-height: 240px; } }
 </style>

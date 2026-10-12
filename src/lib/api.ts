@@ -92,6 +92,8 @@ export const api = {
   removeAccount: (id: string) => call<void>('remove_account', { id }),
   setActiveAccount: (id: string) => call<void>('set_active_account', { id }),
   detectJava: () => call<JavaInstall[]>('detect_java'),
+  listRuntimes: () => call<RuntimeEntry[]>('list_runtimes'),
+  installRuntime: (flavor: string, major: number) => call<JavaInstall>('install_runtime', { flavor, major }),
   launch: (id: string) => call<void>('launch_instance', { id }),
   stop: (id: string) => call<void>('stop_instance', { id }),
   running: () => call<string[]>('running_instances'),
@@ -272,6 +274,7 @@ export interface Settings {
   smoothScroll: boolean
   checkUpdates: boolean
   discordPresence: boolean
+  preferredJava: string | null
 }
 
 export const defaultSettings = (): Settings => ({
@@ -287,7 +290,18 @@ export const defaultSettings = (): Settings => ({
   smoothScroll: true,
   checkUpdates: true,
   discordPresence: true,
+  preferredJava: null,
 })
+
+export interface RuntimeEntry {
+  id: string
+  flavor: string
+  label: string
+  major: number
+  installed: boolean
+  version: string | null
+  path: string | null
+}
 
 export interface StorageInfo {
   root: string

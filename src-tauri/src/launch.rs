@@ -191,7 +191,14 @@ async fn start(app: &AppHandle, inst: &Instance, acc: &Account) -> Result<(Child
             .await
             .ok_or_else(|| Error::msg(format!("The selected Java doesn't work: {p}")))?,
         None => {
-            let managed = runtime::ensure(&client, required, &progress).await;
+            let chosen = match settings::load().preferred_java {
+                Some(id) => runtime::preferred(&id, required).await,
+                None => None,
+            };
+            let managed = match chosen {
+                Some(j) => Ok(Some(j)),
+                None => runtime::ensure(&client, required, &progress).await,
+            };
             match managed {
                 Ok(Some(j)) => j,
                 other => {

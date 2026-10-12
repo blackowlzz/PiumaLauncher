@@ -6,6 +6,7 @@ use crate::accounts::{self, Account, AccountStore};
 use crate::error::{Error, Result};
 use crate::instance::{self, Instance};
 use crate::java::{self, JavaInstall};
+use crate::runtime;
 use crate::microsoft;
 use crate::presence;
 use crate::minecraft::{self, VersionEntry};
@@ -103,6 +104,16 @@ pub fn set_active_account(id: String) -> Result<()> {
 #[tauri::command]
 pub async fn detect_java() -> Vec<JavaInstall> {
     java::detect().await
+}
+
+#[tauri::command]
+pub async fn list_runtimes() -> Vec<runtime::RuntimeEntry> {
+    runtime::catalog().await
+}
+
+#[tauri::command]
+pub async fn install_runtime(app: AppHandle, flavor: String, major: u32) -> Result<JavaInstall> {
+    runtime::install_by_id(&net::client(), &flavor, major, &progress_emitter(&app)).await
 }
 
 #[tauri::command]

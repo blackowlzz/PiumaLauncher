@@ -3,8 +3,9 @@
   import Icon from './Icon.svelte'
   import { t } from './i18n.svelte'
 
-  let { title, action, onAction, cols = 'minmax(250px, 290px)', children }: {
+  let { title, icon, action, onAction, cols = 'minmax(250px, 290px)', children }: {
     title: string
+    icon?: 'flame' | 'box'
     action?: string
     onAction?: () => void
     cols?: string
@@ -34,9 +35,9 @@
 
 <section>
   <div class="head">
-    <h2>{title}</h2>
+    <h2>{#if icon}<Icon name={icon} size={20} />{/if}{title}</h2>
     <div class="ctl">
-      {#if action}<button class="ghost" onclick={onAction}>{action}</button>{/if}
+      {#if action}<button class="ghost" onclick={onAction}>{action} →</button>{/if}
       <button class="arrow" onclick={() => page(-1)} disabled={!canPrev} aria-label={t('Previous')}><span class="flip"><Icon name="chevron" size={16} /></span></button>
       <button class="arrow" onclick={() => page(1)} disabled={!canNext} aria-label={t('Next')}><Icon name="chevron" size={16} /></button>
     </div>
@@ -50,7 +51,7 @@
 
 <style>
   .head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-  h2 { margin: 0; color: var(--text); font-size: 18px; font-weight: 600; letter-spacing: -0.03em; }
+  h2 { margin: 0; display: flex; align-items: center; gap: 10px; color: var(--text); font-size: 18px; font-weight: 600; letter-spacing: -0.03em; }
   .ctl { display: flex; align-items: center; gap: 8px; }
   .arrow { display: inline-grid; place-items: center; width: 34px; height: 34px; padding: 0; }
   .flip { display: inline-grid; transform: scaleX(-1); }

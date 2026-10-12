@@ -1,7 +1,7 @@
 
 use std::path::{Component, Path, PathBuf};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
 use crate::java::{self, JavaInstall};
@@ -9,12 +9,20 @@ use crate::net::{self, Check, Job};
 use crate::paths;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Flavor {
+pub enum Flavor {
     Graal,
     Temurin,
 }
 
 impl Flavor {
+    fn parse(slug: &str) -> Option<Flavor> {
+        match slug {
+            "graalvm" => Some(Flavor::Graal),
+            "temurin" => Some(Flavor::Temurin),
+            _ => None,
+        }
+    }
+
     fn slug(self) -> &'static str {
         match self {
             Flavor::Graal => "graalvm",
@@ -130,10 +138,19 @@ pub async fn ensure(
     if target().is_none() {
         return Ok(None);
     }
+    install(client, flavor, major, progress).await.map(Some)
+}
+
+async fn install(
+    client: &reqwest::Client,
+    flavor: Flavor,
+    major: u32,
+    progress: &(dyn Fn(&str, u32, u32) + Sync),
+) -> Result<JavaInstall> {
     let home = home_dir(flavor, major);
     if java_bin(&home).is_file() {
         if let Some(found) = java::probe(&java_bin(&home)).await {
-            return Ok(Some(found));
+            return Ok(found);
         }
     }
 
@@ -172,8 +189,84 @@ pub async fn ensure(
 
     java::probe(&java_bin(&home))
         .await
-        .map(Some)
         .ok_or_else(|| Error::msg("The downloaded Java doesn't start"))
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeEntry {
+    pub id: String,
+    pub flavor: String,
+    pub label: String,
+    pub major: u32,
+    pub installed: bool,
+    pub version: Option<String>,
+    pub path: Option<String>,
+}
+
+const CATALOG: &[(Flavor, u32)] = &[
+    (Flavor::Temurin, 8),
+    (Flavor::Temurin, 17),
+    (Flavor::Temurin, 21),
+    (Flavor::Temurin, 25),
+    (Flavor::Graal, 17),
+    (Flavor::Graal, 21),
+    (Flavor::Graal, 25),
+];
+
+fn supported(flavor: Flavor) -> bool {
+    match target() {
+        None => false,
+        Some((os, arch)) => !(flavor == Flavor::Graal && os == "windows" && arch != "x64"),
+    }
+}
+
+pub fn runtime_id(flavor: Flavor, major: u32) -> String {
+    format!("{}-{major}", flavor.slug())
+}
+
+pub fn is_known_id(id: &str) -> bool {
+    CATALOG.iter().any(|(f, m)| runtime_id(*f, *m) == id)
+}
+
+pub fn home_of(id: &str) -> Option<PathBuf> {
+    is_known_id(id).then(|| paths::runtimes().join(id))
+}
+
+pub async fn catalog() -> Vec<RuntimeEntry> {
+    let probes = CATALOG.iter().filter(|(f, _)| supported(*f)).map(|(f, m)| async move {
+        let bin = java_bin(&home_dir(*f, *m));
+        let found = if bin.is_file() { java::probe(&bin).await } else { None };
+        RuntimeEntry {
+            id: runtime_id(*f, *m),
+            flavor: f.slug().into(),
+            label: f.label().into(),
+            major: *m,
+            installed: found.is_some(),
+            version: found.as_ref().map(|j| j.version.clone()),
+            path: found.map(|j| j.path),
+        }
+    });
+    futures_util::future::join_all(probes).await
+}
+
+pub async fn install_by_id(
+    client: &reqwest::Client,
+    flavor: &str,
+    major: u32,
+    progress: &(dyn Fn(&str, u32, u32) + Sync),
+) -> Result<JavaInstall> {
+    let flavor = Flavor::parse(flavor).ok_or_else(|| Error::msg("unknown Java distribution"))?;
+    if !is_known_id(&runtime_id(flavor, major)) || !supported(flavor) {
+        return Err(Error::msg("this Java isn't available for this system"));
+    }
+    install(client, flavor, major, progress).await
+}
+
+pub async fn preferred(id: &str, required: u32) -> Option<JavaInstall> {
+    let home = home_of(id)?;
+    let found = java::probe(&java_bin(&home)).await?;
+    (found.major >= required).then_some(found)
 }
 
 fn stripped(path: &Path) -> Option<PathBuf> {

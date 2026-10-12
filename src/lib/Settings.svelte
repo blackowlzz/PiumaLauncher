@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { api, type FlagProfile, type StorageInfo } from './api'
-  import { LANGUAGES, i18n, setLanguage, t } from './i18n.svelte'
+  import { api, type FlagProfile, type RuntimeEntry, type StorageInfo } from './api'
+  import { LANGUAGES, i18n, setLanguage, stageText, t } from './i18n.svelte'
   import Select from './Select.svelte'
   import { formatBytes, profiles } from './meta'
   import { app, notify, saveSettings } from './store.svelte'
@@ -9,6 +9,50 @@
   let storage = $state<StorageInfo | null>(null)
   const loadStorage = async () => (storage = await api.storageInfo().catch(() => null))
   onMount(loadStorage)
+
+  let runtimes = $state<RuntimeEntry[]>([])
+  let busyJava = $state<string | null>(null)
+  const loadRuntimes = async () => (runtimes = await api.listRuntimes().catch(() => []))
+  onMount(loadRuntimes)
+
+  const javaNote = (r: RuntimeEntry) =>
+    r.flavor === 'graalvm'
+      ? t('Fast peak performance, ideal for modern versions.')
+      : r.major <= 8
+        ? t('For Minecraft 1.16 and older.')
+        : t('Lightweight and very stable.')
+
+  async function installJava(r: RuntimeEntry) {
+    busyJava = r.id
+    try {
+      await api.installRuntime(r.flavor, r.major)
+      await Promise.all([loadRuntimes(), loadStorage()])
+    } catch (e) {
+      notify(e)
+    } finally {
+      busyJava = null
+      app.install = null
+    }
+  }
+
+  async function removeJava(r: RuntimeEntry) {
+    if (!confirm(t('Delete {name}?', { name: `${r.label} ${r.major}` }))) return
+    try {
+      await api.deleteRuntime(r.id)
+      if (app.settings.preferredJava === r.id) {
+        app.settings.preferredJava = null
+        await saveSettings()
+      }
+      await Promise.all([loadRuntimes(), loadStorage()])
+    } catch (e) {
+      notify(e)
+    }
+  }
+
+  async function setPreferred(r: RuntimeEntry) {
+    app.settings.preferredJava = app.settings.preferredJava === r.id ? null : r.id
+    await saveSettings()
+  }
 
   const total = $derived(storage ? storage.items.reduce((n, i) => n + i.bytes, 0) : 0)
   const label = (key: string) =>
@@ -147,6 +191,41 @@
   </section>
 
   <section class="group">
+    <h2>{t('Java')}</h2>
+    <p class="muted small intro">{t('Install the Java you prefer. The default one is used whenever the game version allows it, otherwise the launcher picks a compatible one on its own.')}</p>
+
+    {#each runtimes as r (r.id)}
+      <div class="item">
+        <div class="txt">
+          <div class="n">
+            {r.label} {r.major}
+            {#if app.settings.preferredJava === r.id}<span class="tag def">{t('Default')}</span>{/if}
+          </div>
+          <div class="d">
+            {#if busyJava === r.id}
+              {app.install ? `${stageText(app.install.stage)}${app.install.total > 0 ? ` · ${Math.round((app.install.done / app.install.total) * 100)}%` : ''}` : t('Installing…')}
+            {:else if r.installed}
+              {r.version} · {javaNote(r)}
+            {:else}
+              {javaNote(r)}
+            {/if}
+          </div>
+        </div>
+        <div class="acts">
+          {#if r.installed}
+            <button class:primary={app.settings.preferredJava !== r.id} onclick={() => setPreferred(r)}>
+              {app.settings.preferredJava === r.id ? t('Remove default') : t('Set as default')}
+            </button>
+            <button class="ghost" onclick={() => removeJava(r)}>{t('Delete')}</button>
+          {:else}
+            <button onclick={() => installJava(r)} disabled={busyJava !== null}>{busyJava === r.id ? t('Installing…') : t('Install')}</button>
+          {/if}
+        </div>
+      </div>
+    {/each}
+  </section>
+
+  <section class="group">
     <h2>{t('Performance')}</h2>
     <div class="item">
       <div class="txt">
@@ -282,6 +361,8 @@
   .u { display: flex; justify-content: space-between; font-size: 14px; padding: 3px 0; }
   .u.tot { margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--line); font-weight: 600; }
   .rt { padding-top: 16px; }
+  .acts { display: flex; gap: 8px; align-items: center; flex: none; }
+  .def { margin-left: 8px; color: var(--text); }
   .danger h2 { color: var(--text); }
 
   .backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.62); z-index: 20; animation: fade 200ms ease both; }

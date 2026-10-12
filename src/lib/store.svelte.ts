@@ -19,7 +19,7 @@ import {
   type VersionEntry,
 } from './api'
 
-export type Page = 'home' | 'library' | 'explore' | 'accounts' | 'instance' | 'settings'
+export type Page = 'home' | 'library' | 'explore' | 'accounts' | 'instance' | 'settings' | 'themes'
 
 const MAX_LOG_LINES = 400
 const MAX_STAT_SAMPLES = 90
@@ -81,7 +81,16 @@ export async function init() {
   await Promise.all([reloadInstances(), reloadAccounts()])
   app.loaded = true
   reloadStats()
-  setTimeout(() => api.checkUpdate().then((u) => (app.update = u)).catch(() => {}), 4000)
+  const checkUpdate = () =>
+    api
+      .checkUpdate()
+      .then((u) => {
+        if (u && u.version !== app.update?.version) app.updateDismissed = false
+        if (u) app.update = u
+      })
+      .catch(() => {})
+  setTimeout(checkUpdate, 4000)
+  setInterval(checkUpdate, 30 * 60 * 1000)
   stats.news().then((n) => (app.news = n)).catch(() => {})
   api.listVersions().then((v) => (app.versions = v)).catch((e) => notify(t('Version list unavailable: {error}', { error: e })))
   modrinth

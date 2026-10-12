@@ -140,7 +140,7 @@ input[type='checkbox'] { width: 16px; height: 16px; accent-color: var(--inv-bg);
 .page > :nth-child(3) { animation-delay: 140ms; }
 .page > :nth-child(4) { animation-delay: 210ms; }
 .page > :nth-child(n + 5) { animation-delay: 280ms; }
-.page { display: flex; flex-direction: column; gap: 22px; min-height: 0; }
+.page { display: flex; flex-direction: column; gap: 22px; flex: none; }
 @keyframes blockin { from { opacity: 0; transform: translateY(18px); } }
 @keyframes chip { from { transform: scale(0.9); } }
 @keyframes shellin { from { opacity: 0; } }

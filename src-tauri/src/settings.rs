@@ -20,6 +20,7 @@ pub struct Settings {
     pub smooth_scroll: bool,
     pub check_updates: bool,
     pub discord_presence: bool,
+    pub preferred_java: Option<String>,
 }
 
 impl Default for Settings {
@@ -37,6 +38,7 @@ impl Default for Settings {
             smooth_scroll: true,
             check_updates: true,
             discord_presence: true,
+            preferred_java: None,
         }
     }
 }
@@ -68,6 +70,9 @@ impl Settings {
         }
         if !matches!(self.ui_scale.as_str(), "auto" | "100" | "125" | "150") {
             self.ui_scale = "auto".into();
+        }
+        if self.preferred_java.as_deref().is_some_and(|id| !crate::runtime::is_known_id(id)) {
+            self.preferred_java = None;
         }
         self.default_memory_max_mb = self.default_memory_max_mb.clamp(512, 65_536);
         self.default_memory_min_mb = self.default_memory_min_mb.clamp(128, self.default_memory_max_mb);

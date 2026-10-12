@@ -4,6 +4,7 @@
   import Icon from './Icon.svelte'
   import { reveal } from './actions'
   import { t } from './i18n.svelte'
+  import InstanceMenu from './InstanceMenu.svelte'
   import NewInstanceModal from './NewInstanceModal.svelte'
   import Select from './Select.svelte'
   import { app, isBusy, isInstalled, openInstance, play, playInfo } from './store.svelte'
@@ -87,6 +88,7 @@
             </div>
           </div>
         </button>
+        <span class="dots"><InstanceMenu {inst} /></span>
         <button class="quick" onclick={() => play(inst.id)} disabled={isBusy(inst.id)} aria-label={t('Play {name}', { name: inst.name })} title={t('Play')}><Icon name="play" size={16} /></button>
       </article>
     {/each}
@@ -102,6 +104,7 @@
           <span class="tag">{inst.mcVersion}</span>
         </button>
         <button onclick={() => play(inst.id)} disabled={isBusy(inst.id)}>{t('Play')}</button>
+        <InstanceMenu {inst} />
       </div>
     {/each}
   </div>
@@ -130,7 +133,8 @@
   .card.sel .open { border-color: var(--text); }
   .cover { --fade: var(--surface); position: relative; overflow: hidden; aspect-ratio: 16 / 9; display: grid; place-items: center; }
   .when { position: absolute; left: 12px; bottom: 10px; display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: #fff; background: rgba(0, 0, 0, 0.55); border-radius: 999px; padding: 3px 10px; }
-  .body { padding: 12px 14px 14px; display: grid; gap: 8px; }
+  .dots { position: absolute; right: 8px; bottom: 8px; }
+  .body { padding: 12px 46px 14px 14px; display: grid; gap: 8px; }
   .title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .live { position: absolute; left: 10px; top: 10px; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; background: var(--bg); border-radius: 999px; padding: 3px 9px; }

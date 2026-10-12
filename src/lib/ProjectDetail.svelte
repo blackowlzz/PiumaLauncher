@@ -5,6 +5,7 @@
   import Icon from './Icon.svelte'
   import LoaderCover from './LoaderCover.svelte'
   import { locale, stageText, t } from './i18n.svelte'
+  import Select from './Select.svelte'
   import { renderMarkdown } from './markdown'
   import { formatBytes, relativeTime } from './meta'
   import { portal } from './actions'
@@ -37,6 +38,36 @@
   const latest = $derived(page?.versions.find((v) => v.kind === 'release') ?? page?.versions[0])
   const chosen = $derived(page?.versions.find((v) => v.id === versionId) ?? latest)
   const isLatest = $derived(!chosen || chosen.id === latest?.id)
+  let vquery = $state('')
+  let vmc = $state('')
+  let vloader = $state('')
+  let vkind = $state('')
+  const cmpVer = (a: string, b: string) => {
+    const x = a.split(/[.\-]/).map((s) => parseInt(s) || 0)
+    const y = b.split(/[.\-]/).map((s) => parseInt(s) || 0)
+    for (let i = 0; i < Math.max(x.length, y.length); i++) if ((y[i] ?? 0) !== (x[i] ?? 0)) return (y[i] ?? 0) - (x[i] ?? 0)
+    return 0
+  }
+  const mcOptions = $derived([...new Set(page?.versions.flatMap((v) => v.mcVersions) ?? [])].sort(cmpVer))
+  const loaderOptions = $derived([...new Set(page?.versions.flatMap((v) => v.loaders) ?? [])].sort())
+  const kindOptions = $derived([...new Set(page?.versions.map((v) => v.kind) ?? [])])
+  const shownVersions = $derived.by(() => {
+    const q = vquery.trim().toLowerCase()
+    return (page?.versions ?? []).filter(
+      (v) =>
+        (!q || `${v.number} ${v.name} ${v.mcVersions.join(' ')} ${v.loaders.join(' ')}`.toLowerCase().includes(q)) &&
+        (!vmc || v.mcVersions.includes(vmc)) &&
+        (!vloader || v.loaders.includes(vloader)) &&
+        (!vkind || v.kind === vkind),
+    )
+  })
+  const filtering = $derived(!!(vquery.trim() || vmc || vloader || vkind))
+  const clearFilters = () => {
+    vquery = ''
+    vmc = ''
+    vloader = ''
+    vkind = ''
+  }
   const body = $derived(page ? renderMarkdown(page.body) : '')
 
   async function load() {
@@ -216,8 +247,25 @@
       {/if}
     {:else if tab === 'versions'}
       {#if page}
-        <div class="table">
-          {#each page.versions as v (v.id)}
+        <div class="vfilters">
+          <label class="vsearch grow">
+            <span class="sr">{t('Search versions')}</span>
+            <span class="field"><Icon name="search" size={16} /><input type="search" bind:value={vquery} placeholder={t('Search versions…')} /></span>
+          </label>
+          <Select bind:value={vmc} width="170px" label={t('Minecraft version')} options={[{ value: '', label: t('All versions') }, ...mcOptions.map((m) => ({ value: m, label: m }))]} />
+          {#if loaderOptions.length > 1}
+            <Select bind:value={vloader} width="150px" label={t('Loader')} options={[{ value: '', label: t('All loaders') }, ...loaderOptions.map((l) => ({ value: l, label: loaderName(l) }))]} />
+          {/if}
+          {#if kindOptions.length > 1}
+            <Select bind:value={vkind} width="140px" label={t('Release type')} options={[{ value: '', label: t('All types') }, ...kindOptions.map((k) => ({ value: k, label: k[0].toUpperCase() + k.slice(1) }))]} />
+          {/if}
+        </div>
+        {#if filtering}<p class="muted small vcount">{t('{n} of {total} versions', { n: shownVersions.length, total: page.versions.length })} · <button class="link" onclick={clearFilters}>{t('Clear filters')}</button></p>{/if}
+        {#if !shownVersions.length}
+          <div class="state"><p class="muted">{t('No version matches.')}</p></div>
+        {/if}
+        <div class="table" class:none={!shownVersions.length}>
+          {#each shownVersions as v (v.id)}
             <div class="tr vrow" class:cur={chosen?.id === v.id}>
               <div class="pt">
                 <div class="n">{v.number}<span class="opt" class:rel={v.kind === 'release'}>{v.kind}</span></div>
@@ -320,6 +368,12 @@
   .gallery figure { margin: 0; display: grid; gap: 6px; }
   .gallery figcaption { font-size: 12px; color: var(--muted); }
   .gallery img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 16px; border: 1px solid var(--line); background: var(--surface-2); }
+  .vfilters { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
+  .vsearch { min-width: 200px; }
+  .vcount { margin: 0 0 10px; }
+  .link { display: inline; padding: 0; border: 0; background: none; color: var(--text); text-decoration: underline; text-underline-offset: 3px; border-radius: 0; }
+  .link:hover:not(:disabled) { background: none; }
+  .table.none { display: none; }
   .vrow { grid-template-columns: minmax(0, 1fr) minmax(0, 150px) auto; }
   .vrow.cur { background: var(--surface-2); }
   .vact { display: flex; gap: 8px; }

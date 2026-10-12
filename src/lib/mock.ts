@@ -194,7 +194,26 @@ export async function mock(cmd: string, args: Record<string, unknown>): Promise<
         ],
         runtimes: [{ name: 'graalvm-21', bytes: 340_000_000 }, { name: 'graalvm-25', bytes: 370_000_000 }],
       }
-    case 'delete_runtime':
+    case 'list_runtimes': {
+      let have: string[] = []
+      try { have = JSON.parse(localStorage.getItem('mock-runtimes') ?? '["graalvm-21"]') } catch {  }
+      return [['temurin', 'Temurin', 8], ['temurin', 'Temurin', 17], ['temurin', 'Temurin', 21], ['temurin', 'Temurin', 25], ['graalvm', 'GraalVM', 17], ['graalvm', 'GraalVM', 21], ['graalvm', 'GraalVM', 25]].map(([flavor, label, major]) => {
+        const id = `${flavor}-${major}`
+        const installed = have.includes(id)
+        return { id, flavor, label, major, installed, version: installed ? `${major}.0.1` : null, path: installed ? `/runtimes/${id}/bin/java` : null }
+      })
+    }
+    case 'install_runtime': {
+      let have: string[] = []
+      try { have = JSON.parse(localStorage.getItem('mock-runtimes') ?? '["graalvm-21"]') } catch {  }
+      await new Promise((r) => setTimeout(r, 900))
+      try { localStorage.setItem('mock-runtimes', JSON.stringify([...have, `${args.flavor}-${args.major}`])) } catch {  }
+      return { path: '', major: args.major, version: `${args.major}.0.1`, isGraal: args.flavor === 'graalvm' }
+    }
+    case 'delete_runtime': {
+      try { localStorage.setItem('mock-runtimes', JSON.stringify((JSON.parse(localStorage.getItem('mock-runtimes') ?? '["graalvm-21"]') as string[]).filter((x) => x !== args.name))) } catch {  }
+      return null
+    }
     case 'reset_data':
     case 'open_data_dir':
       return null
