@@ -150,6 +150,8 @@ input[type='checkbox'] { width: 16px; height: 16px; accent-color: var(--inv-bg);
 
 * { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
 
+:root[data-idle] *, :root[data-idle] *::before, :root[data-idle] *::after { animation-play-state: paused !important; }
+
 :root[data-reduce] *, :root[data-reduce] *::before, :root[data-reduce] *::after { transition: none !important; animation: none !important; }
 :root[data-reduce] .rv { opacity: 1; transform: none; }
 

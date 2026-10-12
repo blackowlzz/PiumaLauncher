@@ -35,13 +35,15 @@
 
   <div class="side left">
     {#if inst}
-      <button class="thumb" onclick={() => openInstance(inst.id)} title={t('Open details')} aria-label={t('Details of {name}', { name: inst.name })}>
-        <Cover {inst} />
-      </button>
+      {#key inst.id}
+        <button class="thumb" onclick={() => openInstance(inst.id)} title={t('Open details')} aria-label={t('Details of {name}', { name: inst.name })}>
+          <Cover {inst} />
+        </button>
+      {/key}
       <div class="pick">
         <InstancePicker />
         <div class="sub muted small" aria-live="polite">
-          {#key status}<span class="st">{status || `${inst.mcVersion}${inst.loader !== 'vanilla' ? ` · ${loaderNames[inst.loader]}` : ''}`}</span>{/key}
+          {#key status}<span class="st">{#if game?.state === 'running'}<span class="dot"></span>{/if}{status || `${inst.mcVersion}${inst.loader !== 'vanilla' ? ` · ${loaderNames[inst.loader]}` : ''}`}</span>{/key}
         </div>
       </div>
     {:else}
@@ -65,12 +67,14 @@
   .top { position: absolute; top: -1px; left: 0; right: 0; border-radius: 0; }
   .side { display: flex; align-items: center; gap: 12px; min-width: 0; }
   .right { justify-content: flex-end; }
-  .thumb { position: relative; width: 48px; height: 48px; padding: 0; border-radius: 14px; overflow: hidden; flex: none; display: grid; place-items: center; }
+  .thumb { position: relative; width: 48px; height: 48px; padding: 0; border-radius: 14px; overflow: hidden; flex: none; display: grid; place-items: center; animation: gopop 320ms var(--spring) backwards; }
   .pick { display: grid; justify-items: start; min-width: 0; }
   .pick :global(.picker) { margin-left: -10px; }
   .sub { padding-left: 0; }
   .sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .st { display: inline-block; max-width: 100%; animation: swapin 300ms var(--spring) backwards; }
+  .dot { display: inline-block; width: 6px; height: 6px; margin-right: 7px; vertical-align: 1px; border-radius: 50%; background: var(--text); animation: pulse 1.4s infinite; }
+  @keyframes pulse { 50% { opacity: 0.25; } }
   .go { animation: gopop 380ms var(--spring) backwards; min-width: 230px; height: 52px; font-size: 16px; letter-spacing: -0.02em; }
   @media (max-width: 900px) { .bar { grid-template-columns: 1fr auto; } .right { display: none; } .go { min-width: 140px; } }
   @media (max-width: 560px) { .bar { padding: 0 12px; } .pick { display: none; } }

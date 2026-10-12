@@ -215,6 +215,9 @@
   .cta { display: flex; flex-wrap: wrap; gap: 12px; }
   .cta button { display: inline-flex; align-items: center; gap: 9px; }
   .ic { display: inline-grid; }
+  .cta .primary:not(:disabled)::after { animation: glint 5s ease-in-out 2s infinite; }
+  .cta .primary:not(:disabled):hover::after { animation: none; }
+  @keyframes glint { 0%, 70% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
 
   .cols { display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: 28px; align-items: start; }
   .main { display: grid; grid-template-columns: minmax(0, 1fr); gap: 34px; min-width: 0; }

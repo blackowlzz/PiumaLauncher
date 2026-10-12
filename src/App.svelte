@@ -99,11 +99,20 @@
   }
 
   onMount(() => {
+    const root = document.documentElement
+    const idle = () => root.toggleAttribute('data-idle', document.hidden || !document.hasFocus())
+    idle()
+    document.addEventListener('visibilitychange', idle)
+    addEventListener('focus', idle)
+    addEventListener('blur', idle)
     const onScheme = () => (systemDark = !scheme.matches)
     scheme.addEventListener('change', onScheme)
     addEventListener('resize', fitScale)
     init().then(maybeBench).catch((e) => notify(t('Startup error: {error}', { error: e })))
     return () => {
+      document.removeEventListener('visibilitychange', idle)
+      removeEventListener('focus', idle)
+      removeEventListener('blur', idle)
       scheme.removeEventListener('change', onScheme)
       removeEventListener('resize', fitScale)
     }

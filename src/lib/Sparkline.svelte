@@ -18,5 +18,6 @@
 </svg>
 
 <style>
-  svg { width: 100%; display: block; }
+  svg { width: 100%; display: block; animation: draw 900ms var(--spring) both; }
+  @keyframes draw { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
 </style>
