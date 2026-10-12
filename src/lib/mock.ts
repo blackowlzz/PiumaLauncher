@@ -178,7 +178,7 @@ export async function mock(cmd: string, args: Record<string, unknown>): Promise<
       try { saved = JSON.parse(localStorage.getItem('mock-settings') ?? '{}'); lang = localStorage.getItem('mock-lang') } catch {  }
       return {
         theme: 'system', uiScale: 'auto', minimizeOnLaunch: false, checkUpdates: true, defaultMemoryMaxMb: 2048,
-        defaultMemoryMinMb: 512, defaultFlagProfile: 'balanced', lookupSkins: true, reduceEffects: false, smoothScroll: true, ...saved,
+        defaultMemoryMinMb: 512, defaultFlagProfile: 'balanced', lookupSkins: true, reduceEffects: false, smoothScroll: true, discordPresence: true, ...saved,
         ...{ language: forced ?? (fresh ? null : lang) },
       }
     }

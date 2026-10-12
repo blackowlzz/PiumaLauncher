@@ -19,6 +19,7 @@ pub struct Settings {
     pub reduce_effects: bool,
     pub smooth_scroll: bool,
     pub check_updates: bool,
+    pub discord_presence: bool,
 }
 
 impl Default for Settings {
@@ -35,6 +36,7 @@ impl Default for Settings {
             reduce_effects: false,
             smooth_scroll: true,
             check_updates: true,
+            discord_presence: true,
         }
     }
 }

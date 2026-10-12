@@ -237,6 +237,8 @@ export const es: Record<string, string> = {
   "Version {v}": "Versión {v}",
   "Open source · GPL-3.0": "Código abierto · GPL-3.0",
   "Delete {name}?": "¿Eliminar {name}?",
+  "Discord Rich Presence": "Rich Presence de Discord",
+  "Shows on your Discord profile that you are using PiumaLauncher, with your player name and whether you are in singleplayer or on a server.": "Muestra en tu perfil de Discord que usas PiumaLauncher, con tu nombre de jugador y si estás en un solo jugador o en un servidor.",
   "Reduce visual effects": "Reducir los efectos visuales",
   "Turns off animations and transitions. Helps on slower computers.": "Desactiva animaciones y transiciones. Ayuda en equipos más lentos.",
   "Minimize": "Minimizar",

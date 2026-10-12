@@ -174,6 +174,16 @@
     <h2>{t('Privacy')}</h2>
     <div class="item">
       <div class="txt">
+        <div class="n">{t('Discord Rich Presence')}</div>
+        <div class="d">{t('Shows on your Discord profile that you are using PiumaLauncher, with your player name and whether you are in singleplayer or on a server.')}</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" bind:checked={app.settings.discordPresence} onchange={saveSettings} aria-label={t('Discord Rich Presence')} />
+        <span class="track"></span>
+      </label>
+    </div>
+    <div class="item">
+      <div class="txt">
         <div class="n">{t('Look up skins on Mojang')}</div>
         <div class="d">{t('Sends the player name you type to Mojang to show its skin. Turn off to use generated skins only.')}</div>
       </div>

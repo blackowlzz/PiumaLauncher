@@ -18,7 +18,7 @@ use crate::instance::Instance;
 use crate::java::{self, JavaInstall};
 use crate::microsoft::{self, Session};
 use crate::minecraft::{rules_allow, Arg, OneOrMany};
-use crate::{net, paths, runtime, settings, stats, Running};
+use crate::{net, paths, presence, runtime, settings, stats, Running};
 
 const SHIM_CLASS: &[u8] = include_bytes!("../shim/PiumaShim.class");
 const TOKEN_PLACEHOLDER: &str = "@@PIUMA_TOKEN@@";
@@ -247,6 +247,7 @@ fn forward_lines<R: AsyncRead + Unpin + Send + 'static>(app: AppHandle, id: Stri
     tauri::async_runtime::spawn(async move {
         let mut lines = BufReader::new(reader).lines();
         while let Ok(Some(line)) = lines.next_line().await {
+            presence::observe(&id, &line);
             let line = match &secret {
                 Some(s) if line.contains(s.as_str()) => line.replace(s.as_str(), "***"),
                 _ => line,
@@ -262,6 +263,7 @@ pub async fn run(app: AppHandle, inst: Instance, acc: Account, mut kill_rx: ones
         Err(e) => emit_state(&app, &id, "error", None, 0, 0, Some(e.to_string()), None),
         Ok((mut child, secret)) => {
             emit_state(&app, &id, "running", None, 0, 0, None, None);
+            presence::start(&id, &acc.name, &inst.mc_version);
             let minimized = settings::load().minimize_on_launch;
             if minimized {
                 if let Some(w) = app.get_webview_window("main") {
@@ -288,6 +290,7 @@ pub async fn run(app: AppHandle, inst: Instance, acc: Account, mut kill_rx: ones
                 }
             };
             done.store(true, Ordering::Relaxed);
+            presence::stop(&id);
             if minimized {
                 if let Some(w) = app.get_webview_window("main") {
                     let _ = w.unminimize();

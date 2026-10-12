@@ -271,6 +271,7 @@ export interface Settings {
   reduceEffects: boolean
   smoothScroll: boolean
   checkUpdates: boolean
+  discordPresence: boolean
 }
 
 export const defaultSettings = (): Settings => ({
@@ -285,6 +286,7 @@ export const defaultSettings = (): Settings => ({
   reduceEffects: false,
   smoothScroll: true,
   checkUpdates: true,
+  discordPresence: true,
 })
 
 export interface StorageInfo {

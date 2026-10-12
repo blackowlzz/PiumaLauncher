@@ -7,6 +7,7 @@ use crate::error::{Error, Result};
 use crate::instance::{self, Instance};
 use crate::java::{self, JavaInstall};
 use crate::microsoft;
+use crate::presence;
 use crate::minecraft::{self, VersionEntry};
 use crate::modrinth::{self, Content, ModFile, SearchResult};
 use crate::news::{self, NewsItem};
@@ -274,7 +275,9 @@ pub fn set_language(code: String) -> Result<()> {
 
 #[tauri::command]
 pub fn save_settings(settings: settings::Settings) -> Result<()> {
-    settings::save(settings)
+    settings::save(settings)?;
+    presence::refresh();
+    Ok(())
 }
 
 #[tauri::command]

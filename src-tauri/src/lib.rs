@@ -14,6 +14,7 @@ mod modrinth;
 mod net;
 mod news;
 mod paths;
+mod presence;
 mod runtime;
 mod settings;
 mod skin;
@@ -56,6 +57,7 @@ pub fn run() {
                     let _ = w.center();
                 }
             }
+            presence::launcher();
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
