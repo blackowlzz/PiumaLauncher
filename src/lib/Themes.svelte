@@ -1,7 +1,7 @@
 <script lang="ts">
   import Icon from './Icon.svelte'
   import { t } from './i18n.svelte'
-  import { COLOR_KEYS, PRESETS, activePalette, choosePreset, onAccent, isCustomized, resetTheme, setColor, themes, type ColorKey, type Palette } from './themes.svelte'
+  import { COLOR_KEYS, PRESETS, activePalette, choosePreset, onAccent, isCustomized, resetTheme, setColor, themes, type ColorKey, type Palette } from './palette.svelte'
 
   const labels: Record<ColorKey, () => string> = {
     bg: () => t('Background'),

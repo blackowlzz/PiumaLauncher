@@ -16,7 +16,7 @@
   import Explore from './lib/Explore.svelte'
   import Settings from './lib/Settings.svelte'
   import Themes from './lib/Themes.svelte'
-  import { applyTheme, isCustomized, resetTheme } from './lib/themes.svelte'
+  import { applyTheme, isCustomized, resetTheme } from './lib/palette.svelte'
   import UpdateBanner from './lib/UpdateBanner.svelte'
   import TitleBar from './lib/TitleBar.svelte'
   import { maybeBench } from './lib/bench'
