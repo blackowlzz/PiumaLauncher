@@ -88,6 +88,7 @@ pub fn run() {
             commands::install_content,
             commands::list_content,
             commands::remove_content,
+            commands::transfer_content,
             commands::content_details,
             commands::update_content,
             commands::modrinth_categories,

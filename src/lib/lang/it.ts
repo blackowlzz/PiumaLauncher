@@ -363,4 +363,10 @@ export const it: Record<string, string> = {
   "Added to new instances. Separate arguments with spaces.": "Aggiunti alle nuove istanze. Separa gli argomenti con uno spazio.",
   "Launcher": "Launcher",
   "This Java is already being installed": "Questo Java è già in installazione",
+  "Copy to…": "Copia in…",
+  "Move to…": "Sposta in…",
+  "No other instance available.": "Nessun'altra istanza disponibile.",
+  "{done} sent to \"{name}\"": "{done} inviati a \"{name}\"",
+  "{done} sent to \"{name}\", {skipped} already there": "{done} inviati a \"{name}\", {skipped} già presenti",
+  "Pick a different instance": "Scegli un'altra istanza",
 }

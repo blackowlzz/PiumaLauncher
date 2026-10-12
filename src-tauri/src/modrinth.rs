@@ -372,6 +372,42 @@ pub fn remove_content(instance_id: &str, kind: Content, file_name: &str) -> Resu
     Ok(())
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TransferResult {
+    pub done: u32,
+    pub skipped: u32,
+}
+
+pub fn transfer_content(from: &str, to: &str, kind: Content, files: &[String], remove_source: bool) -> Result<TransferResult> {
+    instance::check_id(from)?;
+    instance::check_id(to)?;
+    if from == to {
+        return Err(Error::msg("Pick a different instance"));
+    }
+    let dest_dir = paths::game_dir(to).join(kind.folder());
+    std::fs::create_dir_all(&dest_dir)?;
+    let mut result = TransferResult { done: 0, skipped: 0 };
+    for file in files {
+        let src = content_path(from, kind, file)?;
+        let base = file.strip_suffix(".disabled").unwrap_or(file);
+        let exists = dest_dir.join(base).exists() || dest_dir.join(format!("{base}.disabled")).exists();
+        if exists || !src.is_file() {
+            result.skipped += 1;
+            continue;
+        }
+        let dest = dest_dir.join(file);
+        let tmp = dest_dir.join(format!(".{file}.part"));
+        std::fs::copy(&src, &tmp)?;
+        std::fs::rename(&tmp, &dest)?;
+        if remove_source {
+            std::fs::remove_file(&src)?;
+        }
+        result.done += 1;
+    }
+    Ok(result)
+}
+
 pub fn set_mod_enabled(instance_id: &str, file_name: &str, enabled: bool) -> Result<()> {
     let from = content_path(instance_id, Content::Mods, file_name)?;
     let base = file_name.strip_suffix(".disabled").unwrap_or(file_name);

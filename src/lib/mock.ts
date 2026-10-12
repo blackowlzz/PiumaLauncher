@@ -246,6 +246,8 @@ export async function mock(cmd: string, args: Record<string, unknown>): Promise<
       return [{ folder: 'Nuovo mondo', size: 48_000_000, modifiedMs: Date.now() - 3_600_000 }]
     case 'detect_java':
       return [{ path: '/usr/lib/jvm/graalvm/bin/java', major: 25, version: '25.0.4', isGraal: true }]
+    case 'transfer_content':
+      return { done: (args.files as string[]).length, skipped: 0 }
     case 'system_info':
       return { totalMemoryMb: 16384, cpuCores: 8 }
     case 'running_instances':

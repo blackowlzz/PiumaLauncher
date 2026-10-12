@@ -268,6 +268,8 @@ export const modrinth = {
     call<ContentEntry[]>('content_details', { instanceId, kind }),
   updateContent: (instanceId: string, kind: ContentKind, fileName: string) =>
     call<string>('update_content', { instanceId, kind, fileName }),
+  transferContent: (fromId: string, toId: string, kind: ContentKind, files: string[], removeSource: boolean) =>
+    call<{ done: number; skipped: number }>('transfer_content', { fromId, toId, kind, files, removeSource }),
   setModEnabled: (instanceId: string, fileName: string, enabled: boolean) =>
     call<void>('set_mod_enabled', { instanceId, fileName, enabled }),
 }

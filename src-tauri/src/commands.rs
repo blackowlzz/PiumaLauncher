@@ -237,6 +237,11 @@ pub async fn update_content(instance_id: String, kind: Content, file_name: Strin
 }
 
 #[tauri::command]
+pub fn transfer_content(from_id: String, to_id: String, kind: Content, files: Vec<String>, remove_source: bool) -> Result<modrinth::TransferResult> {
+    modrinth::transfer_content(&from_id, &to_id, kind, &files, remove_source)
+}
+
+#[tauri::command]
 pub fn remove_content(instance_id: String, kind: Content, file_name: String) -> Result<()> {
     modrinth::remove_content(&instance_id, kind, &file_name)
 }

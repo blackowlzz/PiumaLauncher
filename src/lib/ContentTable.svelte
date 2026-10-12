@@ -108,6 +108,27 @@
   }
   const toggleAll = (on: boolean) => rows.forEach((e) => (selected[e.fileName] = on))
 
+  let transfer: 'copy' | 'move' | null = $state(null)
+  const targets = $derived(app.instances.filter((i) => i.id !== inst.id && !(kind === 'mods' && i.loader === 'vanilla')))
+
+  async function sendTo(target: Instance) {
+    const mode = transfer
+    const files = chosen.map((e) => e.fileName)
+    transfer = null
+    if (!mode || !files.length) return
+    try {
+      const r = await modrinth.transferContent(inst.id, target.id, kind, files, mode === 'move')
+      if (mode === 'move' && r.done) await load()
+      notify(
+        r.skipped
+          ? t('{done} sent to "{name}", {skipped} already there', { done: r.done, name: target.name, skipped: r.skipped })
+          : t('{done} sent to "{name}"', { done: r.done, name: target.name }),
+      )
+    } catch (e) {
+      notify(e)
+    }
+  }
+
   function browse() {
     app.exploreIntent = { kind: kinds.find((k) => k.id === kind)!.type, targetId: inst.id }
     app.page = 'explore'
@@ -167,6 +188,19 @@
         <button class="sm" onclick={() => bulk((e) => setEnabled(e, true))} disabled={busy}>{t('Enable')}</button>
         <button class="sm" onclick={() => bulk((e) => setEnabled(e, false))} disabled={busy}>{t('Disable')}</button>
         {#if chosen.some((e) => e.update)}<button class="sm" onclick={() => bulk((e) => (e.update ? update(e) : Promise.resolve()))} disabled={busy}>{t('Update')}</button>{/if}
+        <div class="pop">
+          <button class="sm" onclick={() => (transfer = transfer === 'copy' ? null : 'copy')} aria-expanded={transfer === 'copy'}>{t('Copy to…')}</button>
+          <button class="sm" onclick={() => (transfer = transfer === 'move' ? null : 'move')} disabled={busy} aria-expanded={transfer === 'move'}>{t('Move to…')}</button>
+          {#if transfer}
+            <ul class="menu" role="menu" transition:fade={{ duration: 120 }}>
+              {#each targets as i (i.id)}
+                <li><button role="menuitem" onclick={() => sendTo(i)}>{i.name}<span class="muted">{i.mcVersion}</span></button></li>
+              {:else}
+                <li class="none muted">{t('No other instance available.')}</li>
+              {/each}
+            </ul>
+          {/if}
+        </div>
         <button class="sm" onclick={() => bulk(remove)} disabled={busy}>{t('Remove')}</button>
       </div>
     {:else}
@@ -255,6 +289,12 @@
   .act { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
   .upd { background: var(--inv-bg); color: var(--inv-text); border-color: var(--inv-bg); }
   .upd:hover:not(:disabled) { background: var(--inv-bg); border-color: var(--inv-bg); opacity: 0.85; }
+  .pop { position: relative; display: flex; gap: 8px; }
+  .menu { position: absolute; z-index: 30; top: calc(100% + 8px); right: 0; min-width: 240px; max-height: 280px; overflow: auto; margin: 0; padding: 6px; list-style: none; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 14px; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45); }
+  .menu button { display: flex; width: 100%; justify-content: space-between; gap: 16px; border-color: transparent; background: transparent; text-align: left; border-radius: 10px; padding: 9px 12px; }
+  .menu button:hover { background: var(--surface-2); }
+  .menu .none { padding: 10px 12px; font-size: 13px; }
+  .table { overflow: visible; }
   .sm { padding: 6px 14px; font-size: 13px; }
   .empty { padding: 36px 18px; text-align: center; }
   @media (max-width: 900px) { .th, .tr { grid-template-columns: 40px minmax(0, 1fr) auto; } .ver, .th span:nth-child(3) { display: none; } }

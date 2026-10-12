@@ -16,6 +16,7 @@
   import Explore from './lib/Explore.svelte'
   import Settings from './lib/Settings.svelte'
   import Performance from './lib/Performance.svelte'
+  import Intro from './lib/Intro.svelte'
   import Themes from './lib/Themes.svelte'
   import { applyTheme, isCustomized, resetTheme } from './lib/palette.svelte'
   import UpdateBanner from './lib/UpdateBanner.svelte'
@@ -187,6 +188,7 @@
   {/key}
 {/if}
 
+<Intro />
 <Welcome />
 
 <style>

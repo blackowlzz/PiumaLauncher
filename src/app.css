@@ -159,3 +159,6 @@ input[type='checkbox'] { width: 16px; height: 16px; accent-color: var(--inv-bg);
   *, *::before, *::after { transition: none !important; animation: none !important; }
   .rv { opacity: 1; transform: none; }
 }
+
+:root[data-intro], :root[data-intro] * { scrollbar-width: none; }
+:root[data-intro] ::-webkit-scrollbar { display: none; }
