@@ -15,11 +15,13 @@ import {
   type UpdateInfo,
   type GameStateEvent,
   type InstallProgress,
+  type RuntimeEntry,
+  type JavaInstall,
   type Instance,
   type VersionEntry,
 } from './api'
 
-export type Page = 'home' | 'library' | 'explore' | 'accounts' | 'instance' | 'settings' | 'themes'
+export type Page = 'home' | 'library' | 'explore' | 'accounts' | 'instance' | 'settings' | 'themes' | 'performance'
 
 const MAX_LOG_LINES = 400
 const MAX_STAT_SAMPLES = 90
@@ -38,6 +40,8 @@ export const app = $state({
   settings: defaultSettings() as Settings,
   versionImages: {} as Record<string, string>,
   install: null as InstallProgress | null,
+  runtimes: [] as RuntimeEntry[],
+  javaBusy: null as string | null,
   stats: {} as Record<string, number[]>,
   featured: [] as ProjectHit[],
   sessions: [] as Session[],
@@ -219,4 +223,34 @@ export function photoFor(version: string | undefined, seed: string): string | nu
   let h = 0
   for (const c of seed) h = (h * 31 + c.charCodeAt(0)) >>> 0
   return map[keys[h % keys.length]]
+}
+
+export async function reloadRuntimes() {
+  app.runtimes = await api.listRuntimes().catch(() => [] as RuntimeEntry[])
+}
+
+export async function installRuntime(r: RuntimeEntry): Promise<boolean> {
+  if (app.javaBusy) return false
+  app.javaBusy = r.id
+  app.install = null
+  try {
+    await api.installRuntime(r.flavor, r.major)
+    await reloadRuntimes()
+    return true
+  } catch (e) {
+    notify(e)
+    return false
+  } finally {
+    app.javaBusy = null
+    app.install = null
+  }
+}
+
+export async function installedJavas(): Promise<JavaInstall[]> {
+  const [found] = await Promise.all([api.detectJava().catch(() => [] as JavaInstall[]), reloadRuntimes()])
+  const seen = new Set(found.map((j) => j.path))
+  const managed = app.runtimes
+    .filter((r) => r.installed && r.path && !seen.has(r.path))
+    .map((r) => ({ path: r.path!, major: r.major, version: r.version ?? '', isGraal: r.flavor === 'graalvm' }))
+  return [...managed, ...found].sort((a, b) => b.major - a.major)
 }

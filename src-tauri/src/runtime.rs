@@ -260,6 +260,22 @@ pub async fn install_by_id(
     if !is_known_id(&runtime_id(flavor, major)) || !supported(flavor) {
         return Err(Error::msg("this Java isn't available for this system"));
     }
+    static BUSY: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+    struct Slot(String);
+    impl Drop for Slot {
+        fn drop(&mut self) {
+            BUSY.lock().unwrap().retain(|id| *id != self.0);
+        }
+    }
+    let id = runtime_id(flavor, major);
+    {
+        let mut busy = BUSY.lock().unwrap();
+        if busy.contains(&id) {
+            return Err(Error::msg("This Java is already being installed"));
+        }
+        busy.push(id.clone());
+    }
+    let _slot = Slot(id);
     install(client, flavor, major, progress).await
 }
 

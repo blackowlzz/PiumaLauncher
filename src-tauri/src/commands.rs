@@ -106,6 +106,23 @@ pub async fn detect_java() -> Vec<JavaInstall> {
     java::detect().await
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SystemInfo {
+    total_memory_mb: u64,
+    cpu_cores: usize,
+}
+
+#[tauri::command]
+pub fn system_info() -> SystemInfo {
+    let mut sys = sysinfo::System::new();
+    sys.refresh_memory();
+    SystemInfo {
+        total_memory_mb: sys.total_memory() / 1_048_576,
+        cpu_cores: std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1),
+    }
+}
+
 #[tauri::command]
 pub async fn list_runtimes() -> Vec<runtime::RuntimeEntry> {
     runtime::catalog().await

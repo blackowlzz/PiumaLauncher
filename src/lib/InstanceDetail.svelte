@@ -1,7 +1,7 @@
 <script lang="ts">
   import { api, type Instance, type JavaInstall, type World } from './api'
   import { locale, t } from './i18n.svelte'
-  import { app, isBusy, notify, play, reloadInstances, stop } from './store.svelte'
+  import { app, installedJavas, isBusy, notify, play, reloadInstances, stop } from './store.svelte'
   import { formatBytes, loaderNames, profileName, profiles } from './meta'
   import Cover from './Cover.svelte'
   import ContentTable from './ContentTable.svelte'
@@ -19,7 +19,6 @@
   let tab: Tab = $state('overview')
   let worlds: World[] = $state([])
   let javas: JavaInstall[] = $state([])
-  let javasLoaded = false
   let draft: Instance | null = $state(null)
   let busyAction = $state(false)
 
@@ -43,10 +42,7 @@
   $effect(() => {
     void inst?.id
     if (tab === 'worlds') loadWorlds()
-    if (tab === 'settings' && !javasLoaded) {
-      javasLoaded = true
-      api.detectJava().then((j) => (javas = j)).catch(() => {})
-    }
+    if (tab === 'settings') installedJavas().then((j) => (javas = j))
   })
 
   async function attempt(fn: () => Promise<unknown>) {
@@ -187,7 +183,7 @@
           label="Java"
           options={[
             { value: null, label: t('Automatic (the launcher downloads GraalVM/Temurin)') },
-            ...javas.map((j) => ({ value: j.path, label: `Java ${j.major}${j.isGraal ? ' · GraalVM' : ''}`, hint: j.path })),
+            ...javas.map((j) => ({ value: j.path, label: `Java ${j.major} · ${j.isGraal ? 'GraalVM' : 'Temurin/OpenJDK'}`, hint: j.path })),
           ]}
         />
       </label>

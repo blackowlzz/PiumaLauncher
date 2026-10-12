@@ -74,6 +74,7 @@ pub fn run() {
             commands::remove_account,
             commands::set_active_account,
             commands::detect_java,
+            commands::system_info,
             commands::list_runtimes,
             commands::install_runtime,
             commands::launch_instance,

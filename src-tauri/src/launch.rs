@@ -152,7 +152,7 @@ pub fn build_args(prep: &Prepared, inst: &Instance, acc: &Account, session: Opti
     };
 
     let mut args = vec![format!("-Xms{}M", inst.memory_min_mb), format!("-Xmx{}M", inst.memory_max_mb)];
-    args.extend(flags::jvm_flags(inst.flag_profile, java.major));
+    args.extend(flags::launch_flags(inst.flag_profile, &crate::settings::load().tuning, java.major));
     args.extend(inst.extra_jvm_args.split_whitespace().map(String::from));
     args.extend(prep.logging_arg.clone());
     args.extend(version_jvm);

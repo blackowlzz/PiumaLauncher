@@ -2,7 +2,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
-use crate::flags::FlagProfile;
+use crate::flags::{FlagProfile, Tuning};
 use crate::paths;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -21,6 +21,8 @@ pub struct Settings {
     pub check_updates: bool,
     pub discord_presence: bool,
     pub preferred_java: Option<String>,
+    pub default_extra_jvm_args: String,
+    pub tuning: Tuning,
 }
 
 impl Default for Settings {
@@ -39,6 +41,8 @@ impl Default for Settings {
             check_updates: true,
             discord_presence: true,
             preferred_java: None,
+            default_extra_jvm_args: String::new(),
+            tuning: Tuning::default(),
         }
     }
 }
@@ -74,6 +78,8 @@ impl Settings {
         if self.preferred_java.as_deref().is_some_and(|id| !crate::runtime::is_known_id(id)) {
             self.preferred_java = None;
         }
+        self.tuning = self.tuning.sanitized();
+        self.default_extra_jvm_args = self.default_extra_jvm_args.replace(['\n', '\r'], " ").trim().chars().take(1000).collect();
         self.default_memory_max_mb = self.default_memory_max_mb.clamp(512, 65_536);
         self.default_memory_min_mb = self.default_memory_min_mb.clamp(128, self.default_memory_max_mb);
         Ok(self)

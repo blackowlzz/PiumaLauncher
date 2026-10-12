@@ -15,6 +15,7 @@
   import Accounts from './lib/Accounts.svelte'
   import Explore from './lib/Explore.svelte'
   import Settings from './lib/Settings.svelte'
+  import Performance from './lib/Performance.svelte'
   import Themes from './lib/Themes.svelte'
   import { applyTheme, isCustomized, resetTheme } from './lib/palette.svelte'
   import UpdateBanner from './lib/UpdateBanner.svelte'
@@ -22,12 +23,13 @@
   import { maybeBench } from './lib/bench'
   import { smoothScroll } from './lib/smoothscroll'
 
-  const tabs: { id: Page; label: string; icon: 'home' | 'grid' | 'compass' | 'user' | 'settings' | 'palette' }[] = [
+  const tabs: { id: Page; label: string; icon: 'home' | 'grid' | 'compass' | 'user' | 'settings' | 'palette' | 'cpu' }[] = [
     { id: 'home', label: 'Home', icon: 'home' },
     { id: 'library', label: 'Library', icon: 'grid' },
     { id: 'explore', label: 'Explore', icon: 'compass' },
     { id: 'accounts', label: 'Account', icon: 'user' },
     { id: 'themes', label: 'Themes', icon: 'palette' },
+    { id: 'performance', label: 'Performance', icon: 'cpu' },
     { id: 'settings', label: 'Settings', icon: 'settings' },
   ]
   const section = $derived(app.page === 'instance' ? 'library' : app.page)
@@ -73,7 +75,7 @@
     void fitScale()
   })
 
-  const order: Page[] = ['home', 'library', 'explore', 'accounts', 'themes', 'settings']
+  const order: Page[] = ['home', 'library', 'explore', 'accounts', 'themes', 'performance', 'settings']
   async function shortcuts(e: KeyboardEvent) {
     const el = e.target as HTMLElement | null
     const typing = !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
@@ -84,7 +86,7 @@
       app.page = 'explore'
       await tick()
       document.querySelector<HTMLInputElement>('main input[type="search"]')?.focus()
-    } else if (mod && /^[1-6]$/.test(e.key)) {
+    } else if (mod && /^[1-7]$/.test(e.key)) {
       e.preventDefault()
       app.page = order[Number(e.key) - 1]
     }
@@ -160,6 +162,8 @@
             <Accounts />
           {:else if app.page === 'themes'}
             <Themes />
+          {:else if app.page === 'performance'}
+            <Performance />
           {:else if app.page === 'settings'}
             <Settings />
           {:else}

@@ -178,7 +178,7 @@ export async function mock(cmd: string, args: Record<string, unknown>): Promise<
       try { saved = JSON.parse(localStorage.getItem('mock-settings') ?? '{}'); lang = localStorage.getItem('mock-lang') } catch {  }
       return {
         theme: 'system', uiScale: 'auto', minimizeOnLaunch: false, checkUpdates: true, defaultMemoryMaxMb: 2048,
-        defaultMemoryMinMb: 512, defaultFlagProfile: 'balanced', lookupSkins: true, reduceEffects: false, smoothScroll: true, discordPresence: true, ...saved,
+        defaultMemoryMinMb: 512, defaultFlagProfile: 'balanced', lookupSkins: true, reduceEffects: false, smoothScroll: true, discordPresence: true, defaultExtraJvmArgs: '', tuning: { gc: 'auto', pauseMs: 0, gcThreads: 0, preTouch: false, disableExplicitGc: false, stringDedup: false }, ...saved,
         ...{ language: forced ?? (fresh ? null : lang) },
       }
     }
@@ -246,6 +246,8 @@ export async function mock(cmd: string, args: Record<string, unknown>): Promise<
       return [{ folder: 'Nuovo mondo', size: 48_000_000, modifiedMs: Date.now() - 3_600_000 }]
     case 'detect_java':
       return [{ path: '/usr/lib/jvm/graalvm/bin/java', major: 25, version: '25.0.4', isGraal: true }]
+    case 'system_info':
+      return { totalMemoryMb: 16384, cpuCores: 8 }
     case 'running_instances':
       return []
     default:

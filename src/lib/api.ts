@@ -14,6 +14,21 @@ async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> 
 export type Loader = 'vanilla' | 'fabric' | 'quilt'
 
 export type FlagProfile = 'low' | 'balanced' | 'performance' | 'none'
+export type Gc = 'auto' | 'g1' | 'zgc' | 'parallel' | 'serial'
+
+export interface Tuning {
+  gc: Gc
+  pauseMs: number
+  gcThreads: number
+  preTouch: boolean
+  disableExplicitGc: boolean
+  stringDedup: boolean
+}
+
+export interface SystemInfo {
+  totalMemoryMb: number
+  cpuCores: number
+}
 
 export interface Instance {
   id: string
@@ -91,6 +106,7 @@ export const api = {
   microsoftLoginCancel: () => call<void>('microsoft_login_cancel'),
   removeAccount: (id: string) => call<void>('remove_account', { id }),
   setActiveAccount: (id: string) => call<void>('set_active_account', { id }),
+  systemInfo: () => call<SystemInfo>('system_info'),
   detectJava: () => call<JavaInstall[]>('detect_java'),
   listRuntimes: () => call<RuntimeEntry[]>('list_runtimes'),
   installRuntime: (flavor: string, major: number) => call<JavaInstall>('install_runtime', { flavor, major }),
@@ -275,6 +291,8 @@ export interface Settings {
   checkUpdates: boolean
   discordPresence: boolean
   preferredJava: string | null
+  defaultExtraJvmArgs: string
+  tuning: Tuning
 }
 
 export const defaultSettings = (): Settings => ({
@@ -291,6 +309,8 @@ export const defaultSettings = (): Settings => ({
   checkUpdates: true,
   discordPresence: true,
   preferredJava: null,
+  defaultExtraJvmArgs: '',
+  tuning: { gc: 'auto', pauseMs: 0, gcThreads: 0, preTouch: false, disableExplicitGc: false, stringDedup: false },
 })
 
 export interface RuntimeEntry {

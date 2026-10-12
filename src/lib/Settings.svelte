@@ -1,19 +1,16 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { api, type FlagProfile, type RuntimeEntry, type StorageInfo } from './api'
+  import { api, type RuntimeEntry, type StorageInfo } from './api'
   import { LANGUAGES, i18n, setLanguage, stageText, t } from './i18n.svelte'
   import Select from './Select.svelte'
-  import { formatBytes, profiles } from './meta'
-  import { app, notify, saveSettings } from './store.svelte'
+  import { formatBytes } from './meta'
+  import { app, installRuntime, notify, reloadRuntimes, saveSettings } from './store.svelte'
 
   let storage = $state<StorageInfo | null>(null)
   const loadStorage = async () => (storage = await api.storageInfo().catch(() => null))
   onMount(loadStorage)
 
-  let runtimes = $state<RuntimeEntry[]>([])
-  let busyJava = $state<string | null>(null)
-  const loadRuntimes = async () => (runtimes = await api.listRuntimes().catch(() => []))
-  onMount(loadRuntimes)
+  onMount(reloadRuntimes)
 
   const javaNote = (r: RuntimeEntry) =>
     r.flavor === 'graalvm'
@@ -23,16 +20,7 @@
         : t('Lightweight and very stable.')
 
   async function installJava(r: RuntimeEntry) {
-    busyJava = r.id
-    try {
-      await api.installRuntime(r.flavor, r.major)
-      await Promise.all([loadRuntimes(), loadStorage()])
-    } catch (e) {
-      notify(e)
-    } finally {
-      busyJava = null
-      app.install = null
-    }
+    if (await installRuntime(r)) await loadStorage()
   }
 
   async function removeJava(r: RuntimeEntry) {
@@ -43,7 +31,7 @@
         app.settings.preferredJava = null
         await saveSettings()
       }
-      await Promise.all([loadRuntimes(), loadStorage()])
+      await Promise.all([reloadRuntimes(), loadStorage()])
     } catch (e) {
       notify(e)
     }
@@ -170,31 +158,10 @@
   </section>
 
   <section class="group">
-    <h2>{t('New instances')}</h2>
-    <p class="muted small intro">{t('Used when you create a new instance.')}</p>
-
-    <div class="item">
-      <div class="txt"><div class="n">{t('Max RAM (MB)')}</div></div>
-      <input class="num" type="number" min="512" step="256" bind:value={app.settings.defaultMemoryMaxMb} onchange={saveSettings} aria-label={t('Max RAM (MB)')} />
-    </div>
-    <div class="item">
-      <div class="txt"><div class="n">{t('Initial RAM (MB)')}</div></div>
-      <input class="num" type="number" min="128" step="128" bind:value={app.settings.defaultMemoryMinMb} onchange={saveSettings} aria-label={t('Initial RAM (MB)')} />
-    </div>
-    <div class="item">
-      <div class="txt">
-        <div class="n">{t('JVM profile')}</div>
-        <div class="d">{profiles().find((p) => p.id === app.settings.defaultFlagProfile)?.hint}</div>
-      </div>
-      <Select bind:value={app.settings.defaultFlagProfile} width="190px" label={t('JVM profile')} onchange={saveSettings} options={profiles().map((p) => ({ value: p.id, label: p.label }))} />
-    </div>
-  </section>
-
-  <section class="group">
     <h2>{t('Java')}</h2>
     <p class="muted small intro">{t('Install the Java you prefer. The default one is used whenever the game version allows it, otherwise the launcher picks a compatible one on its own.')}</p>
 
-    {#each runtimes as r (r.id)}
+    {#each app.runtimes as r (r.id)}
       <div class="item">
         <div class="txt">
           <div class="n">
@@ -202,7 +169,7 @@
             {#if app.settings.preferredJava === r.id}<span class="tag def">{t('Default')}</span>{/if}
           </div>
           <div class="d">
-            {#if busyJava === r.id}
+            {#if app.javaBusy === r.id}
               {app.install ? `${stageText(app.install.stage)}${app.install.total > 0 ? ` · ${Math.round((app.install.done / app.install.total) * 100)}%` : ''}` : t('Installing…')}
             {:else if r.installed}
               {r.version} · {javaNote(r)}
@@ -218,35 +185,11 @@
             </button>
             <button class="ghost" onclick={() => removeJava(r)}>{t('Delete')}</button>
           {:else}
-            <button onclick={() => installJava(r)} disabled={busyJava !== null}>{busyJava === r.id ? t('Installing…') : t('Install')}</button>
+            <button onclick={() => installJava(r)} disabled={app.javaBusy !== null}>{app.javaBusy === r.id ? t('Installing…') : t('Install')}</button>
           {/if}
         </div>
       </div>
     {/each}
-  </section>
-
-  <section class="group">
-    <h2>{t('Performance')}</h2>
-    <div class="item">
-      <div class="txt">
-        <div class="n">{t('Smooth scrolling')}</div>
-        <div class="d">{t('Eases the mouse wheel for a softer scroll.')}</div>
-      </div>
-      <label class="switch">
-        <input type="checkbox" bind:checked={app.settings.smoothScroll} onchange={saveSettings} aria-label={t('Smooth scrolling')} />
-        <span class="track"></span>
-      </label>
-    </div>
-    <div class="item">
-      <div class="txt">
-        <div class="n">{t('Reduce visual effects')}</div>
-        <div class="d">{t('Turns off animations and transitions. Helps on slower computers.')}</div>
-      </div>
-      <label class="switch">
-        <input type="checkbox" bind:checked={app.settings.reduceEffects} onchange={saveSettings} aria-label={t('Reduce visual effects')} />
-        <span class="track"></span>
-      </label>
-    </div>
   </section>
 
   <section class="group">
@@ -309,7 +252,7 @@
     <h2>{t('Reset launcher')}</h2>
     <div class="item">
       <div class="txt"><div class="d">{t('Delete launcher data. After a restart, the launcher starts as if it were new.')}</div></div>
-      <button onclick={() => (showReset = true)}>{t('Reset…')}</button>
+      <button class="danger-btn" onclick={() => (showReset = true)}>{t('Reset…')}</button>
     </div>
   </section>
 
@@ -340,7 +283,7 @@
     <p class="warn small">{t("This can't be undone. Worlds inside the instances are deleted too.")}</p>
     <div class="row end">
       <button class="ghost" onclick={() => (showReset = false)} disabled={resetting}>{t('Cancel')}</button>
-      <button class="primary" onclick={doReset} disabled={resetting || !anyChosen}>{resetting ? t('Deleting…') : t('Delete and restart')}</button>
+      <button class="danger-btn solid" onclick={doReset} disabled={resetting || !anyChosen}>{resetting ? t('Deleting…') : t('Delete and restart')}</button>
     </div>
   </div>
 {/if}
@@ -364,6 +307,11 @@
   .acts { display: flex; gap: 8px; align-items: center; flex: none; }
   .def { margin-left: 8px; color: var(--text); }
   .danger h2 { color: var(--text); }
+  .danger-btn { color: #e5484d; border-color: rgba(229, 72, 77, 0.55); }
+  .danger-btn:hover:not(:disabled) { background: rgba(229, 72, 77, 0.12); border-color: #e5484d; }
+  .danger-btn.solid { background: #e5484d; border-color: #e5484d; color: #fff; font-weight: 600; }
+  .danger-btn.solid:hover:not(:disabled) { background: #d23c41; border-color: #d23c41; }
+  .danger-btn.solid:disabled { background: var(--surface-2); border-color: var(--line); color: var(--faint); }
 
   .backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.62); z-index: 20; animation: fade 200ms ease both; }
   @keyframes fade { from { opacity: 0; } }

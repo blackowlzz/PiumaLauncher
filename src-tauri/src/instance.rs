@@ -116,7 +116,7 @@ pub fn create(
         memory_min_mb: defaults.default_memory_min_mb,
         flag_profile: defaults.default_flag_profile,
         java_path: None,
-        extra_jvm_args: String::new(),
+        extra_jvm_args: defaults.default_extra_jvm_args.clone(),
         icon_url: None,
         banner_url: None,
     };
