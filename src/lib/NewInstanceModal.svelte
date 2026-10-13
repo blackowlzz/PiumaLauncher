@@ -29,12 +29,12 @@
   })
   const autoName = $derived(`${loader === 'vanilla' ? 'Minecraft' : loaderNames[loader]} ${chosen}`.trim())
 
-  const loaders: { id: Loader | 'forge' | 'neoforge'; label: string; ready: boolean }[] = [
+  const loaders: { id: Loader; label: string; ready: boolean }[] = [
     { id: 'vanilla', label: 'Vanilla', ready: true },
     { id: 'fabric', label: 'Fabric', ready: true },
     { id: 'quilt', label: 'Quilt', ready: true },
-    { id: 'forge', label: 'Forge', ready: false },
-    { id: 'neoforge', label: 'NeoForge', ready: false },
+    { id: 'forge', label: 'Forge', ready: true },
+    { id: 'neoforge', label: 'NeoForge', ready: true },
   ]
 
   async function create() {

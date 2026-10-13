@@ -78,6 +78,8 @@ fn loader_tags(loader: Loader) -> &'static [&'static str] {
         Loader::Vanilla => &[],
         Loader::Fabric => &["fabric"],
         Loader::Quilt => &["quilt", "fabric"],
+        Loader::Forge => &["forge"],
+        Loader::NeoForge => &["neoforge"],
     }
 }
 
@@ -277,7 +279,7 @@ pub async fn install_content(
 ) -> Result<Vec<String>> {
     let tags: &[&str] = if kind == Content::Mods { loader_tags(inst.loader) } else { &[] };
     if kind == Content::Mods && tags.is_empty() {
-        return Err(Error::msg("This instance is Vanilla: create one with Fabric or Quilt to use mods"));
+        return Err(Error::msg("This instance is Vanilla: create one with a mod loader to use mods"));
     }
     let dir = paths::game_dir(&inst.id).join(kind.folder());
     tokio::fs::create_dir_all(&dir).await?;
@@ -753,8 +755,10 @@ pub async fn install_modpack(
         (Loader::Fabric, v.clone())
     } else if let Some(v) = index.dependencies.get("quilt-loader") {
         (Loader::Quilt, v.clone())
-    } else if index.dependencies.contains_key("neoforge") || index.dependencies.contains_key("forge") {
-        return Err(Error::msg("This modpack uses Forge/NeoForge, which aren't supported yet"));
+    } else if let Some(v) = index.dependencies.get("neoforge") {
+        (Loader::NeoForge, v.clone())
+    } else if let Some(v) = index.dependencies.get("forge") {
+        (Loader::Forge, v.clone())
     } else {
         (Loader::Vanilla, String::new())
     };
@@ -763,7 +767,7 @@ pub async fn install_modpack(
     let (loader_version, launch_version) = match loader {
         Loader::Vanilla => (None, None),
         _ => {
-            let i = loaders::install(client, loader, &mc, Some(loader_version)).await?;
+            let i = loaders::install(client, loader, &mc, Some(loader_version), progress).await?;
             (Some(i.loader_version), Some(i.id))
         }
     };

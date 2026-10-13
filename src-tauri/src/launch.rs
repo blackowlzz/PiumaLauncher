@@ -371,18 +371,21 @@ pub(crate) mod tests {
     async fn smoke_launch_latest_release() {
         let client = net::client();
         let manifest = minecraft::manifest(&client).await.unwrap();
-        let version = manifest.versions.iter().find(|v| v.kind == "release").unwrap().id.clone();
+        let version = std::env::var("SMOKE_MC")
+            .unwrap_or_else(|_| manifest.versions.iter().find(|v| v.kind == "release").unwrap().id.clone());
         eprintln!("versione: {version}");
 
         let loader = match std::env::var("SMOKE_LOADER").as_deref() {
             Ok("fabric") => Loader::Fabric,
             Ok("quilt") => Loader::Quilt,
+            Ok("forge") => Loader::Forge,
+            Ok("neoforge") => Loader::NeoForge,
             _ => Loader::Vanilla,
         };
         let (loader_version, launch_version) = match loader {
             Loader::Vanilla => (None, None),
             _ => {
-                let i = loaders::install(&client, loader, &version, None).await.unwrap();
+                let i = loaders::install(&client, loader, &version, None, &|_, _, _| {}).await.unwrap();
                 eprintln!("loader: {:?} {}", loader, i.loader_version);
                 (Some(i.loader_version), Some(i.id))
             }

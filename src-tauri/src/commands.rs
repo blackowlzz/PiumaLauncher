@@ -45,7 +45,7 @@ pub async fn create_instance(name: String, mc_version: String, loader: Loader) -
     let (loader_version, launch_version) = match loader {
         Loader::Vanilla => (None, None),
         _ => {
-            let installed = loaders::install(&net::client(), loader, &mc_version, None).await?;
+            let installed = loaders::install(&net::client(), loader, &mc_version, None, &|_, _, _| {}).await?;
             (Some(installed.loader_version), Some(installed.id))
         }
     };

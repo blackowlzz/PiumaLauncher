@@ -5,6 +5,8 @@
     vanilla: 'linear-gradient(150deg, #3a8a4a, #174a2b)',
     fabric: 'linear-gradient(150deg, #eadfc2, #b7a678)',
     quilt: 'linear-gradient(150deg, #8658ff, #3b1f9c)',
+    forge: 'linear-gradient(150deg, #5a6b85, #1e2a3d)',
+    neoforge: 'linear-gradient(150deg, #f6a04a, #b4531a)',
   }
 </script>
 
@@ -20,6 +22,12 @@
       <rect x="9" y="34" width="21" height="21" rx="4" fill="#fff" opacity="0.55" />
       <rect x="34" y="34" width="21" height="21" rx="4" fill="#fff" />
       <path d="M13 19.5h13M44.5 13v13M13 44.5h13M44.5 38v13" stroke="#8658ff" stroke-width="1.6" stroke-dasharray="2.4 2.4" stroke-linecap="round" fill="none" />
+    {:else if loader === 'forge'}
+      <path d="M10 18h44v8H40c0 8 4 10 4 18H20c0-8 4-10 4-18H10Z" fill="#e6ebf5" />
+      <path d="M18 48h28v6H18Z" fill="#e6ebf5" opacity="0.7" />
+    {:else if loader === 'neoforge'}
+      <path d="M32 8 52 20v24L32 56 12 44V20Z" fill="#fff" opacity="0.92" />
+      <path d="M32 18 43 25v14L32 46 21 39V25Z" fill="#b4531a" />
     {:else}
       <path d="M32 7 56 20 32 33 8 20Z" fill="#8bd05f" />
       <path d="M8 20 32 33V57L8 44Z" fill="#8a5a2e" />

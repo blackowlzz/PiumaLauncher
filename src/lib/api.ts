@@ -11,7 +11,7 @@ async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> 
   throw new Error('Backend non disponibile: apri PiumaLauncher come app')
 }
 
-export type Loader = 'vanilla' | 'fabric' | 'quilt'
+export type Loader = 'vanilla' | 'fabric' | 'quilt' | 'forge' | 'neoforge'
 
 export type FlagProfile = 'low' | 'balanced' | 'performance' | 'none'
 export type Gc = 'auto' | 'g1' | 'zgc' | 'parallel' | 'serial'

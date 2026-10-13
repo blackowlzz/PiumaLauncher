@@ -8,7 +8,7 @@ export const profiles = (): { id: FlagProfile; label: string; hint: string }[] =
   { id: 'none', label: t('None'), hint: t('No extra flags.') },
 ]
 
-export const loaderNames: Record<Loader, string> = { vanilla: 'Vanilla', fabric: 'Fabric', quilt: 'Quilt' }
+export const loaderNames: Record<Loader, string> = { vanilla: 'Vanilla', fabric: 'Fabric', quilt: 'Quilt', forge: 'Forge', neoforge: 'NeoForge' }
 
 export const profileName = (id: FlagProfile) => profiles().find((p) => p.id === id)?.label ?? id
 
