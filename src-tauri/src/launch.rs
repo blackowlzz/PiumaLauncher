@@ -12,7 +12,7 @@ use tokio::sync::oneshot;
 
 use crate::accounts::{self, Account, AccountKind};
 use crate::error::{Error, Result};
-use crate::flags;
+use crate::{console, flags};
 use crate::install::{self, Prepared};
 use crate::instance::Instance;
 use crate::java::{self, JavaInstall};
@@ -68,13 +68,6 @@ fn sample_memory(app: AppHandle, id: String, pid: u32, done: Arc<AtomicBool>) {
             tokio::time::sleep(std::time::Duration::from_secs(2)).await;
         }
     });
-}
-
-#[derive(Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct LogEvent<'a> {
-    instance_id: &'a str,
-    line: &'a str,
 }
 
 fn expand(s: &str, vars: &HashMap<&'static str, String>) -> String {
@@ -258,7 +251,7 @@ async fn start(app: &AppHandle, inst: &Instance, acc: &Account) -> Result<(Child
     Ok((child, session.map(|s| s.token)))
 }
 
-fn forward_lines<R: AsyncRead + Unpin + Send + 'static>(app: AppHandle, id: String, reader: R, secret: Option<String>) {
+fn forward_lines<R: AsyncRead + Unpin + Send + 'static>(app: AppHandle, id: String, reader: R, secret: Option<String>, console: bool) {
     tauri::async_runtime::spawn(async move {
         let mut lines = BufReader::new(reader).lines();
         while let Ok(Some(line)) = lines.next_line().await {
@@ -267,7 +260,9 @@ fn forward_lines<R: AsyncRead + Unpin + Send + 'static>(app: AppHandle, id: Stri
                 Some(s) if line.contains(s.as_str()) => line.replace(s.as_str(), "***"),
                 _ => line,
             };
-            let _ = app.emit("game-log", LogEvent { instance_id: &id, line: &line });
+            if console {
+                console::push(&app, &id, &line);
+            }
         }
     });
 }
@@ -278,6 +273,10 @@ pub async fn run(app: AppHandle, inst: Instance, acc: Account, mut kill_rx: ones
         Err(e) => emit_state(&app, &id, "error", None, 0, 0, Some(e.to_string()), None),
         Ok((mut child, secret)) => {
             emit_state(&app, &id, "running", None, 0, 0, None, None);
+            let console = settings::load().live_console;
+            if console {
+                console::start(&app, &inst);
+            }
             presence::start(&id, &acc.name, &inst.mc_version);
             let minimized = settings::load().minimize_on_launch;
             if minimized {
@@ -292,10 +291,10 @@ pub async fn run(app: AppHandle, inst: Instance, acc: Account, mut kill_rx: ones
                 sample_memory(app.clone(), id.clone(), pid, done.clone());
             }
             if let Some(out) = child.stdout.take() {
-                forward_lines(app.clone(), id.clone(), out, secret.clone());
+                forward_lines(app.clone(), id.clone(), out, secret.clone(), console);
             }
             if let Some(err) = child.stderr.take() {
-                forward_lines(app.clone(), id.clone(), err, secret.clone());
+                forward_lines(app.clone(), id.clone(), err, secret.clone(), console);
             }
             let code = tokio::select! {
                 status = child.wait() => status.ok().and_then(|s| s.code()),

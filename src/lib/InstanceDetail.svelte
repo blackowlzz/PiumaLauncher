@@ -26,7 +26,6 @@
   const game = $derived(inst ? app.games[inst.id] : undefined)
   const running = $derived(game?.state === 'running')
   const busy = $derived(isBusy(inst?.id ?? null))
-  const logLines = $derived(inst ? (app.logs[inst.id] ?? []) : [])
   const samples = $derived(inst ? (app.stats[inst.id] ?? []) : [])
   const current = $derived(running && samples.length ? samples[samples.length - 1] : null)
   const peak = $derived(samples.length ? Math.max(...samples) : null)
@@ -105,9 +104,14 @@
           {#if running}<span class="tag live">{t('Running')}</span>{/if}
         </div>
       </div>
-      {#if running}
-        <button class="stopbtn" onclick={() => stop(inst.id)}>{t('Stop')}</button>
-      {/if}
+      <div class="acts">
+        {#if app.settings.liveConsole}
+          <button class="stopbtn" onclick={() => api.openConsole(inst.id).catch(notify)}>{t('Console')}</button>
+        {/if}
+        {#if running}
+          <button class="stopbtn" onclick={() => stop(inst.id)}>{t('Stop')}</button>
+        {/if}
+      </div>
     </div>
     <div class="tabs" role="tablist" aria-label={t('Instance sections')}>
       {#each tabs as tb}
@@ -142,12 +146,6 @@
       {#if !samples.length}<p class="muted small hint">{t('The chart fills in while the game is running.')}</p>{/if}
     </div>
 
-    {#if logLines.length}
-      <details class="console" open={game?.state === 'running'}>
-        <summary>{t('Console')} <span class="muted">({t('{n} lines', { n: logLines.length })})</span></summary>
-        <pre>{logLines.join('\n')}</pre>
-      </details>
-    {/if}
   {:else if tab === 'mods'}
     <ContentTable {inst} {busy} />
   {:else if tab === 'worlds'}
@@ -218,6 +216,7 @@
   .tag { background: rgba(0,0,0,.5); color: #fff; border-color: rgba(255,255,255,.3); }
   .live { border-color: #fff; }
   .stopbtn { position: relative; }
+  .acts { position: relative; display: flex; gap: 8px; }
   .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
   .swap { display: flex; flex-direction: column; gap: 22px; animation: swap 300ms var(--spring) both; }
   .swap > * { flex-shrink: 0; }
@@ -233,8 +232,6 @@
   .chart { position: relative; border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; background: var(--surface); }
   .hint { position: absolute; inset: 0; display: grid; place-items: center; }
   .console { border-top: 1px solid var(--line); padding-top: 12px; }
-  summary { cursor: pointer; font-size: 13px; padding: 4px 0; }
-  pre { margin: 10px 0 0; max-height: 280px; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; font-size: 12px; line-height: 1.5; font-variant-numeric: tabular-nums; white-space: pre-wrap; word-break: break-all; color: var(--muted); }
   .toolbar { gap: 8px; }
   .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .when { min-width: 150px; text-align: right; }

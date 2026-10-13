@@ -182,6 +182,10 @@ export async function mock(cmd: string, args: Record<string, unknown>): Promise<
         ...{ language: forced ?? (fresh ? null : lang) },
       }
     }
+    case 'console_history':
+      return []
+    case 'open_console':
+      return null
     case 'save_settings':
       try { localStorage.setItem('mock-settings', JSON.stringify(args.settings)) } catch {  }
       return null

@@ -3,7 +3,8 @@
   "identifier": "default",
   "description": "Base permissions for the main window",
   "windows": [
-    "main"
+    "main",
+    "console-*"
   ],
   "permissions": [
     "core:default",

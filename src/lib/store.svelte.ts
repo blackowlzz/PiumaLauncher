@@ -23,7 +23,6 @@ import {
 
 export type Page = 'home' | 'library' | 'explore' | 'accounts' | 'instance' | 'settings' | 'themes' | 'performance'
 
-const MAX_LOG_LINES = 400
 const MAX_STAT_SAMPLES = 90
 
 export const app = $state({
@@ -34,7 +33,6 @@ export const app = $state({
   versions: [] as VersionEntry[],
   selectedId: null as string | null,
   games: {} as Record<string, GameStateEvent>,
-  logs: {} as Record<string, string[]>,
   toast: null as string | null,
   loaded: false,
   settings: defaultSettings() as Settings,
@@ -108,16 +106,10 @@ async function listenToBackend() {
     const ev = e.payload
     app.games[ev.instanceId] = ev
     if (ev.state === 'preparing') {
-      app.logs[ev.instanceId] = []
       app.stats[ev.instanceId] = []
     }
     if (ev.state === 'error') notify(ev.message ?? t('Launch failed'))
     if (ev.state === 'exited' || ev.state === 'running') reloadStats()
-  })
-  await listen<{ instanceId: string; line: string }>('game-log', (e) => {
-    const lines = (app.logs[e.payload.instanceId] ??= [])
-    lines.push(e.payload.line)
-    if (lines.length > MAX_LOG_LINES) lines.splice(0, lines.length - MAX_LOG_LINES)
   })
   await listen<{ instanceId: string; rssMb: number }>('game-stats', (e) => {
     const samples = (app.stats[e.payload.instanceId] ??= [])

@@ -193,6 +193,20 @@
   </section>
 
   <section class="group">
+    <h2>{t('Developer')}</h2>
+    <div class="item">
+      <div class="txt">
+        <div class="n">{t('Live console')}</div>
+        <div class="d">{t('Opens a separate window with the live game log every time you play. Turned off, nothing runs and nothing is stored. Takes effect from the next launch.')}</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" bind:checked={app.settings.liveConsole} onchange={saveSettings} aria-label={t('Live console')} />
+        <span class="track"></span>
+      </label>
+    </div>
+  </section>
+
+  <section class="group">
     <h2>{t('Privacy')}</h2>
     <div class="item">
       <div class="txt">

@@ -24,6 +24,7 @@ pub struct Settings {
     pub default_extra_jvm_args: String,
     pub tuning: Tuning,
     pub auto_optimize: bool,
+    pub live_console: bool,
 }
 
 impl Default for Settings {
@@ -45,6 +46,7 @@ impl Default for Settings {
             default_extra_jvm_args: String::new(),
             tuning: Tuning::default(),
             auto_optimize: false,
+            live_console: false,
         }
     }
 }

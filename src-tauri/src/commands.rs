@@ -3,6 +3,7 @@ use tauri::{AppHandle, Emitter, State};
 use tokio::sync::oneshot;
 
 use crate::accounts::{self, Account, AccountStore};
+use crate::console;
 use crate::error::{Error, Result};
 use crate::instance::{self, Instance};
 use crate::java::{self, JavaInstall};
@@ -160,6 +161,22 @@ pub fn stop_instance(running: State<'_, Running>, id: String) {
     if let Some(tx) = running.0.lock().unwrap().remove(&id) {
         let _ = tx.send(());
     }
+}
+
+#[tauri::command]
+pub fn console_history(instance_id: String) -> Result<Vec<console::Line>> {
+    instance::check_id(&instance_id)?;
+    Ok(console::history(&instance_id))
+}
+
+#[tauri::command]
+pub fn open_console(app: AppHandle, instance_id: String) -> Result<()> {
+    if !settings::load().live_console {
+        return Err(Error::msg("The live console is turned off in Settings"));
+    }
+    let inst = instance::get(&instance_id)?;
+    console::show(&app, &inst);
+    Ok(())
 }
 
 #[tauri::command]

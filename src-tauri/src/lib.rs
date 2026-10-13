@@ -1,5 +1,6 @@
 mod accounts;
 mod commands;
+mod console;
 mod error;
 mod flags;
 mod install;
@@ -115,6 +116,8 @@ pub fn run() {
             commands::list_worlds,
             commands::open_folder,
             commands::duplicate_instance,
+            commands::console_history,
+            commands::open_console,
         ])
         .run(tauri::generate_context!())
         .expect("error while starting PiumaLauncher");

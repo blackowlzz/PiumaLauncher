@@ -774,6 +774,7 @@ pub async fn install_modpack(
 
     let mut inst = instance::create(&index.name, &mc, loader, loader_version, launch_version)?;
     inst.memory_max_mb = 4096;
+    inst.memory_min_mb = inst.memory_min_mb.min(inst.memory_max_mb);
     if let Some((icon, banner)) = project_images(client, project_id).await {
         inst.icon_url = icon;
         inst.banner_url = banner;

@@ -123,6 +123,8 @@ export const api = {
   launch: (id: string) => call<void>('launch_instance', { id }),
   stop: (id: string) => call<void>('stop_instance', { id }),
   running: () => call<string[]>('running_instances'),
+  consoleHistory: (instanceId: string) => call<{ seq: number; text: string }[]>('console_history', { instanceId }),
+  openConsole: (instanceId: string) => call<void>('open_console', { instanceId }),
   checkUpdate: () => call<UpdateInfo | null>('check_update'),
   thumbnail: (url: string, width: number) => call<string>('thumbnail', { url, width }),
   fetchSkin: (name: string) => call<SkinInfo | null>('fetch_skin', { name }),
@@ -306,6 +308,7 @@ export interface Settings {
   defaultExtraJvmArgs: string
   tuning: Tuning
   autoOptimize: boolean
+  liveConsole: boolean
 }
 
 export const defaultSettings = (): Settings => ({
@@ -325,6 +328,7 @@ export const defaultSettings = (): Settings => ({
   defaultExtraJvmArgs: '',
   tuning: { gc: 'auto', pauseMs: 0, gcThreads: 0, preTouch: false, disableExplicitGc: false, stringDedup: false },
   autoOptimize: false,
+  liveConsole: false,
 })
 
 export interface RuntimeEntry {
