@@ -38,14 +38,14 @@ pub fn list_instances() -> Vec<Instance> {
 }
 
 #[tauri::command]
-pub async fn create_instance(name: String, mc_version: String, loader: Loader) -> Result<Instance> {
+pub async fn create_instance(app: AppHandle, name: String, mc_version: String, loader: Loader) -> Result<Instance> {
     if name.trim().is_empty() {
         return Err(Error::msg("Give the instance a name"));
     }
     let (loader_version, launch_version) = match loader {
         Loader::Vanilla => (None, None),
         _ => {
-            let installed = loaders::install(&net::client(), loader, &mc_version, None, &|_, _, _| {}).await?;
+            let installed = loaders::install(&net::client(), loader, &mc_version, None, &progress_emitter(&app)).await?;
             (Some(installed.loader_version), Some(installed.id))
         }
     };

@@ -16,6 +16,7 @@ use crate::flags;
 use crate::install::{self, Prepared};
 use crate::instance::Instance;
 use crate::java::{self, JavaInstall};
+use crate::loaders::Loader;
 use crate::microsoft::{self, Session};
 use crate::minecraft::{rules_allow, Arg, OneOrMany};
 use crate::{net, paths, presence, runtime, settings, stats, Running};
@@ -139,7 +140,13 @@ pub fn build_args(prep: &Prepared, inst: &Instance, acc: &Account, session: Opti
     let main_class = v.main_class.clone().ok_or_else(|| Error::msg("mainClass missing"))?;
 
     let (version_jvm, game) = match (&v.arguments, &v.minecraft_arguments) {
-        (Some(a), _) => (collect(&a.jvm, &vars), collect(&a.game, &vars)),
+        (Some(a), _) => {
+            let mut jvm_vars = vars.clone();
+            if matches!(inst.loader, Loader::Forge | Loader::NeoForge) {
+                jvm_vars.insert("version_name", prep.resolved.jar_id.clone());
+            }
+            (collect(&a.jvm, &jvm_vars), collect(&a.game, &vars))
+        }
         (None, Some(legacy)) => (
             vec![
                 expand("-Djava.library.path=${natives_directory}", &vars),

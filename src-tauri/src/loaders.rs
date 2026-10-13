@@ -222,6 +222,11 @@ fn installer_version_id(jar: &std::path::Path) -> Result<String> {
 
 async fn installer_java(client: &reqwest::Client, mc: &str, progress: Progress<'_>) -> Result<java::JavaInstall> {
     let required = minecraft::resolve(client, mc).await?.required_java().max(17);
+    if required <= 21 {
+        if let Ok(j) = runtime::ensure_temurin(client, 17, progress).await {
+            return Ok(j);
+        }
+    }
     match runtime::ensure(client, required, progress).await {
         Ok(Some(j)) => Ok(j),
         other => {

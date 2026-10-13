@@ -31,6 +31,7 @@ export const it: Record<string, string> = {
   Details: 'Dettagli',
   'Details of {name}': 'Dettagli di {name}',
   Disable: 'Disattiva',
+  'Downloading the loader installer': "Scarico l'installer del loader",
   'Downloading assets': 'Scarico le risorse',
   'Downloading libraries': 'Scarico le librerie',
   'Downloading mods': 'Scarico le mod',

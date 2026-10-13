@@ -2,7 +2,7 @@
   import { onMount } from 'svelte'
   import { api, type Loader } from './api'
   import { app, notify, play, reloadInstances } from './store.svelte'
-  import { t } from './i18n.svelte'
+  import { stageText, t } from './i18n.svelte'
   import Select from './Select.svelte'
   import { loaderNames } from './meta'
 
@@ -14,6 +14,8 @@
   let snapshots = $state(false)
   let launchAfter = $state(false)
   let creating = $state(false)
+  const percent = $derived(app.install && app.install.total > 0 ? Math.round((app.install.done / app.install.total) * 100) : null)
+  const stage = $derived(creating && app.install ? stageText(app.install.stage) : '')
   let nameInput: HTMLInputElement | undefined = $state()
 
   const choices = $derived(app.versions.filter((v) => v.kind === 'release' || (snapshots && v.kind === 'snapshot')))
@@ -39,6 +41,7 @@
 
   async function create() {
     creating = true
+    app.install = null
     try {
       const inst = await api.createInstance(name.trim() || autoName, chosen, loader)
       await reloadInstances()
@@ -49,6 +52,7 @@
       notify(e)
     } finally {
       creating = false
+      app.install = null
     }
   }
 
@@ -86,17 +90,26 @@
     </div>
   </div>
 
+  {#if creating}
+    <div class="prog" aria-live="polite">
+      <div class="line" class:indeterminate={percent === null}><div style:width={percent !== null ? `${percent}%` : undefined}></div></div>
+      {#if stage}<span class="muted small">{stage}{percent !== null ? ` · ${percent}%` : ''}</span>{/if}
+    </div>
+  {/if}
+
   <div class="foot">
     <label class="inline"><input type="checkbox" bind:checked={launchAfter} />{t('Launch after install')}</label>
     <div class="row">
       <button type="button" class="ghost" onclick={onClose}>{t('Cancel')}</button>
-      <button class="primary" type="submit" disabled={creating || !app.versions.length}>{creating ? t('Creating…') : t('Create instance')}</button>
+      <button class="primary" type="submit" disabled={creating || !app.versions.length}>{creating ? `${t('Creating…')}${percent !== null ? ` ${percent}%` : ''}` : t('Create instance')}</button>
     </div>
   </div>
 </form>
 </div>
 
 <style>
+  .prog { display: grid; gap: 6px; }
+  .prog .line { position: relative; }
   .backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.62); z-index: 20; animation: fade 200ms ease both; }
   .mform { display: grid; gap: 20px; }
   .modal { position: fixed; z-index: 21; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 26px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 18px; box-shadow: 0 30px 90px rgba(0, 0, 0, 0.55); animation: pop 280ms var(--spring) both; }

@@ -141,6 +141,17 @@ pub async fn ensure(
     install(client, flavor, major, progress).await.map(Some)
 }
 
+pub async fn ensure_temurin(
+    client: &reqwest::Client,
+    major: u32,
+    progress: &(dyn Fn(&str, u32, u32) + Sync),
+) -> Result<JavaInstall> {
+    if target().is_none() {
+        return Err(Error::msg("this system isn't supported for automatic Java download"));
+    }
+    install(client, Flavor::Temurin, major, progress).await
+}
+
 async fn install(
     client: &reqwest::Client,
     flavor: Flavor,

@@ -55,7 +55,7 @@
     <button class="stop go" onclick={() => stop(inst.id)}>{t('Stop')}</button>
   {:else}
     <button class="primary go" onclick={() => inst && play(inst.id)} disabled={!inst || busy || !account}>
-      {game?.state === 'preparing' ? t('Preparing…') : t('Play')}
+      {game?.state === 'preparing' ? `${t('Preparing…')}${percent !== null ? ` ${percent}%` : ''}` : t('Play')}
     </button>
   {/if}
 
