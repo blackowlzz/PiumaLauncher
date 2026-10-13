@@ -338,4 +338,5 @@ export const sq: Record<string, string> = {
   "Saves these values as the defaults for new instances.": "Ruan këto vlera si parazgjedhje për instancat e reja.",
   "It is a safe starting point, not always better than settings you tune yourself. If you know what your computer needs, manual values can do better.": "Është një pikënisje e sigurt, jo gjithmonë më e mirë se cilësimet që i akordon vetë. Nëse di çfarë i duhet kompjuterit tënd, vlerat manuale mund të bëjnë më mirë.",
   "The optimizer is on, so memory and Java flags are chosen at launch. The manual values above are used only if you turn it off.": "Optimizuesi është i ndezur, kështu që memoria dhe flamujt e Java-s zgjidhen gjatë nisjes. Vlerat manuale më sipër përdoren vetëm nëse e fiket.",
+  "Verified Premium account": "Llogari Premium e verifikuar",
 }

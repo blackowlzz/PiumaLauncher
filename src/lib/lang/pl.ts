@@ -338,4 +338,5 @@ export const pl: Record<string, string> = {
   "Saves these values as the defaults for new instances.": "Zapisuje te wartości jako domyślne dla nowych instancji.",
   "It is a safe starting point, not always better than settings you tune yourself. If you know what your computer needs, manual values can do better.": "To bezpieczny punkt wyjścia, nie zawsze lepszy od ustawień, które dostroisz sam. Jeśli wiesz, czego potrzebuje twój komputer, wartości ręczne mogą działać lepiej.",
   "The optimizer is on, so memory and Java flags are chosen at launch. The manual values above are used only if you turn it off.": "Optymalizator jest włączony, więc pamięć i flagi Javy są wybierane przy uruchomieniu. Ręczne wartości powyżej są używane tylko wtedy, gdy go wyłączysz.",
+  "Verified Premium account": "Zweryfikowane konto Premium",
 }

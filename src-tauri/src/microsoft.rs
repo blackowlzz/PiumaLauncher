@@ -79,18 +79,29 @@ fn load_tokens() -> HashMap<String, Tokens> {
         .unwrap_or_default()
 }
 
-fn save_tokens(map: &HashMap<String, Tokens>) -> Result<()> {
-    let path = paths::microsoft_file();
+fn write_private(path: &std::path::Path, bytes: &[u8]) -> Result<()> {
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir)?;
     }
-    std::fs::write(&path, serde_json::to_string(map)?)?;
+    let tmp = path.with_extension("json.tmp");
+    let _ = std::fs::remove_file(&tmp);
+    let mut opts = std::fs::OpenOptions::new();
+    opts.write(true).create_new(true);
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
+        use std::os::unix::fs::OpenOptionsExt;
+        opts.mode(0o600);
     }
+    {
+        use std::io::Write;
+        opts.open(&tmp)?.write_all(bytes)?;
+    }
+    std::fs::rename(&tmp, path)?;
     Ok(())
+}
+
+fn save_tokens(map: &HashMap<String, Tokens>) -> Result<()> {
+    write_private(&paths::microsoft_file(), serde_json::to_string(map)?.as_bytes())
 }
 
 pub fn forget(id: &str) {
@@ -295,4 +306,46 @@ fn str_at(v: &Value, pointer: &str) -> Result<String> {
         .and_then(Value::as_str)
         .map(String::from)
         .ok_or_else(|| Error::msg("Unexpected reply from Microsoft"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn token_file_is_private_and_replaced_atomically() {
+        let dir = std::env::temp_dir().join(format!("piuma-test-{}", std::process::id()));
+        let path = dir.join("microsoft.json");
+        write_private(&path, b"first").unwrap();
+        write_private(&path, b"second-longer").unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), b"second-longer");
+        assert!(!path.with_extension("json.tmp").exists());
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(std::fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o600);
+        }
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn stale_loose_temp_file_does_not_leak_permissions() {
+        let dir = std::env::temp_dir().join(format!("piuma-test-stale-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("microsoft.json");
+        let stale = path.with_extension("json.tmp");
+        std::fs::write(&stale, b"old").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&stale, std::fs::Permissions::from_mode(0o644)).unwrap();
+        }
+        write_private(&path, b"secret").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(std::fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o600);
+        }
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 }

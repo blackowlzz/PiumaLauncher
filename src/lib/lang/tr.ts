@@ -338,4 +338,5 @@ export const tr: Record<string, string> = {
   "Saves these values as the defaults for new instances.": "Bu değerleri yeni örnekler için varsayılan olarak kaydeder.",
   "It is a safe starting point, not always better than settings you tune yourself. If you know what your computer needs, manual values can do better.": "Bu güvenli bir başlangıç noktasıdır; elle ayarlanan ayarlardan her zaman daha iyi olmayabilir. Bilgisayarın neye ihtiyacı olduğu biliniyorsa, elle girilen değerler daha iyi sonuç verebilir.",
   "The optimizer is on, so memory and Java flags are chosen at launch. The manual values above are used only if you turn it off.": "Optimize edici açık olduğundan bellek ve Java bayrakları başlatma sırasında seçilir. Yukarıdaki elle girilen değerler yalnızca kapatılırsa kullanılır.",
+  "Verified Premium account": "Doğrulanmış Premium hesap",
 }

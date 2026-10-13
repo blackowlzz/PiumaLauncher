@@ -338,4 +338,5 @@ export const bg: Record<string, string> = {
   "Saves these values as the defaults for new instances.": "Запазва тези стойности като настройки по подразбиране за новите инстанции.",
   "It is a safe starting point, not always better than settings you tune yourself. If you know what your computer needs, manual values can do better.": "Това е безопасна отправна точка, не винаги по-добра от настройки, които си нагласил сам. Ако знаеш какво е нужно на компютъра ти, ръчните стойности може да вършат по-добра работа.",
   "The optimizer is on, so memory and Java flags are chosen at launch. The manual values above are used only if you turn it off.": "Оптимизаторът е включен, така че паметта и Java флаговете се избират при стартиране. Ръчните стойности по-горе се използват само ако го изключиш.",
+  "Verified Premium account": "Потвърден Premium акаунт",
 }

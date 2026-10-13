@@ -1,6 +1,7 @@
 <script lang="ts">
   import Head from './Head.svelte'
   import Icon from './Icon.svelte'
+  import Verified from './Verified.svelte'
   import { api } from './api'
   import { t } from './i18n.svelte'
   import { activeAccount, app, notify, reloadAccounts } from './store.svelte'
@@ -34,6 +35,7 @@
     <button class="trigger ghost" onclick={() => (open = !open)} aria-haspopup="menu" aria-expanded={open} aria-label={t('Account: {name}', { name: account.name })}>
       <Head name={account.name} size={34} />
       <span class="n">{account.name}</span>
+      {#if account.kind === 'microsoft'}<Verified size={15} />{/if}
       <span class="chev" class:up={open}><Icon name="chevron" size={13} /></span>
     </button>
   {:else}
@@ -45,7 +47,7 @@
       {#each app.accounts.accounts as a, n (a.id)}
         <button class="opt" role="menuitemradio" aria-checked={a.id === app.accounts.active} onclick={() => choose(a.id)} style:--n={n}>
           <Head name={a.name} size={32} />
-          <span class="who"><span class="n">{a.name}</span><span class="kind">{a.kind === 'offline' ? t('Offline') : t('Premium')}</span></span>
+          <span class="who"><span class="n">{a.name}{#if a.kind === 'microsoft'} <Verified size={13} />{/if}</span><span class="kind">{a.kind === 'offline' ? t('Offline') : t('Premium')}</span></span>
           {#if a.id === app.accounts.active}<span class="tick"><Icon name="check" size={15} /></span>{/if}
         </button>
       {/each}

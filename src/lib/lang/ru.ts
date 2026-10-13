@@ -338,4 +338,5 @@ export const ru: Record<string, string> = {
   "Saves these values as the defaults for new instances.": "Сохраняет эти значения как настройки по умолчанию для новых экземпляров.",
   "It is a safe starting point, not always better than settings you tune yourself. If you know what your computer needs, manual values can do better.": "Это безопасная отправная точка, не всегда лучше настроек, которые вы подбираете сами. Если вы знаете, что нужно вашему компьютеру, ручные значения могут работать лучше.",
   "The optimizer is on, so memory and Java flags are chosen at launch. The manual values above are used only if you turn it off.": "Оптимизатор включён, поэтому память и флаги Java выбираются при запуске. Ручные значения выше используются, только если вы его выключите.",
+  "Verified Premium account": "Подтверждённый аккаунт Premium",
 }

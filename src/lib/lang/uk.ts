@@ -338,4 +338,5 @@ export const uk: Record<string, string> = {
   "Saves these values as the defaults for new instances.": "Зберігає ці значення як типові для нових екземплярів.",
   "It is a safe starting point, not always better than settings you tune yourself. If you know what your computer needs, manual values can do better.": "Це безпечна відправна точка, не завжди краща за налаштування, які ви підбираєте самі. Якщо ви знаєте, що потрібно вашому комп'ютеру, ручні значення можуть працювати краще.",
   "The optimizer is on, so memory and Java flags are chosen at launch. The manual values above are used only if you turn it off.": "Оптимізатор увімкнено, тож пам'ять і прапорці Java обираються під час запуску. Ручні значення вище використовуються, лише якщо ви його вимкнете.",
+  "Verified Premium account": "Підтверджений акаунт Premium",
 }

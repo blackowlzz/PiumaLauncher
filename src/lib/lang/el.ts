@@ -338,4 +338,5 @@ export const el: Record<string, string> = {
   "Saves these values as the defaults for new instances.": "Αποθηκεύει αυτές τις τιμές ως προεπιλογές για τα νέα στιγμιότυπα.",
   "It is a safe starting point, not always better than settings you tune yourself. If you know what your computer needs, manual values can do better.": "Είναι ένα ασφαλές σημείο εκκίνησης, που δεν είναι πάντα καλύτερο από ρυθμίσεις που ρυθμίζεις μόνος σου. Αν ξέρεις τι χρειάζεται ο υπολογιστής σου, οι χειροκίνητες τιμές μπορεί να αποδώσουν καλύτερα.",
   "The optimizer is on, so memory and Java flags are chosen at launch. The manual values above are used only if you turn it off.": "Ο βελτιστοποιητής είναι ενεργός, οπότε η μνήμη και οι σημαίες Java επιλέγονται κατά την εκκίνηση. Οι χειροκίνητες τιμές παραπάνω χρησιμοποιούνται μόνο αν τον απενεργοποιήσεις.",
+  "Verified Premium account": "Επαληθευμένος λογαριασμός Premium",
 }

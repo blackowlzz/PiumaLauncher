@@ -340,4 +340,5 @@ export const pt: Record<string, string> = {
   "Saves these values as the defaults for new instances.": "Salva estes valores como padrão para novas instâncias.",
   "It is a safe starting point, not always better than settings you tune yourself. If you know what your computer needs, manual values can do better.": "É um ponto de partida seguro, nem sempre melhor do que as configurações que você ajusta. Se você sabe do que o seu computador precisa, valores manuais podem render mais.",
   "The optimizer is on, so memory and Java flags are chosen at launch. The manual values above are used only if you turn it off.": "O otimizador está ativado, então memória e flags de Java são escolhidas na inicialização. Os valores manuais acima só são usados se você desativá-lo.",
+  "Verified Premium account": "Conta Premium verificada",
 }

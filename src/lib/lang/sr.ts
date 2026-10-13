@@ -338,4 +338,5 @@ export const sr: Record<string, string> = {
   "Saves these values as the defaults for new instances.": "Čuva ove vrednosti kao podrazumevane za nove instance.",
   "It is a safe starting point, not always better than settings you tune yourself. If you know what your computer needs, manual values can do better.": "To je bezbedna polazna tačka, ne uvek bolja od podešavanja koje sam namestiš. Ako znaš šta tvoj računar treba, ručne vrednosti mogu biti bolje.",
   "The optimizer is on, so memory and Java flags are chosen at launch. The manual values above are used only if you turn it off.": "Optimizator je uključen, pa se memorija i Java flagovi biraju pri pokretanju. Ručne vrednosti iznad koriste se samo ako ga isključiš.",
+  "Verified Premium account": "Verifikovan Premium nalog",
 }

@@ -338,4 +338,5 @@ export const ro: Record<string, string> = {
   "Saves these values as the defaults for new instances.": "Salvează aceste valori ca implicite pentru instanțele noi.",
   "It is a safe starting point, not always better than settings you tune yourself. If you know what your computer needs, manual values can do better.": "Este un punct de plecare sigur, nu întotdeauna mai bun decât setările pe care le ajustezi tu. Dacă știi de ce are nevoie computerul tău, valorile manuale pot fi mai bune.",
   "The optimizer is on, so memory and Java flags are chosen at launch. The manual values above are used only if you turn it off.": "Optimizatorul este activat, deci memoria și opțiunile Java sunt alese la lansare. Valorile manuale de mai sus se folosesc doar dacă îl dezactivezi.",
+  "Verified Premium account": "Cont Premium verificat",
 }
