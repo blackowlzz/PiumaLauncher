@@ -10,7 +10,7 @@ use serde_json::json;
 use crate::{settings, stats};
 
 const CLIENT_ID: &str = "1559113688605261854";
-const DOWNLOAD_URL: &str = "https://github.com/blackowlzz/PiumaLauncher/releases/latest";
+const DOWNLOAD_URL: &str = "https://www.piumalauncher.it/download";
 const RETRY: Duration = Duration::from_secs(20);
 const IO_TIMEOUT: Duration = Duration::from_secs(3);
 
