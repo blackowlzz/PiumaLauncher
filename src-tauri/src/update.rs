@@ -1,9 +1,10 @@
 use std::cmp::Ordering;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
 const REPO: &str = "blackowlzz/PiumaLauncher";
+const PUBLISH_DELAY_SECS: u64 = 300;
 const DOWNLOAD_URL: &str = "https://www.piumalauncher.it/download";
 
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
@@ -21,6 +22,28 @@ struct Release {
     draft: bool,
     #[serde(default)]
     prerelease: bool,
+    published_at: Option<String>,
+}
+
+fn unix_time(iso: &str) -> Option<u64> {
+    let (date, time) = iso.trim_end_matches('Z').split_once('T')?;
+    let mut d = date.split('-').map(|p| p.parse::<i64>().ok());
+    let (y, m, day) = (d.next()??, d.next()??, d.next()??);
+    let mut t = time.split(':').map(|p| p.parse::<i64>().ok());
+    let (h, mi, sec) = (t.next()??, t.next()??, t.next()??);
+    let y = if m <= 2 { y - 1 } else { y };
+    let era = y.div_euclid(400);
+    let yoe = y - era * 400;
+    let doy = (153 * (if m > 2 { m - 3 } else { m + 9 }) + 2) / 5 + day - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    let days = era * 146097 + doe - 719468;
+    u64::try_from(days * 86400 + h * 3600 + mi * 60 + sec).ok()
+}
+
+fn settled(published_at: Option<&str>, now: u64) -> bool {
+    published_at
+        .and_then(unix_time)
+        .is_some_and(|t| now.saturating_sub(t) >= PUBLISH_DELAY_SECS)
 }
 
 fn parse(version: &str) -> Option<Vec<u64>> {
@@ -59,6 +82,10 @@ pub async fn check(client: &reqwest::Client) -> Option<UpdateInfo> {
     if release.draft || release.prerelease || !trusted_url(&release.html_url) {
         return None;
     }
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).ok()?.as_secs();
+    if !settled(release.published_at.as_deref(), now) {
+        return None;
+    }
     is_newer(&release.tag_name, env!("CARGO_PKG_VERSION")).then(|| UpdateInfo {
         version: release.tag_name.trim_start_matches('v').to_string(),
         url: DOWNLOAD_URL.to_string(),
@@ -82,6 +109,21 @@ mod tests {
         assert!(!is_newer("v0.1.0", "0.1.0"));
         assert!(!is_newer("0.1", "0.1.0"));
         assert!(!is_newer("0.0.9", "0.1.0"));
+    }
+
+    #[test]
+    fn iso_timestamps_are_parsed() {
+        assert_eq!(unix_time("1970-01-01T00:00:00Z"), Some(0));
+        assert_eq!(unix_time("2026-10-13T15:30:52Z"), Some(1791905452));
+        assert_eq!(unix_time("nope"), None);
+    }
+
+    #[test]
+    fn fresh_releases_wait_for_the_delay() {
+        let t = unix_time("2026-10-13T15:30:52Z").unwrap();
+        assert!(!settled(Some("2026-10-13T15:30:52Z"), t + 299));
+        assert!(settled(Some("2026-10-13T15:30:52Z"), t + 300));
+        assert!(!settled(None, t + 1000));
     }
 
     #[test]
