@@ -4,6 +4,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 const REPO: &str = "blackowlzz/PiumaLauncher";
+const DOWNLOAD_URL: &str = "https://www.piumalauncher.it/download";
 
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -60,7 +61,7 @@ pub async fn check(client: &reqwest::Client) -> Option<UpdateInfo> {
     }
     is_newer(&release.tag_name, env!("CARGO_PKG_VERSION")).then(|| UpdateInfo {
         version: release.tag_name.trim_start_matches('v').to_string(),
-        url: release.html_url,
+        url: DOWNLOAD_URL.to_string(),
     })
 }
 
