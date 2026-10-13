@@ -30,6 +30,15 @@ export interface SystemInfo {
   cpuCores: number
 }
 
+export interface Recommendation {
+  tier: 'weak' | 'modest' | 'capable' | 'strong'
+  memoryMaxMb: number
+  memoryMinMb: number
+  flagProfile: FlagProfile
+  tuning: Tuning
+  reasons: string[]
+}
+
 export interface Instance {
   id: string
   name: string
@@ -107,6 +116,7 @@ export const api = {
   removeAccount: (id: string) => call<void>('remove_account', { id }),
   setActiveAccount: (id: string) => call<void>('set_active_account', { id }),
   systemInfo: () => call<SystemInfo>('system_info'),
+  recommendPerformance: () => call<Recommendation>('recommend_performance'),
   detectJava: () => call<JavaInstall[]>('detect_java'),
   listRuntimes: () => call<RuntimeEntry[]>('list_runtimes'),
   installRuntime: (flavor: string, major: number) => call<JavaInstall>('install_runtime', { flavor, major }),
@@ -295,6 +305,7 @@ export interface Settings {
   preferredJava: string | null
   defaultExtraJvmArgs: string
   tuning: Tuning
+  autoOptimize: boolean
 }
 
 export const defaultSettings = (): Settings => ({
@@ -313,6 +324,7 @@ export const defaultSettings = (): Settings => ({
   preferredJava: null,
   defaultExtraJvmArgs: '',
   tuning: { gc: 'auto', pauseMs: 0, gcThreads: 0, preTouch: false, disableExplicitGc: false, stringDedup: false },
+  autoOptimize: false,
 })
 
 export interface RuntimeEntry {

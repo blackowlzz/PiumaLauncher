@@ -23,6 +23,7 @@ pub struct Settings {
     pub preferred_java: Option<String>,
     pub default_extra_jvm_args: String,
     pub tuning: Tuning,
+    pub auto_optimize: bool,
 }
 
 impl Default for Settings {
@@ -43,6 +44,7 @@ impl Default for Settings {
             preferred_java: None,
             default_extra_jvm_args: String::new(),
             tuning: Tuning::default(),
+            auto_optimize: false,
         }
     }
 }

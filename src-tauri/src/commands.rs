@@ -124,6 +124,11 @@ pub fn system_info() -> SystemInfo {
 }
 
 #[tauri::command]
+pub fn recommend_performance() -> crate::optimizer::Recommendation {
+    crate::optimizer::recommend(&crate::optimizer::hardware(), 0)
+}
+
+#[tauri::command]
 pub async fn list_runtimes() -> Vec<runtime::RuntimeEntry> {
     runtime::catalog().await
 }

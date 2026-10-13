@@ -151,8 +151,9 @@ pub fn build_args(prep: &Prepared, inst: &Instance, acc: &Account, session: Opti
         _ => return Err(Error::msg("this version has no launch arguments")),
     };
 
-    let mut args = vec![format!("-Xms{}M", inst.memory_min_mb), format!("-Xmx{}M", inst.memory_max_mb)];
-    args.extend(flags::launch_flags(inst.flag_profile, &crate::settings::load().tuning, java.major));
+    let eff = crate::optimizer::effective(inst, &crate::settings::load());
+    let mut args = vec![format!("-Xms{}M", eff.memory_min_mb), format!("-Xmx{}M", eff.memory_max_mb)];
+    args.extend(flags::launch_flags(eff.flag_profile, &eff.tuning, java.major));
     args.extend(inst.extra_jvm_args.split_whitespace().map(String::from));
     args.extend(prep.logging_arg.clone());
     args.extend(version_jvm);

@@ -1,15 +1,18 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { api, type Gc, type SystemInfo } from './api'
+  import { api, type Gc, type Recommendation, type SystemInfo } from './api'
   import { t } from './i18n.svelte'
   import Select from './Select.svelte'
+  import PixelField from './PixelField.svelte'
   import Slider from './Slider.svelte'
   import { profiles } from './meta'
   import { app, saveSettings } from './store.svelte'
 
   let sys = $state<SystemInfo | null>(null)
+  let rec = $state<Recommendation | null>(null)
   onMount(() => {
     api.systemInfo().then((s) => (sys = s)).catch(() => {})
+    api.recommendPerformance().then((r) => (rec = r)).catch(() => {})
   })
 
   const s = app.settings
@@ -19,6 +22,38 @@
   const tooMuch = $derived(sys !== null && s.defaultMemoryMaxMb > totalMb * 0.75)
   const gb = (mb: number) => `${(mb / 1024).toFixed(mb % 1024 ? 1 : 0)} GB`
   const presets = $derived([2048, 4096, 6144, 8192, 12288, 16384].filter((m) => m <= ceiling))
+
+  const tierName = $derived(
+    rec
+      ? {
+          weak: t('Light hardware'),
+          modest: t('Modest hardware'),
+          capable: t('Capable hardware'),
+          strong: t('Powerful hardware'),
+        }[rec.tier]
+      : '',
+  )
+
+  const level = $derived(rec ? { weak: 0.3, modest: 0.55, capable: 0.8, strong: 1 }[rec.tier] : 0.5)
+
+  const isSaved = $derived(
+    rec !== null &&
+      s.defaultMemoryMaxMb === rec.memoryMaxMb &&
+      s.defaultMemoryMinMb === rec.memoryMinMb &&
+      s.defaultFlagProfile === rec.flagProfile &&
+      s.tuning.gcThreads === rec.tuning.gcThreads &&
+      s.tuning.disableExplicitGc === rec.tuning.disableExplicitGc &&
+      s.tuning.stringDedup === rec.tuning.stringDedup,
+  )
+
+  function applyRecommendation() {
+    if (!rec) return
+    s.defaultMemoryMaxMb = rec.memoryMaxMb
+    s.defaultMemoryMinMb = rec.memoryMinMb
+    s.defaultFlagProfile = rec.flagProfile
+    s.tuning = { ...s.tuning, gcThreads: rec.tuning.gcThreads, disableExplicitGc: rec.tuning.disableExplicitGc, stringDedup: rec.tuning.stringDedup, preTouch: rec.tuning.preTouch }
+    saveSettings()
+  }
 
   function setMax(mb: number) {
     s.defaultMemoryMaxMb = mb
@@ -58,6 +93,43 @@
 </header>
 
 <div class="groups">
+  <section class="group auto">
+    <h2>{t('Automatic optimizer')}</h2>
+    <p class="muted small intro">{t('Picks memory and Java settings that fit your computer, so you do not have to.')}</p>
+
+    {#if rec}
+      <div class="card" data-tier={rec.tier}>
+        <PixelField level={level} />
+        <div class="body">
+          <div class="eyebrow">{t('Detected')}</div>
+          <div class="tier">{tierName}</div>
+          <div class="facts">
+            <div><span class="muted small">{t('Memory')}</span><b>{gb(rec.memoryMaxMb)}</b></div>
+            <div><span class="muted small">{t('Java profile')}</span><b>{profiles().find((p) => p.id === rec?.flagProfile)?.label}</b></div>
+            <div><span class="muted small">{t('Threads')}</span><b>{cores}</b></div>
+          </div>
+          {#each rec.reasons as r}<p class="why">{t(r)}</p>{/each}
+          <div class="actions">
+            <button class="primary" disabled={isSaved} onclick={applyRecommendation}>{isSaved ? t('Saved') : t('Save')}</button>
+            <span class="muted small">{t('Saves these values as the defaults for new instances.')}</span>
+          </div>
+        </div>
+      </div>
+    {/if}
+
+    <div class="item">
+      <div class="txt">
+        <div class="n">{t('Optimize every launch automatically')}</div>
+        <div class="d">{t('Before each launch it checks your free memory and the mods in the instance, then sets memory and Java flags. You can still choose the garbage collector yourself.')}</div>
+        <div class="d">{t('It is a safe starting point, not always better than settings you tune yourself. If you know what your computer needs, manual values can do better.')}</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" bind:checked={s.autoOptimize} onchange={saveSettings} aria-label={t('Optimize every launch automatically')} />
+        <span class="track"></span>
+      </label>
+    </div>
+    {#if s.autoOptimize}<p class="warn small">{t('The optimizer is on, so memory and Java flags are chosen at launch. The manual values above are used only if you turn it off.')}</p>{/if}
+  </section>
   <section class="group">
     <h2>{t('Memory for new instances')}</h2>
     <p class="muted small intro">
@@ -223,5 +295,14 @@
   .wide { width: 100%; }
   .presets { display: flex; flex-wrap: wrap; gap: 6px; }
   .presets .on { background: #7c4dff; color: #fff; border-color: #7c4dff; box-shadow: 0 0 14px rgba(124, 77, 255, 0.55); }
+  .card { position: relative; overflow: hidden; margin: 14px 0 4px; border-radius: 20px; border: 1px solid var(--line-strong); background: var(--surface-2); isolation: isolate; }
+  .body { position: relative; display: grid; gap: 12px; padding: 24px 26px; }
+  .eyebrow { color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
+  .tier { font-size: 30px; font-weight: 700; letter-spacing: -0.035em; line-height: 1.05; }
+  .facts { display: flex; flex-wrap: wrap; gap: 14px 40px; margin-top: 4px; }
+  .facts div { display: grid; gap: 2px; }
+  .facts b { font-size: 17px; font-weight: 600; letter-spacing: -0.02em; }
+  .why { margin: 0; max-width: 460px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+  .actions { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; margin-top: 6px; }
   .warn { color: var(--text); background: var(--surface-2); border-radius: 12px; padding: 10px 14px; margin: 0; }
 </style>

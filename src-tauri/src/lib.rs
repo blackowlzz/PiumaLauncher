@@ -13,6 +13,7 @@ mod minecraft;
 mod modrinth;
 mod net;
 mod news;
+mod optimizer;
 mod paths;
 mod presence;
 mod runtime;
@@ -75,6 +76,7 @@ pub fn run() {
             commands::set_active_account,
             commands::detect_java,
             commands::system_info,
+            commands::recommend_performance,
             commands::list_runtimes,
             commands::install_runtime,
             commands::launch_instance,
