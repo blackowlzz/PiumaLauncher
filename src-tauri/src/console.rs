@@ -64,6 +64,7 @@ pub fn show(app: &AppHandle, inst: &Instance) {
     let url = WebviewUrl::App(format!("index.html?console={}", inst.id).into());
     let _ = WebviewWindowBuilder::new(app, &label, url)
         .title(format!("{} — Console", inst.name))
+        .decorations(false)
         .inner_size(1000.0, 600.0)
         .min_inner_size(520.0, 320.0)
         .center()

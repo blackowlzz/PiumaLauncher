@@ -34,6 +34,7 @@ export const app = $state({
   selectedId: null as string | null,
   games: {} as Record<string, GameStateEvent>,
   toast: null as string | null,
+  confirm: null as { message: string; confirmLabel: string; resolve: (ok: boolean) => void } | null,
   loaded: false,
   settings: defaultSettings() as Settings,
   versionImages: {} as Record<string, string>,
@@ -58,6 +59,20 @@ export function notify(message: unknown) {
   app.toast = String(message)
   clearTimeout(toastTimer)
   toastTimer = setTimeout(() => (app.toast = null), 6000)
+}
+
+export function askConfirm(message: string, confirmLabel = t('Delete')): Promise<boolean> {
+  app.confirm?.resolve(false)
+  return new Promise((resolve) => {
+    app.confirm = {
+      message,
+      confirmLabel,
+      resolve: (ok) => {
+        app.confirm = null
+        resolve(ok)
+      },
+    }
+  })
 }
 
 export async function reloadInstances() {

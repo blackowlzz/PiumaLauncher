@@ -1,7 +1,7 @@
 <script lang="ts">
   import { api, type Instance, type JavaInstall, type World } from './api'
   import { locale, t } from './i18n.svelte'
-  import { app, installedJavas, isBusy, notify, play, reloadInstances, stop } from './store.svelte'
+  import { app, askConfirm, installedJavas, isBusy, notify, play, reloadInstances, stop } from './store.svelte'
   import { formatBytes, loaderNames, profileName, profiles } from './meta'
   import Cover from './Cover.svelte'
   import ContentTable from './ContentTable.svelte'
@@ -75,7 +75,7 @@
 
   const remove = () =>
     attempt(async () => {
-      if (!inst || !confirm(t('Delete "{name}" with all its worlds and mods?', { name: inst.name }))) return
+      if (!inst || !(await askConfirm(t('Delete "{name}" with all its worlds and mods?', { name: inst.name })))) return
       await api.deleteInstance(inst.id)
       app.detailId = null
       app.page = 'library'

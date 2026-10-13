@@ -3,7 +3,7 @@
   import { api, type Instance } from './api'
   import Icon from './Icon.svelte'
   import { t } from './i18n.svelte'
-  import { app, isBusy, notify, openInstance, reloadInstances } from './store.svelte'
+  import { app, askConfirm, isBusy, notify, openInstance, reloadInstances } from './store.svelte'
 
   let { inst }: { inst: Instance } = $props()
 
@@ -46,7 +46,7 @@
 
   async function remove() {
     close()
-    if (!confirm(t('Delete "{name}" with all its worlds and mods?', { name: inst.name }))) return
+    if (!(await askConfirm(t('Delete "{name}" with all its worlds and mods?', { name: inst.name })))) return
     try {
       await api.deleteInstance(inst.id)
       if (app.selectedId === inst.id) app.selectedId = null

@@ -17,6 +17,7 @@
   import Settings from './lib/Settings.svelte'
   import Performance from './lib/Performance.svelte'
   import Intro from './lib/Intro.svelte'
+  import ConfirmDialog from './lib/ConfirmDialog.svelte'
   import Themes from './lib/Themes.svelte'
   import { applyTheme, isCustomized, resetTheme } from './lib/palette.svelte'
   import UpdateBanner from './lib/UpdateBanner.svelte'
@@ -188,6 +189,7 @@
   {/key}
 {/if}
 
+<ConfirmDialog />
 <Intro />
 <Welcome />
 

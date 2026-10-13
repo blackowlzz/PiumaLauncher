@@ -4,7 +4,7 @@
   import { LANGUAGES, i18n, setLanguage, stageText, t } from './i18n.svelte'
   import Select from './Select.svelte'
   import { formatBytes } from './meta'
-  import { app, installRuntime, notify, reloadRuntimes, saveSettings } from './store.svelte'
+  import { app, askConfirm, installRuntime, notify, reloadRuntimes, saveSettings } from './store.svelte'
 
   let storage = $state<StorageInfo | null>(null)
   const loadStorage = async () => (storage = await api.storageInfo().catch(() => null))
@@ -24,7 +24,7 @@
   }
 
   async function removeJava(r: RuntimeEntry) {
-    if (!confirm(t('Delete {name}?', { name: `${r.label} ${r.major}` }))) return
+    if (!(await askConfirm(t('Delete {name}?', { name: `${r.label} ${r.major}` })))) return
     try {
       await api.deleteRuntime(r.id)
       if (app.settings.preferredJava === r.id) {
@@ -58,7 +58,7 @@
   }
 
   async function deleteRuntime(name: string) {
-    if (!confirm(t('Delete {name}?', { name }))) return
+    if (!(await askConfirm(t('Delete {name}?', { name })))) return
     try {
       await api.deleteRuntime(name)
       await loadStorage()
