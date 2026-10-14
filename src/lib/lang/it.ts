@@ -558,4 +558,8 @@ export const it: Record<string, string> = {
   "Copy address": "Copia indirizzo",
   "Copy name": "Copia nome",
   "Copy UUID": "Copia UUID",
+  "Server": "Server",
+  "Players": "Giocatori",
+  "Ping": "Ping",
+  "Instance": "Istanza",
 }

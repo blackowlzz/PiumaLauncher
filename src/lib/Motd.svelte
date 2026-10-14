@@ -1,5 +1,5 @@
 <script lang="ts">
-  let { text }: { text: string } = $props()
+  let { text, compact = false }: { text: string; compact?: boolean } = $props()
 
   const palette: Record<string, string> = {
     '0': '#000000', '1': '#0000aa', '2': '#00aa00', '3': '#00aaaa', '4': '#aa0000', '5': '#aa00aa', '6': '#ffaa00', '7': '#aaaaaa',
@@ -46,10 +46,10 @@
     return out
   }
 
-  const lines = $derived(text.split('\n').slice(0, 2).map(parse))
+  const lines = $derived(text.split('\n').slice(0, compact ? 1 : 2).map(parse))
 </script>
 
-<div class="motd">
+<div class="motd" class:compact>
   {#each lines as segs, n}
     <div class="ln" style:--n={n}>{#each segs as s}<span class={s.cls} style:color={s.color}>{s.text}</span>{/each}</div>
   {/each}
@@ -57,6 +57,8 @@
 
 <style>
   .motd { display: grid; gap: 1px; padding: 8px 12px; border-radius: 10px; background: #0b0b0b; border: 1px solid #1f1f1f; color: #aaaaaa; font: 12.5px/1.45 ui-monospace, 'JetBrains Mono', monospace; letter-spacing: 0; min-width: 0; }
+  .motd.compact { padding: 0; background: none; border: 0; border-radius: 0; font: 13px/1.4 inherit; font-family: inherit; }
+  .motd.compact .ln { animation: none; }
   .ln { white-space: pre; overflow: hidden; text-overflow: ellipsis; animation: swapin 420ms var(--spring) calc(var(--n) * 90ms) backwards; }
   .fl { font-weight: 700; }
   .fo { font-style: italic; }
