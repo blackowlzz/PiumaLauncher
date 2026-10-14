@@ -412,6 +412,31 @@ pub fn transfer_content(from: &str, to: &str, kind: Content, files: &[String], r
     Ok(result)
 }
 
+pub fn import_content(instance_id: &str, kind: Content, files: &[String]) -> Result<TransferResult> {
+    instance::check_id(instance_id)?;
+    let dest_dir = paths::game_dir(instance_id).join(kind.folder());
+    std::fs::create_dir_all(&dest_dir)?;
+    let mut result = TransferResult { done: 0, skipped: 0 };
+    for file in files {
+        let src = PathBuf::from(file);
+        let Some(name) = src.file_name().and_then(|n| n.to_str()) else {
+            result.skipped += 1;
+            continue;
+        };
+        let base = name.strip_suffix(".disabled").unwrap_or(name);
+        let ok = plain_file_name(name).is_ok() && kind.accepts(name) && src.is_file();
+        if !ok || dest_dir.join(base).exists() || dest_dir.join(format!("{base}.disabled")).exists() {
+            result.skipped += 1;
+            continue;
+        }
+        let tmp = dest_dir.join(format!(".{name}.part"));
+        std::fs::copy(&src, &tmp)?;
+        std::fs::rename(&tmp, dest_dir.join(name))?;
+        result.done += 1;
+    }
+    Ok(result)
+}
+
 pub fn set_mod_enabled(instance_id: &str, file_name: &str, enabled: bool) -> Result<()> {
     let from = content_path(instance_id, Content::Mods, file_name)?;
     let base = file_name.strip_suffix(".disabled").unwrap_or(file_name);

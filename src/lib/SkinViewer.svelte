@@ -1,11 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte'
 
-  let { skin, size = 400, arrive = true, slim = false }: { skin: string; size?: number; arrive?: boolean; slim?: boolean } = $props()
+  let { skin, size = 400, arrive = true, slim = false, cape = null, turn = false }: { skin: string; size?: number; arrive?: boolean; slim?: boolean; cape?: string | null; turn?: boolean } = $props()
 
   type V3 = [number, number, number]
   type Uv = Record<'f' | 'b' | 'r' | 'l' | 't' | 'o', [number, number]>
-  interface Part { w: number; h: number; d: number; c: [number, number]; pivot: [number, number]; kind: 'head' | 'body' | 'armR' | 'armL' | 'legR' | 'legL'; uv: Uv; e?: number }
+  interface Part { w: number; h: number; d: number; c: [number, number]; pivot: [number, number]; kind: 'head' | 'body' | 'armR' | 'armL' | 'legR' | 'legL' | 'cape'; uv: Uv; e?: number; z?: number }
 
   function buildParts(slimArms: boolean): Part[] {
     const aw = slimArms ? 3 : 4
@@ -18,14 +18,15 @@
       { kind: 'armL', w: aw, h: 12, d: 4, c: [ac, 0], pivot: [ac, -6], uv: slimArms ? { f: [36, 52], b: [43, 52], r: [32, 52], l: [39, 52], t: [36, 48], o: [39, 48] } : { f: [36, 52], b: [44, 52], r: [32, 52], l: [40, 52], t: [36, 48], o: [40, 48] } },
       { kind: 'head', w: 8, h: 8, d: 8, c: [0, -10], pivot: [0, -6], uv: { f: [8, 8], b: [24, 8], r: [0, 8], l: [16, 8], t: [8, 0], o: [16, 0] } },
     ]
-    const shift: Record<Part['kind'], [number, number]> = { head: [32, 0], body: [0, 16], armR: [0, 16], armL: [16, 0], legR: [0, 16], legL: [-16, 0] }
+    const shift: Record<Exclude<Part['kind'], 'cape'>, [number, number]> = { head: [32, 0], body: [0, 16], armR: [0, 16], armL: [16, 0], legR: [0, 16], legL: [-16, 0] }
     const overlay = base.map((p): Part => {
-      const [dx, dy] = shift[p.kind]
+      const [dx, dy] = shift[p.kind as keyof typeof shift]
       const uv = Object.fromEntries(Object.entries(p.uv).map(([k, [u, v]]) => [k, [u + dx, v + dy]])) as Uv
       return { ...p, uv, e: p.kind === 'head' ? 0.5 : 0.25 }
     })
     return [...base, ...overlay]
   }
+  const CAPE: Part = { kind: 'cape', w: 10, h: 16, d: 1, c: [0, 2], z: -2.5, pivot: [0, -6], uv: { f: [12, 1], b: [1, 1], r: [0, 1], l: [11, 1], t: [1, 0], o: [11, 0] } }
   const PARTS_CLASSIC = buildParts(false)
   const PARTS_SLIM = buildParts(true)
 
@@ -47,6 +48,7 @@
 
   let canvas: HTMLCanvasElement | undefined = $state()
   let atlas: HTMLCanvasElement | null = null
+  let capeImg: HTMLImageElement | null = null
   let popAt = 0
   const W = $derived(Math.round(size * 0.82))
   const H = $derived(size)
@@ -99,12 +101,26 @@
     img.src = src
   })
 
+  $effect(() => {
+    const src = cape
+    if (!src) {
+      capeImg = null
+      return
+    }
+    const img = new Image()
+    img.onload = () => {
+      capeImg = img
+    }
+    img.src = src
+  })
+
   onMount(() => {
     const ctx = canvas!.getContext('2d')!
     const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
     const start = performance.now()
     let raf = 0
     const look = { x: 0, y: 0 }
+    let turned = 0
 
     const move = (e: PointerEvent) => {
       const r = canvas!.getBoundingClientRect()
@@ -151,7 +167,8 @@
       const swing = Math.sin(t * 1.9) * 0.22 * idle
       const pop = Math.max(0, 1 - (now - popAt) / 260)
       const popS = 1 + 0.05 * Math.sin(pop * Math.PI)
-      const yaw = (0.34 + look.x * 0.5) * (T >= 1 ? 1 : 0) + spin
+      turned += ((turn ? Math.PI : 0) - turned) * 0.12
+      const yaw = (0.34 + look.x * 0.5) * (T >= 1 ? 1 : 0) + spin + turned
       const pitch = look.y * -0.16 * idle
       const ox = (W * dpr) / 2
       const oy = (H * dpr) / 2 - 2 * s
@@ -170,11 +187,11 @@
       ctx.fill()
       ctx.restore()
 
-      type Item = { depth: number; sx: number; sy: number; m: [number, number, number, number, number, number]; fw: number; fh: number; shade: number }
+      type Item = { src: CanvasImageSource; k: number; depth: number; sx: number; sy: number; m: [number, number, number, number, number, number]; fw: number; fh: number; shade: number }
       const items: Item[] = []
       const headLook = [look.x * 0.5 * idle, look.y * -0.3 * idle]
       const place = (p0: V3, part: Part): V3 => {
-        let p: V3 = [p0[0] + part.c[0], p0[1] + part.c[1], p0[2]]
+        let p: V3 = [p0[0] + part.c[0], p0[1] + part.c[1], p0[2] + (part.z ?? 0)]
         const [px, py] = part.pivot
         const rotAround = (fn: (v: V3) => V3) => {
           const q = fn([p[0] - px, p[1] - py, p[2]])
@@ -183,6 +200,7 @@
         if (part.kind === 'armR' || part.kind === 'legL') rotAround((v) => rotX(v, swing))
         if (part.kind === 'armL' || part.kind === 'legR') rotAround((v) => rotX(v, -swing))
         if (part.kind === 'head') rotAround((v) => rotX(rotY(v, headLook[0]), headLook[1]))
+        if (part.kind === 'cape') rotAround((v) => rotX(v, -0.1 - Math.abs(swing) * 0.4))
         p = rotX(rotY(p, yaw), pitch)
         return [p[0] * popS, (p[1] + dropY + bob) * squash * popS, p[2]]
       }
@@ -191,9 +209,12 @@
         if (part.kind === 'armR' || part.kind === 'legL') n = rotX(n, swing)
         if (part.kind === 'armL' || part.kind === 'legR') n = rotX(n, -swing)
         if (part.kind === 'head') n = rotX(rotY(n, headLook[0]), headLook[1])
+        if (part.kind === 'cape') n = rotX(n, -0.1 - Math.abs(swing) * 0.4)
         return rotX(rotY(n, yaw), pitch)
       }
-      for (const part of slim ? PARTS_SLIM : PARTS_CLASSIC) {
+      const parts = slim ? PARTS_SLIM : PARTS_CLASSIC
+      for (const part of capeImg ? [...parts, CAPE] : parts) {
+        const isCape = part.kind === 'cape'
         const fs = faces(part.w, part.h, part.d, part.e ?? 0)
         for (const k of Object.keys(fs) as (keyof Uv)[]) {
           const f = fs[k]
@@ -206,6 +227,8 @@
           const vx = (Vv[0] - O[0]) * s, vy = (Vv[1] - O[1]) * s
           const light = Math.max(0, n[0] * LIGHT[0] + n[1] * LIGHT[1] + n[2] * LIGHT[2])
           items.push({
+            src: isCape ? capeImg! : atlas!,
+            k: isCape ? capeImg!.width / 64 : 1,
             depth: O[2] + (Uv[2] - O[2] + Vv[2] - O[2]) / 2,
             sx: part.uv[k][0], sy: part.uv[k][1], fw: f.fw, fh: f.fh,
             m: [ux / f.fw, uy / f.fw, vx / f.fh, vy / f.fh, ox + O[0] * s, oy + O[1] * s],
@@ -217,7 +240,7 @@
       const pad = 0.05
       for (const it of items) {
         ctx.setTransform(...it.m)
-        ctx.drawImage(atlas, it.sx, it.sy, it.fw, it.fh, -pad, -pad, it.fw + pad * 2, it.fh + pad * 2)
+        ctx.drawImage(it.src, it.sx * it.k, it.sy * it.k, it.fw * it.k, it.fh * it.k, -pad, -pad, it.fw + pad * 2, it.fh + pad * 2)
         if (it.shade > 0.01) {
           ctx.fillStyle = `rgba(0,0,0,${it.shade})`
           ctx.fillRect(-pad, -pad, it.fw + pad * 2, it.fh + pad * 2)

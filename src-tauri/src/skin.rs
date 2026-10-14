@@ -68,7 +68,7 @@ fn parse_textures(session: &Session) -> Option<(String, bool)> {
     Some((skin.url, slim))
 }
 
-fn trusted_texture_url(url: &str) -> Option<String> {
+pub fn trusted_texture_url(url: &str) -> Option<String> {
     let rest = url.strip_prefix("http://").or_else(|| url.strip_prefix("https://"))?;
     rest.starts_with("textures.minecraft.net/").then(|| format!("https://{rest}"))
 }
@@ -117,13 +117,20 @@ async fn download(client: &reqwest::Client, name: &str) -> Result<Option<SkinInf
         .json()
         .await?;
     let Some((url, slim)) = parse_textures(&session) else { return Ok(None) };
-    let url = trusted_texture_url(&url).ok_or_else(|| Error::msg("unexpected skin host"))?;
+    Ok(Some(SkinInfo { png: texture(client, &url).await?, slim }))
+}
 
+pub async fn texture(client: &reqwest::Client, url: &str) -> Result<String> {
+    let url = trusted_texture_url(url).ok_or_else(|| Error::msg("unexpected skin host"))?;
     let bytes = client.get(url).send().await?.error_for_status()?.bytes().await?;
     if bytes.len() > MAX_PNG || !bytes.starts_with(b"\x89PNG") {
         return Err(Error::msg("unexpected skin file"));
     }
-    Ok(Some(SkinInfo { png: format!("data:image/png;base64,{}", STANDARD.encode(&bytes)), slim }))
+    Ok(format!("data:image/png;base64,{}", STANDARD.encode(&bytes)))
+}
+
+pub fn remember(name: &str, info: SkinInfo) {
+    write_cache(name, &Some(info));
 }
 
 pub async fn fetch(client: &reqwest::Client, name: &str) -> Result<Option<SkinInfo>> {

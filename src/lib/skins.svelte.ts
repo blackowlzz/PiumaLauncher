@@ -21,3 +21,8 @@ export async function ensureSkin(name: string) {
     cache[key] = { state: 'none' }
   }
 }
+
+export async function refreshSkin(name: string) {
+  delete cache[name.toLowerCase()]
+  await ensureSkin(name)
+}

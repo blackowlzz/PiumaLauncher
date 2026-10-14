@@ -134,12 +134,51 @@
     app.page = 'explore'
   }
 
+  let dragging = $state(false)
+
+  async function importFiles(paths: string[]) {
+    if (vanillaMods || !paths.length) return
+    try {
+      const r = await modrinth.importContent(inst.id, kind, paths)
+      if (r.done) await load()
+      notify(r.skipped ? t('{done} added, {skipped} skipped', r) : t('{done} added', r))
+    } catch (e) {
+      notify(e)
+    }
+  }
+
+  $effect(() => {
+    let off: (() => void) | undefined
+    let gone = false
+    import('@tauri-apps/api/webview').then(async ({ getCurrentWebview }) => {
+      const un = await getCurrentWebview().onDragDropEvent((ev) => {
+        const p = ev.payload
+        if (p.type === 'enter' || p.type === 'over') dragging = !vanillaMods
+        else if (p.type === 'leave') dragging = false
+        else if (p.type === 'drop') {
+          dragging = false
+          importFiles(p.paths)
+        }
+      })
+      if (gone) un()
+      else off = un
+    })
+    return () => {
+      gone = true
+      off?.()
+    }
+  })
+
   const filters = [
     { id: 'all', label: () => t('All') },
     { id: 'enabled', label: () => t('Enabled') },
     { id: 'disabled', label: () => t('Disabled') },
   ] as const
 </script>
+
+{#if dragging}
+  <div class="drop" transition:fade={{ duration: 120 }}>{t('Drop files to add them')}</div>
+{/if}
 
 <div class="bar">
   <label class="search grow">
@@ -264,6 +303,7 @@
   .field input { padding-left: 38px; }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 
+  .drop { position: fixed; inset: 56px 8px 8px 8px; z-index: 50; display: grid; place-items: center; border: 2px dashed var(--line-strong); border-radius: 20px; background: color-mix(in srgb, var(--surface) 88%, transparent); font-size: 18px; font-weight: 600; pointer-events: none; }
   .table { border: 1px solid var(--line); border-radius: 20px; overflow: hidden; background: var(--surface); }
   .th, .tr { display: grid; grid-template-columns: 44px minmax(0, 1.7fr) minmax(0, 1fr) 132px; align-items: center; gap: 12px; padding: 0 18px 0 14px; }
   .th { height: 48px; border-bottom: 1px solid var(--line); font-size: 13px; font-weight: 600; color: var(--muted); }

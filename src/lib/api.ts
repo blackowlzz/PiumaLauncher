@@ -237,6 +237,9 @@ export const api = {
   checkUpdate: () => call<UpdateInfo | null>('check_update'),
   thumbnail: (url: string, width: number) => call<string>('thumbnail', { url, width }),
   fetchSkin: (name: string) => call<SkinInfo | null>('fetch_skin', { name }),
+  wardrobeLoad: (accountId: string) => call<Wardrobe>('wardrobe_load', { accountId }),
+  wardrobeSetSkin: (accountId: string, png: string, slim: boolean) => call<void>('wardrobe_set_skin', { accountId, png, slim }),
+  wardrobeSetCape: (accountId: string, capeId: string | null) => call<void>('wardrobe_set_cape', { accountId, capeId }),
   getSettings: () => call<Settings>('get_settings'),
   saveSettings: (settings: Settings) => call<void>('save_settings', { settings }),
   storageInfo: () => call<StorageInfo>('storage_info'),
@@ -392,6 +395,8 @@ export const modrinth = {
     call<string>('update_content', { instanceId, kind, fileName }),
   transferContent: (fromId: string, toId: string, kind: ContentKind, files: string[], removeSource: boolean) =>
     call<{ done: number; skipped: number }>('transfer_content', { fromId, toId, kind, files, removeSource }),
+  importContent: (instanceId: string, kind: ContentKind, files: string[]) =>
+    call<{ done: number; skipped: number }>('import_content', { instanceId, kind, files }),
   setModEnabled: (instanceId: string, fileName: string, enabled: boolean) =>
     call<void>('set_mod_enabled', { instanceId, fileName, enabled }),
 }
@@ -399,6 +404,18 @@ export const modrinth = {
 export interface SkinInfo {
   png: string
   slim: boolean
+}
+
+export interface Cape {
+  id: string
+  name: string
+  active: boolean
+  png: string | null
+}
+
+export interface Wardrobe {
+  skin: SkinInfo | null
+  capes: Cape[]
 }
 
 export interface Settings {

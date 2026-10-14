@@ -26,6 +26,7 @@ mod settings;
 mod share;
 mod shortcut;
 mod skin;
+mod wardrobe;
 mod stats;
 mod storage;
 mod thumb;
@@ -104,6 +105,7 @@ pub fn run() {
             commands::list_content,
             commands::remove_content,
             commands::transfer_content,
+            commands::import_content,
             commands::content_details,
             commands::update_content,
             commands::modrinth_categories,
@@ -112,6 +114,9 @@ pub fn run() {
             commands::minecraft_news,
             commands::get_settings,
             commands::fetch_skin,
+            commands::wardrobe_load,
+            commands::wardrobe_set_skin,
+            commands::wardrobe_set_cape,
             commands::thumbnail,
             commands::check_update,
             commands::save_settings,

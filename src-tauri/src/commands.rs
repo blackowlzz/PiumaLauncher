@@ -21,6 +21,7 @@ use crate::news::{self, NewsItem};
 use crate::settings;
 use crate::storage;
 use crate::skin;
+use crate::wardrobe;
 use crate::thumb;
 use crate::update;
 use crate::stats::{self, Session};
@@ -374,6 +375,11 @@ pub fn transfer_content(from_id: String, to_id: String, kind: Content, files: Ve
 }
 
 #[tauri::command(async)]
+pub fn import_content(instance_id: String, kind: Content, files: Vec<String>) -> Result<modrinth::TransferResult> {
+    modrinth::import_content(&instance_id, kind, &files)
+}
+
+#[tauri::command(async)]
 pub fn remove_content(instance_id: String, kind: Content, file_name: String) -> Result<()> {
     modrinth::remove_content(&instance_id, kind, &file_name)
 }
@@ -494,6 +500,21 @@ pub async fn thumbnail(url: String, width: u32) -> Result<String> {
 #[tauri::command]
 pub async fn fetch_skin(name: String) -> Result<Option<skin::SkinInfo>> {
     skin::fetch(&net::client(), &name).await
+}
+
+#[tauri::command]
+pub async fn wardrobe_load(account_id: String) -> Result<wardrobe::Wardrobe> {
+    wardrobe::load(&account_id).await
+}
+
+#[tauri::command]
+pub async fn wardrobe_set_skin(account_id: String, png: String, slim: bool) -> Result<()> {
+    wardrobe::set_skin(&account_id, &png, slim).await
+}
+
+#[tauri::command]
+pub async fn wardrobe_set_cape(account_id: String, cape_id: Option<String>) -> Result<()> {
+    wardrobe::set_cape(&account_id, cape_id.as_deref()).await
 }
 
 #[tauri::command]

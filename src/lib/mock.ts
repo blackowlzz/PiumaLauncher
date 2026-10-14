@@ -171,6 +171,31 @@ export async function mock(cmd: string, args: Record<string, unknown>): Promise<
         return null
       }
     }
+    case 'wardrobe_load': {
+      const { makeSkin } = await import('./skin')
+      const cape = (a: string, b: string) => {
+        const cv = document.createElement('canvas')
+        cv.width = 64
+        cv.height = 32
+        const c = cv.getContext('2d')!
+        c.fillStyle = a
+        c.fillRect(0, 0, 64, 32)
+        c.fillStyle = b
+        c.fillRect(1, 1, 10, 16)
+        c.fillRect(12, 1, 10, 16)
+        return cv.toDataURL('image/png')
+      }
+      return {
+        skin: { png: makeSkin('Piuma'), slim: false },
+        capes: [
+          { id: 'a1', name: 'Migrator', active: true, png: cape('#7a1f1f', '#c0392b') },
+          { id: 'b2', name: 'Vanilla', active: false, png: cape('#1f3a7a', '#3a7bd5') },
+        ],
+      }
+    }
+    case 'wardrobe_set_skin':
+    case 'wardrobe_set_cape':
+      return null
     case 'get_settings': {
       const forced = new URLSearchParams(location.search).get('lang')
       let saved: Record<string, unknown> = {}
