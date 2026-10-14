@@ -3,6 +3,7 @@
 
   let { level }: { level: number } = $props()
 
+  const FRAME_MS = 1000 / 30 - 2
   const CELL = 10
   let canvas: HTMLCanvasElement
   let width = 0
@@ -61,6 +62,7 @@
     })
     ro.observe(canvas.parentElement!)
     let raf = 0
+    let drawn = 0
     const loop = (time: number) => {
       raf = requestAnimationFrame(loop)
       const still = document.documentElement.hasAttribute('data-reduce') || document.documentElement.hasAttribute('data-idle')
@@ -68,6 +70,8 @@
         prev = 0
         return
       }
+      if (time - drawn < FRAME_MS && Math.abs(live - level) < 0.001) return
+      drawn = time
       draw(still ? 0 : time)
     }
     raf = requestAnimationFrame(loop)

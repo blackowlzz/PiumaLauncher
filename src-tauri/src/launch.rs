@@ -12,13 +12,14 @@ use tokio::sync::oneshot;
 
 use crate::accounts::{self, Account, AccountKind};
 use crate::error::{Error, Result};
-use crate::{console, flags};
+use crate::{console, crash, flags};
 use crate::install::{self, Prepared};
 use crate::instance::Instance;
 use crate::java::{self, JavaInstall};
 use crate::loaders::Loader;
 use crate::microsoft::{self, Session};
 use crate::minecraft::{rules_allow, Arg, OneOrMany};
+use crate::servers::{self, QuickPlay};
 use crate::{net, paths, presence, runtime, settings, stats, Running};
 
 const SHIM_CLASS: &[u8] = include_bytes!("../shim/PiumaShim.class");
@@ -71,10 +72,23 @@ fn sample_memory(app: AppHandle, id: String, pid: u32, done: Arc<AtomicBool>) {
 }
 
 fn expand(s: &str, vars: &HashMap<&'static str, String>) -> String {
-    let mut out = s.to_string();
-    for (k, v) in vars {
-        out = out.replace(&format!("${{{k}}}"), v);
+    let mut out = String::with_capacity(s.len());
+    let mut rest = s;
+    while let Some(start) = rest.find("${") {
+        out.push_str(&rest[..start]);
+        let tail = &rest[start + 2..];
+        match tail.find('}').and_then(|end| vars.get(&tail[..end]).map(|v| (end, v))) {
+            Some((end, v)) => {
+                out.push_str(v);
+                rest = &tail[end + 1..];
+            }
+            None => {
+                out.push_str("${");
+                rest = tail;
+            }
+        }
     }
+    out.push_str(rest);
     out
 }
 
@@ -93,7 +107,28 @@ fn collect(args: &[Arg], vars: &HashMap<&'static str, String>) -> Vec<String> {
     out
 }
 
-pub fn build_args(prep: &Prepared, inst: &Instance, acc: &Account, session: Option<&Session>, java: &JavaInstall) -> Result<Vec<String>> {
+fn has_game_flag(args: &[Arg], flag: &str) -> bool {
+    args.iter().any(|a| match a {
+        Arg::Plain(s) => s == flag,
+        Arg::Ruled { value: OneOrMany::One(s), .. } => s == flag,
+        Arg::Ruled { value: OneOrMany::Many(v), .. } => v.iter().any(|s| s == flag),
+    })
+}
+
+fn quick_play_args(prep: &Prepared, quick: &QuickPlay) -> Result<Vec<String>> {
+    let modern = prep.resolved.version.arguments.as_ref().is_some_and(|a| has_game_flag(&a.game, "--quickPlayMultiplayer"));
+    Ok(match (quick, modern) {
+        (QuickPlay::Server { address }, true) => vec!["--quickPlayMultiplayer".into(), address.trim().into()],
+        (QuickPlay::Server { address }, false) => {
+            let (host, port) = servers::split(address);
+            vec!["--server".into(), host, "--port".into(), port.unwrap_or(25565).to_string()]
+        }
+        (QuickPlay::World { folder }, true) => vec!["--quickPlaySingleplayer".into(), folder.clone()],
+        (QuickPlay::World { .. }, false) => return Err(Error::msg("Opening a world directly needs Minecraft 1.20 or newer")),
+    })
+}
+
+pub fn build_args(prep: &Prepared, inst: &Instance, acc: &Account, session: Option<&Session>, java: &JavaInstall, quick: Option<&QuickPlay>) -> Result<Vec<String>> {
     let v = &prep.resolved.version;
     let sep = if cfg!(windows) { ";" } else { ":" };
     let shim_dir = session.is_some().then(paths::shim_dir);
@@ -162,10 +197,13 @@ pub fn build_args(prep: &Prepared, inst: &Instance, acc: &Account, session: Opti
     }
     args.push(main_class);
     args.extend(game);
+    if let Some(q) = quick {
+        args.extend(quick_play_args(prep, q)?);
+    }
     Ok(args)
 }
 
-async fn start(app: &AppHandle, inst: &Instance, acc: &Account) -> Result<(Child, Option<String>)> {
+async fn start(app: &AppHandle, inst: &Instance, acc: &Account, quick: Option<&QuickPlay>) -> Result<(Child, Option<String>)> {
     let client = net::client();
     let progress = |stage: &str, done: u32, total: u32| {
         emit_state(app, &inst.id, "preparing", Some(stage), done, total, None, None)
@@ -224,7 +262,7 @@ async fn start(app: &AppHandle, inst: &Instance, acc: &Account) -> Result<(Child
     if session.is_some() {
         ensure_shim()?;
     }
-    let args = build_args(&prep, inst, acc, session.as_ref(), &java)?;
+    let args = build_args(&prep, inst, acc, session.as_ref(), &java, quick)?;
     let mut cmd = Command::new(&java.path);
     cmd.args(args)
         .current_dir(&game_dir)
@@ -251,7 +289,7 @@ async fn start(app: &AppHandle, inst: &Instance, acc: &Account) -> Result<(Child
     Ok((child, session.map(|s| s.token)))
 }
 
-fn forward_lines<R: AsyncRead + Unpin + Send + 'static>(app: AppHandle, id: String, reader: R, secret: Option<String>, console: bool) {
+fn forward_lines<R: AsyncRead + Unpin + Send + 'static>(app: AppHandle, id: String, reader: R, secret: Option<String>, console: bool, tail: crash::Tail) -> tauri::async_runtime::JoinHandle<()> {
     tauri::async_runtime::spawn(async move {
         let mut lines = BufReader::new(reader).lines();
         while let Ok(Some(line)) = lines.next_line().await {
@@ -260,25 +298,28 @@ fn forward_lines<R: AsyncRead + Unpin + Send + 'static>(app: AppHandle, id: Stri
                 Some(s) if line.contains(s.as_str()) => line.replace(s.as_str(), "***"),
                 _ => line,
             };
+            tail.push(&line);
             if console {
                 console::push(&app, &id, &line);
             }
         }
-    });
+    })
 }
 
-pub async fn run(app: AppHandle, inst: Instance, acc: Account, mut kill_rx: oneshot::Receiver<()>) {
+pub async fn run(app: AppHandle, inst: Instance, acc: Account, quick: Option<QuickPlay>, mut kill_rx: oneshot::Receiver<()>) {
     let id = inst.id.clone();
-    match start(&app, &inst, &acc).await {
+    crash::forget(&id);
+    match start(&app, &inst, &acc, quick.as_ref()).await {
         Err(e) => emit_state(&app, &id, "error", None, 0, 0, Some(e.to_string()), None),
         Ok((mut child, secret)) => {
             emit_state(&app, &id, "running", None, 0, 0, None, None);
-            let console = settings::load().live_console;
+            let prefs = settings::load();
+            let console = prefs.live_console;
             if console {
                 console::start(&app, &inst);
             }
             presence::start(&id, &acc.name, &inst.mc_version);
-            let minimized = settings::load().minimize_on_launch;
+            let minimized = prefs.minimize_on_launch;
             if minimized {
                 if let Some(w) = app.get_webview_window("main") {
                     let _ = w.minimize();
@@ -286,21 +327,24 @@ pub async fn run(app: AppHandle, inst: Instance, acc: Account, mut kill_rx: ones
             }
             let started = std::time::Instant::now();
             let started_ms = stats::now_ms();
+            let since = std::time::SystemTime::now() - std::time::Duration::from_secs(2);
+            let tail = crash::Tail::default();
+            let mut readers = vec![];
             let done = Arc::new(AtomicBool::new(false));
             if let Some(pid) = child.id() {
                 sample_memory(app.clone(), id.clone(), pid, done.clone());
             }
             if let Some(out) = child.stdout.take() {
-                forward_lines(app.clone(), id.clone(), out, secret.clone(), console);
+                readers.push(forward_lines(app.clone(), id.clone(), out, secret.clone(), console, tail.clone()));
             }
             if let Some(err) = child.stderr.take() {
-                forward_lines(app.clone(), id.clone(), err, secret.clone(), console);
+                readers.push(forward_lines(app.clone(), id.clone(), err, secret.clone(), console, tail.clone()));
             }
-            let code = tokio::select! {
-                status = child.wait() => status.ok().and_then(|s| s.code()),
+            let (code, stopped) = tokio::select! {
+                status = child.wait() => (status.ok().and_then(|s| s.code()), false),
                 Ok(()) = &mut kill_rx => {
                     let _ = child.kill().await;
-                    None
+                    (None, true)
                 }
             };
             done.store(true, Ordering::Relaxed);
@@ -313,6 +357,10 @@ pub async fn run(app: AppHandle, inst: Instance, acc: Account, mut kill_rx: ones
             }
             stats::record(&id, started_ms, started.elapsed().as_secs());
             emit_state(&app, &id, "exited", None, 0, 0, None, code);
+            if !stopped {
+                let _ = tokio::time::timeout(std::time::Duration::from_secs(2), futures_util::future::join_all(readers)).await;
+                crash::inspect(&app, inst, code, since, tail).await;
+            }
         }
     }
     if let Some(running) = app.try_state::<Running>() {
@@ -357,7 +405,7 @@ pub(crate) mod tests {
         let required = prep.resolved.required_java();
         let java = runtime::ensure(client, required, &progress).await.unwrap().expect("no managed runtime");
         eprintln!("java: {java:?}");
-        let args = build_args(&prep, inst, &acc, None, &java).unwrap();
+        let args = build_args(&prep, inst, &acc, None, &java, None).unwrap();
 
         let mut cmd = Command::new(&java.path);
         cmd.args(args).current_dir(&game_dir).stdout(Stdio::piped()).stderr(Stdio::piped()).kill_on_drop(true);
@@ -370,6 +418,14 @@ pub(crate) mod tests {
         }
         let _ = child.kill().await;
         out
+    }
+
+    #[test]
+    fn expand_replaces_known_vars_only() {
+        let vars = HashMap::from([("a", "1".to_string()), ("b", "${a}".to_string())]);
+        assert_eq!(expand("x${a}y${b}z", &vars), "x1y${a}z");
+        assert_eq!(expand("${missing}-${a", &vars), "${missing}-${a");
+        assert_eq!(expand("${x${a}", &vars), "${x1");
     }
 
     #[tokio::test]

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte'
   import { fly } from 'svelte/transition'
-  import { app, init, installModpack, notify, saveSettings, type Page } from './lib/store.svelte'
+  import { app, handleCli, init, installModpack, notify, saveSettings, type Page } from './lib/store.svelte'
   import { inTauri } from './lib/api'
   import { t } from './lib/i18n.svelte'
   import LanguageMenu from './lib/LanguageMenu.svelte'
@@ -14,10 +14,14 @@
   import PlayBar from './lib/PlayBar.svelte'
   import Accounts from './lib/Accounts.svelte'
   import Explore from './lib/Explore.svelte'
+  import QuickPlay from './lib/QuickPlay.svelte'
   import Settings from './lib/Settings.svelte'
   import Performance from './lib/Performance.svelte'
   import Intro from './lib/Intro.svelte'
   import ConfirmDialog from './lib/ConfirmDialog.svelte'
+  import CrashDialog from './lib/CrashDialog.svelte'
+  import InstanceChooser from './lib/InstanceChooser.svelte'
+  import DropZone from './lib/DropZone.svelte'
   import Themes from './lib/Themes.svelte'
   import { applyTheme, isCustomized, resetTheme } from './lib/palette.svelte'
   import UpdateBanner from './lib/UpdateBanner.svelte'
@@ -25,8 +29,9 @@
   import { maybeBench } from './lib/bench'
   import { smoothScroll } from './lib/smoothscroll'
 
-  const tabs: { id: Page; label: string; icon: 'home' | 'grid' | 'compass' | 'user' | 'settings' | 'palette' | 'cpu' }[] = [
+  const tabs: { id: Page; label: string; icon: 'home' | 'grid' | 'server' | 'compass' | 'user' | 'settings' | 'palette' | 'cpu' }[] = [
     { id: 'home', label: 'Home', icon: 'home' },
+    { id: 'quickplay', label: 'Quick Play', icon: 'server' },
     { id: 'library', label: 'Library', icon: 'grid' },
     { id: 'explore', label: 'Explore', icon: 'compass' },
     { id: 'accounts', label: 'Account', icon: 'user' },
@@ -77,7 +82,7 @@
     void fitScale()
   })
 
-  const order: Page[] = ['home', 'library', 'explore', 'accounts', 'themes', 'performance', 'settings']
+  const order: Page[] = ['home', 'quickplay', 'library', 'explore', 'accounts', 'themes', 'performance', 'settings']
   async function shortcuts(e: KeyboardEvent) {
     const el = e.target as HTMLElement | null
     const typing = !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
@@ -88,7 +93,7 @@
       app.page = 'explore'
       await tick()
       document.querySelector<HTMLInputElement>('main input[type="search"]')?.focus()
-    } else if (mod && /^[1-7]$/.test(e.key)) {
+    } else if (mod && /^[1-8]$/.test(e.key)) {
       e.preventDefault()
       app.page = order[Number(e.key) - 1]
     }
@@ -109,7 +114,7 @@
     const onScheme = () => (systemDark = !scheme.matches)
     scheme.addEventListener('change', onScheme)
     addEventListener('resize', fitScale)
-    init().then(maybeBench).catch((e) => notify(t('Startup error: {error}', { error: e })))
+    init().then(maybeBench).then(handleCli).catch((e) => notify(t('Startup error: {error}', { error: e })))
     return () => {
       document.removeEventListener('visibilitychange', idle)
       removeEventListener('focus', idle)
@@ -160,6 +165,8 @@
             <Library />
           {:else if app.page === 'instance'}
             <InstanceDetail />
+          {:else if app.page === 'quickplay'}
+            <QuickPlay />
           {:else if app.page === 'accounts'}
             <Accounts />
           {:else if app.page === 'themes'}
@@ -189,6 +196,11 @@
   {/key}
 {/if}
 
+{#if app.joining}
+  {#key app.joining.address}<InstanceChooser server={app.joining} onClose={() => (app.joining = null)} />{/key}
+{/if}
+<CrashDialog />
+<DropZone />
 <ConfirmDialog />
 <Intro />
 <Welcome />

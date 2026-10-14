@@ -1,6 +1,8 @@
 mod accounts;
+mod cli;
 mod commands;
 mod console;
+mod crash;
 mod error;
 mod flags;
 mod install;
@@ -12,13 +14,17 @@ mod loaders;
 mod microsoft;
 mod minecraft;
 mod modrinth;
+mod nbt;
 mod net;
 mod news;
 mod optimizer;
 mod paths;
 mod presence;
 mod runtime;
+mod servers;
 mod settings;
+mod share;
+mod shortcut;
 mod skin;
 mod stats;
 mod storage;
@@ -36,6 +42,11 @@ pub struct Running(pub Mutex<HashMap<String, oneshot::Sender<()>>>);
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let request = cli::parse(std::env::args().skip(1));
+    if cli::forward(&request) {
+        return;
+    }
+
     #[cfg(target_os = "linux")]
     if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
         std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
@@ -60,6 +71,7 @@ pub fn run() {
                 }
             }
             presence::launcher();
+            cli::serve(app.handle().clone(), request);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -118,6 +130,22 @@ pub fn run() {
             commands::duplicate_instance,
             commands::console_history,
             commands::open_console,
+            commands::apply_crash_fix,
+            commands::open_crash_report,
+            commands::list_servers,
+            commands::add_server,
+            commands::remove_server,
+            commands::ping_server,
+            commands::recent_worlds,
+            commands::take_cli_request,
+            commands::create_shortcut,
+            commands::export_mrpack,
+            commands::share_code,
+            commands::import_share_code,
+            commands::import_modrinth_link,
+            commands::import_mrpack_file,
+            commands::import_mrpack_bytes,
+            commands::reveal_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while starting PiumaLauncher");

@@ -1,5 +1,6 @@
 
 use std::path::{Component, Path, PathBuf};
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use serde::{Deserialize, Serialize};
 
@@ -172,9 +173,13 @@ async fn install(
     let archive = paths::runtimes().join(".download").join(format!("{}-{major}.{ext}", flavor.slug()));
     let job = Job { url: dl.url, path: archive.clone(), check: Check::Sha256(dl.sha256), size: dl.size };
     let _ = tokio::fs::remove_file(&archive).await;
+    let shown = AtomicU32::new(u32::MAX);
     net::download_with_progress(client, &job, Some(&|got, total| {
         if let Some(t) = total.filter(|t| *t > 0) {
-            progress(&stage, (got * 100 / t) as u32, 100);
+            let percent = (got * 100 / t) as u32;
+            if shown.swap(percent, Ordering::Relaxed) != percent {
+                progress(&stage, percent, 100);
+            }
         }
     }))
     .await?;

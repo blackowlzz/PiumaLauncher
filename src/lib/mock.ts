@@ -185,6 +185,8 @@ export async function mock(cmd: string, args: Record<string, unknown>): Promise<
     case 'console_history':
       return []
     case 'open_console':
+    case 'apply_crash_fix':
+    case 'open_crash_report':
       return null
     case 'save_settings':
       try { localStorage.setItem('mock-settings', JSON.stringify(args.settings)) } catch {  }
@@ -247,7 +249,43 @@ export async function mock(cmd: string, args: Record<string, unknown>): Promise<
         { title: 'Minecraft 26.3 Release Candidate 1', version: '26.3-rc-1', kind: 'snapshot', date: '2026-09-18T10:00:00Z', summary: 'Final fixes before release.', imageUrl: null },
       ]
     case 'list_worlds':
-      return [{ folder: 'Nuovo mondo', size: 48_000_000, modifiedMs: Date.now() - 3_600_000 }]
+      return [{ folder: 'Nuovo mondo', name: 'Nuovo mondo', size: 48_000_000, modifiedMs: Date.now() - 3_600_000 }]
+    case 'list_servers':
+      return [
+        { name: 'Hypixel', address: 'mc.hypixel.net', icon: null, instances: ['survival-a1b2', 'vanilla-e5f6'] },
+        { name: 'Server di casa', address: '192.168.1.20', icon: null, instances: ['survival-a1b2'] },
+      ].filter((s) => !args.instanceId || s.instances.includes(String(args.instanceId)))
+    case 'take_cli_request':
+      return null
+    case 'export_mrpack':
+      await new Promise((r) => setTimeout(r, 1400))
+      return { path: '/home/steve/Scaricati/Cobblemon.mrpack', linked: 142, bundled: 3 }
+    case 'share_code':
+      await new Promise((r) => setTimeout(r, 1100))
+      return { code: 'PIUMA1-DckxCoAwEAXRq8jWGoyFoJ2llYVeIJqELGQVVrER755fvpmPThppTU5DtYX7oZoEwZquNRbIQHS78tHky_mgaC8abm8GIAKycPIzy0R_AQ', included: 142, excluded: ['homemade-1.0.jar', 'secret-tweaks.jar'] }
+    case 'import_share_code':
+    case 'import_modrinth_link':
+    case 'import_mrpack_file':
+    case 'import_mrpack_bytes':
+      await new Promise((r) => setTimeout(r, 1500))
+      return { instance: instances[0], skipped: 0 }
+    case 'reveal_file':
+      return null
+    case 'create_shortcut':
+      await new Promise((r) => setTimeout(r, 500))
+      return null
+    case 'add_server':
+    case 'remove_server':
+      return null
+    case 'ping_server':
+      await new Promise((r) => setTimeout(r, 400 + Math.random() * 900))
+      if (String(args.address).startsWith('192.')) throw 'The server did not answer'
+      return { motd: '§r§a§lHypixel Network §c[1.8-1.21]\n§r§6§lHALLOWEEN EVENT', version: 'Requires MC 1.8 / 1.21', protocol: 47, online: 31_204, max: 200_000, latencyMs: 48, favicon: null, sample: [] }
+    case 'recent_worlds':
+      return [
+        { instanceId: 'survival-a1b2', folder: 'Nuovo mondo', name: 'Nuovo mondo', modifiedMs: Date.now() - 3_600_000, mode: 0, hardcore: false, icon: null },
+        { instanceId: 'redstone-0789', folder: 'Lab', name: 'Laboratorio', modifiedMs: Date.now() - 90_000_000, mode: 1, hardcore: false, icon: null },
+      ]
     case 'detect_java':
       return [{ path: '/usr/lib/jvm/graalvm/bin/java', major: 25, version: '25.0.4', isGraal: true }]
     case 'transfer_content':

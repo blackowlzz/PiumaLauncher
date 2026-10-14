@@ -4,6 +4,11 @@ use tokio::sync::oneshot;
 
 use crate::accounts::{self, Account, AccountStore};
 use crate::console;
+use crate::cli;
+use crate::crash;
+use crate::shortcut;
+use crate::share;
+use crate::servers::{self, QuickPlay};
 use crate::error::{Error, Result};
 use crate::instance::{self, Instance};
 use crate::java::{self, JavaInstall};
@@ -33,7 +38,7 @@ pub async fn list_mc_versions() -> Result<Vec<VersionEntry>> {
         .collect())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_instances() -> Vec<Instance> {
     instance::list()
 }
@@ -59,12 +64,14 @@ pub fn update_instance(instance: Instance) -> Result<()> {
     instance::save(&instance)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn delete_instance(running: State<'_, Running>, id: String) -> Result<()> {
     if running.0.lock().unwrap().contains_key(&id) {
         return Err(Error::msg("Close the game before deleting the instance"));
     }
-    instance::delete(&id)
+    instance::delete(&id)?;
+    shortcut::forget(&id);
+    Ok(())
 }
 
 #[tauri::command]
@@ -114,7 +121,7 @@ pub struct SystemInfo {
     cpu_cores: usize,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn system_info() -> SystemInfo {
     let mut sys = sysinfo::System::new();
     sys.refresh_memory();
@@ -124,7 +131,7 @@ pub fn system_info() -> SystemInfo {
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn recommend_performance() -> crate::optimizer::Recommendation {
     crate::optimizer::recommend(&crate::optimizer::hardware(), 0)
 }
@@ -140,8 +147,11 @@ pub async fn install_runtime(app: AppHandle, flavor: String, major: u32) -> Resu
 }
 
 #[tauri::command]
-pub fn launch_instance(app: AppHandle, running: State<'_, Running>, id: String) -> Result<()> {
+pub fn launch_instance(app: AppHandle, running: State<'_, Running>, id: String, quick_play: Option<QuickPlay>) -> Result<()> {
     let inst = instance::get(&id)?;
+    if let Some(q) = &quick_play {
+        q.validate(&id)?;
+    }
     let account = accounts::active().ok_or_else(|| Error::msg("Create or select an account before playing"))?;
 
     let (tx, rx) = oneshot::channel();
@@ -152,7 +162,7 @@ pub fn launch_instance(app: AppHandle, running: State<'_, Running>, id: String) 
         }
         map.insert(id, tx);
     }
-    tauri::async_runtime::spawn(launch::run(app, inst, account, rx));
+    tauri::async_runtime::spawn(launch::run(app, inst, account, quick_play, rx));
     Ok(())
 }
 
@@ -163,7 +173,7 @@ pub fn stop_instance(running: State<'_, Running>, id: String) {
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn console_history(instance_id: String) -> Result<Vec<console::Line>> {
     instance::check_id(&instance_id)?;
     Ok(console::history(&instance_id))
@@ -177,6 +187,106 @@ pub fn open_console(app: AppHandle, instance_id: String) -> Result<()> {
     let inst = instance::get(&instance_id)?;
     console::show(&app, &inst);
     Ok(())
+}
+
+#[tauri::command]
+pub async fn apply_crash_fix(app: AppHandle, instance_id: String) -> Result<()> {
+    crash::apply(&net::client(), &instance_id, &progress_emitter(&app)).await
+}
+
+#[tauri::command(async)]
+pub fn open_crash_report(instance_id: String) -> Result<()> {
+    crash::open_report(&instance_id)
+}
+
+#[tauri::command(async)]
+pub fn list_servers(instance_id: Option<String>) -> Result<Vec<servers::Server>> {
+    servers::list(instance_id.as_deref())
+}
+
+fn ensure_closed(running: &Running, ids: &[String]) -> Result<()> {
+    let map = running.0.lock().unwrap();
+    if ids.iter().any(|id| map.contains_key(id)) {
+        return Err(Error::msg("Close the game before editing its servers"));
+    }
+    Ok(())
+}
+
+#[tauri::command(async)]
+pub fn add_server(running: State<'_, Running>, instance_ids: Vec<String>, name: String, address: String) -> Result<()> {
+    ensure_closed(&running, &instance_ids)?;
+    servers::add(&instance_ids, &name, &address)
+}
+
+#[tauri::command(async)]
+pub fn remove_server(running: State<'_, Running>, instance_ids: Vec<String>, address: String) -> Result<()> {
+    ensure_closed(&running, &instance_ids)?;
+    servers::remove(&instance_ids, &address)
+}
+
+#[tauri::command]
+pub async fn ping_server(address: String) -> Result<servers::Status> {
+    servers::ping(&address).await
+}
+
+#[tauri::command(async)]
+pub fn recent_worlds(limit: usize) -> Vec<servers::RecentWorld> {
+    servers::recent_worlds(limit.min(24))
+}
+
+#[tauri::command]
+pub fn take_cli_request() -> Option<cli::Request> {
+    cli::take()
+}
+
+#[tauri::command]
+pub async fn create_shortcut(instance_id: String) -> Result<()> {
+    let inst = instance::get(&instance_id)?;
+    shortcut::create(&net::client(), &inst).await
+}
+
+#[tauri::command]
+pub async fn export_mrpack(app: AppHandle, instance_id: String, options: share::ExportOptions) -> Result<share::Exported> {
+    let inst = instance::get(&instance_id)?;
+    share::export(&net::client(), &inst, options, &progress_emitter(&app)).await
+}
+
+#[tauri::command]
+pub async fn share_code(app: AppHandle, instance_id: String) -> Result<share::ShareCode> {
+    let inst = instance::get(&instance_id)?;
+    share::share_code(&net::client(), &inst, &progress_emitter(&app)).await
+}
+
+#[tauri::command]
+pub async fn import_share_code(app: AppHandle, code: String) -> Result<share::Imported> {
+    share::import_code(&net::client(), &code, &progress_emitter(&app)).await
+}
+
+#[tauri::command]
+pub async fn import_modrinth_link(app: AppHandle, link: String) -> Result<share::Imported> {
+    share::import_link(&net::client(), &link, &progress_emitter(&app)).await
+}
+
+#[tauri::command]
+pub async fn import_mrpack_file(app: AppHandle, path: String) -> Result<share::Imported> {
+    share::import_file(&net::client(), std::path::Path::new(&path), &progress_emitter(&app)).await
+}
+
+#[tauri::command]
+pub async fn import_mrpack_bytes(app: AppHandle, request: tauri::ipc::Request<'_>) -> Result<share::Imported> {
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err(Error::msg("Choose a .mrpack file"));
+    };
+    share::import_bytes(&net::client(), bytes, &progress_emitter(&app)).await
+}
+
+#[tauri::command(async)]
+pub fn reveal_file(path: String) -> Result<()> {
+    let p = std::path::Path::new(&path);
+    if !p.is_file() || !p.extension().is_some_and(|e| e == "mrpack") {
+        return Err(Error::msg("File not found"));
+    }
+    library::open_path(p.parent().ok_or_else(|| Error::msg("File not found"))?)
 }
 
 #[tauri::command]
@@ -225,7 +335,7 @@ pub async fn project_page(project_id: String) -> Result<modrinth::ProjectPage> {
     modrinth::project_page(&net::client(), &project_id).await
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn open_url(url: String) -> Result<()> {
     library::open_url(&url)
 }
@@ -241,7 +351,7 @@ pub async fn install_content(app: AppHandle, instance_id: String, project_id: St
     modrinth::install_content(&net::client(), &inst, &project_id, kind, &progress_emitter(&app)).await
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_content(instance_id: String, kind: Content) -> Result<Vec<ModFile>> {
     modrinth::list_content(&instance_id, kind)
 }
@@ -258,12 +368,12 @@ pub async fn update_content(instance_id: String, kind: Content, file_name: Strin
     modrinth::update_content(&net::client(), &inst, kind, &file_name).await
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn transfer_content(from_id: String, to_id: String, kind: Content, files: Vec<String>, remove_source: bool) -> Result<modrinth::TransferResult> {
     modrinth::transfer_content(&from_id, &to_id, kind, &files, remove_source)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn remove_content(instance_id: String, kind: Content, file_name: String) -> Result<()> {
     modrinth::remove_content(&instance_id, kind, &file_name)
 }
@@ -280,7 +390,7 @@ pub async fn list_worlds(instance_id: String) -> Result<Vec<library::World>> {
         .map_err(|e| Error::msg(e.to_string()))?
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn open_folder(instance_id: String, which: String) -> Result<()> {
     library::open_folder(&instance_id, &which)
 }
@@ -295,12 +405,12 @@ pub async fn duplicate_instance(running: State<'_, Running>, instance_id: String
         .map_err(|e| Error::msg(e.to_string()))?
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn sessions() -> Vec<Session> {
     stats::load()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn installed_versions() -> Vec<String> {
     std::fs::read_dir(crate::paths::versions())
         .into_iter()
@@ -340,17 +450,17 @@ pub async fn storage_info() -> Result<storage::Storage> {
     tokio::task::spawn_blocking(storage::info).await.map_err(|e| Error::msg(e.to_string()))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn delete_runtime(name: String) -> Result<()> {
     storage::delete_runtime(&name)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn open_data_dir() -> Result<()> {
     library::open_root()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn reset_data(running: State<'_, Running>, scope: Vec<String>) -> Result<()> {
     if !running.0.lock().unwrap().is_empty() {
         return Err(Error::msg("Close the game before resetting the launcher"));

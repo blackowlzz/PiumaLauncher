@@ -2,12 +2,14 @@
   import { portal } from './actions'
   import { api, type Instance } from './api'
   import Icon from './Icon.svelte'
+  import ShareModal from './ShareModal.svelte'
   import { t } from './i18n.svelte'
-  import { app, askConfirm, isBusy, notify, openInstance, reloadInstances } from './store.svelte'
+  import { app, askConfirm, createShortcut, isBusy, notify, openInstance, reloadInstances } from './store.svelte'
 
   let { inst }: { inst: Instance } = $props()
 
   let open = $state(false)
+  let sharing = $state(false)
   let x = $state(0)
   let y = $state(0)
   let trigger: HTMLButtonElement | undefined = $state()
@@ -20,7 +22,7 @@
     if (open) return (open = false)
     const r = trigger!.getBoundingClientRect()
     const w = 210
-    const h = 190
+    const h = 270
     x = Math.max(8, Math.min(innerWidth - w - 8, r.right - w))
     y = innerHeight - r.bottom < h + 8 ? Math.max(8, r.top - h - 6) : r.bottom + 6
     open = true
@@ -56,6 +58,11 @@
     }
   }
 
+  async function shortcut() {
+    close()
+    if (await createShortcut(inst.id)) notify(t('Shortcut for "{name}" created', { name: inst.name }))
+  }
+
   function folder() {
     close()
     api.openFolder(inst.id, 'game').catch(notify)
@@ -68,10 +75,14 @@
   <Icon name="dots" size={16} />
 </button>
 
+{#if sharing}<ShareModal {inst} onClose={() => (sharing = false)} />{/if}
+
 {#if open}
   <div class="menu" use:portal bind:this={menu} role="menu" style:left="{x}px" style:top="{y}px">
     <button role="menuitem" onclick={() => { close(); openInstance(inst.id) }}><Icon name="settings" size={15} />{t('Details')}</button>
     <button role="menuitem" onclick={folder}><Icon name="folder" size={15} />{t('Open instance folder')}</button>
+    <button role="menuitem" onclick={() => { close(); sharing = true }}><Icon name="share" size={15} />{t('Share')}</button>
+    <button role="menuitem" onclick={shortcut}><Icon name="shortcut" size={15} />{t('Create shortcut')}</button>
     <button role="menuitem" onclick={duplicate} disabled={locked}><Icon name="file" size={15} />{t('Duplicate')}</button>
     <div class="sep"></div>
     <button role="menuitem" class="danger" onclick={remove} disabled={locked}><Icon name="trash" size={15} />{t('Delete instance')}</button>

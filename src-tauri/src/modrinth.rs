@@ -168,20 +168,22 @@ struct Version {
 }
 
 #[derive(Deserialize, Clone)]
-struct VFile {
-    url: String,
-    filename: String,
+pub(crate) struct VFile {
+    pub(crate) url: String,
+    pub(crate) filename: String,
     #[serde(default)]
-    primary: bool,
+    pub(crate) primary: bool,
     #[serde(default)]
-    size: Option<u64>,
-    hashes: Hashes,
+    pub(crate) size: Option<u64>,
+    pub(crate) hashes: Hashes,
 }
 
 #[derive(Deserialize, Clone, Default)]
-struct Hashes {
+pub(crate) struct Hashes {
     #[serde(default)]
-    sha1: Option<String>,
+    pub(crate) sha1: Option<String>,
+    #[serde(default)]
+    pub(crate) sha512: Option<String>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -225,7 +227,7 @@ fn primary(v: &Version) -> Option<&VFile> {
     v.files.iter().find(|f| f.primary).or(v.files.first())
 }
 
-fn allowed_url(url: &str) -> Result<()> {
+pub(crate) fn allowed_url(url: &str) -> Result<()> {
     let parsed = reqwest::Url::parse(url).map_err(|_| Error::msg("invalid download URL"))?;
     let host_ok = parsed.host_str().is_some_and(|h| ALLOWED_HOSTS.contains(&h));
     if parsed.scheme() == "https" && host_ok {
@@ -235,7 +237,7 @@ fn allowed_url(url: &str) -> Result<()> {
     }
 }
 
-fn plain_file_name(name: &str) -> Result<&str> {
+pub(crate) fn plain_file_name(name: &str) -> Result<&str> {
     let ok = !name.is_empty()
         && !name.starts_with('.')
         && !name.contains(['/', '\\', '\0'])
@@ -253,7 +255,7 @@ pub enum Content {
 }
 
 impl Content {
-    fn folder(self) -> &'static str {
+    pub(crate) fn folder(self) -> &'static str {
         match self {
             Content::Mods => "mods",
             Content::Resourcepacks => "resourcepacks",
@@ -436,7 +438,7 @@ pub async fn categories(client: &reqwest::Client, project_type: &str) -> Result<
 
 static HASH_CACHE: std::sync::Mutex<Option<HashMap<(PathBuf, u64, u64), String>>> = std::sync::Mutex::new(None);
 
-fn sha1_of(path: &Path) -> Result<String> {
+pub(crate) fn sha1_of(path: &Path) -> Result<String> {
     use sha1::{Digest, Sha1};
     let meta = std::fs::metadata(path)?;
     let mtime = meta
@@ -464,12 +466,12 @@ fn sha1_of(path: &Path) -> Result<String> {
 }
 
 #[derive(Deserialize, Clone)]
-struct ApiVersion {
-    id: String,
+pub(crate) struct ApiVersion {
+    pub(crate) id: String,
     project_id: String,
     version_number: String,
     #[serde(default)]
-    files: Vec<VFile>,
+    pub(crate) files: Vec<VFile>,
 }
 
 #[derive(Deserialize)]
@@ -519,7 +521,7 @@ fn update_loaders(inst: &Instance, kind: Content) -> Option<Vec<String>> {
     }
 }
 
-async fn lookup_versions(client: &reqwest::Client, hashes: &[String]) -> Result<HashMap<String, ApiVersion>> {
+pub(crate) async fn lookup_versions(client: &reqwest::Client, hashes: &[String]) -> Result<HashMap<String, ApiVersion>> {
     let resp = client
         .post(format!("{API}/version_files"))
         .json(&serde_json::json!({ "hashes": hashes, "algorithm": "sha1" }))
@@ -578,8 +580,8 @@ pub async fn content_details(client: &reqwest::Client, inst: &Instance, kind: Co
     let (versions, updates, projects) = if unique.is_empty() {
         (HashMap::new(), HashMap::new(), HashMap::new())
     } else {
-        let versions = lookup_versions(client, &unique).await.unwrap_or_default();
-        let updates = lookup_updates(client, inst, kind, &unique).await.unwrap_or_default();
+        let (versions, updates) = tokio::join!(lookup_versions(client, &unique), lookup_updates(client, inst, kind, &unique));
+        let (versions, updates) = (versions.unwrap_or_default(), updates.unwrap_or_default());
         let ids: Vec<&str> = versions.values().map(|v| v.project_id.as_str()).collect::<HashSet<_>>().into_iter().collect();
         let projects = fetch_projects(client, &ids).await;
         (versions, updates, projects)
@@ -593,13 +595,7 @@ pub async fn content_details(client: &reqwest::Client, inst: &Instance, kind: Co
             let version = versions.get(h);
             let latest = updates.get(h).filter(|u| version.is_some_and(|v| v.id != u.id));
             ContentEntry {
-                project: version.and_then(|v| projects.get(&v.project_id)).map(|p| ProjectMeta {
-                    id: p.id.clone(),
-                    slug: p.slug.clone(),
-                    title: p.title.clone(),
-                    description: p.description.clone(),
-                    icon_url: p.icon_url.clone().filter(|u| u.starts_with("https://cdn.modrinth.com/")),
-                }),
+                project: version.and_then(|v| projects.get(&v.project_id)).map(meta_of),
                 version: version.map(|v| VersionMeta { id: v.id.clone(), number: v.version_number.clone() }),
                 update: latest.map(|u| VersionMeta { id: u.id.clone(), number: u.version_number.clone() }),
                 file_name: f.file_name,
@@ -716,6 +712,35 @@ fn extract_overrides(archive: &Path, game_dir: &Path) -> Result<()> {
     Ok(())
 }
 
+pub async fn resolve_modpack(client: &reqwest::Client, slug: &str, version: Option<&str>) -> Result<(String, Option<String>)> {
+    #[derive(Deserialize)]
+    struct Info {
+        id: String,
+        project_type: String,
+    }
+    if !safe_id(slug) {
+        return Err(Error::msg("This link isn't a Modrinth modpack"));
+    }
+    let resp = client.get(format!("{API}/project/{slug}")).send().await?;
+    if resp.status() == reqwest::StatusCode::NOT_FOUND {
+        return Err(Error::msg("That modpack doesn't exist on Modrinth"));
+    }
+    let info: Info = resp.error_for_status()?.json().await?;
+    if info.project_type != "modpack" {
+        return Err(Error::msg("This link isn't a Modrinth modpack"));
+    }
+    let Some(wanted) = version else {
+        return Ok((info.id, None));
+    };
+    let versions = versions_of(client, &info.id, None, &[]).await?;
+    let found = versions
+        .iter()
+        .find(|v| v.id == wanted)
+        .or_else(|| versions.iter().find(|v| v.version_number == wanted))
+        .ok_or_else(|| Error::msg("That version doesn't exist"))?;
+    Ok((info.id, Some(found.id.clone())))
+}
+
 pub async fn install_modpack(
     client: &reqwest::Client,
     project_id: &str,
@@ -741,7 +766,18 @@ pub async fn install_modpack(
     )
     .await?;
 
-    let path = archive.clone();
+    let result = install_archive(client, &archive, project_images(client, project_id), progress).await;
+    let _ = tokio::fs::remove_file(&archive).await;
+    result
+}
+
+pub(crate) async fn install_archive(
+    client: &reqwest::Client,
+    archive: &Path,
+    images: impl std::future::Future<Output = Option<(Option<String>, Option<String>)>>,
+    progress: Progress<'_>,
+) -> Result<Instance> {
+    let path = archive.to_path_buf();
     let index = tokio::task::spawn_blocking(move || read_index(&path))
         .await
         .map_err(|e| Error::msg(e.to_string()))??;
@@ -764,26 +800,28 @@ pub async fn install_modpack(
     };
 
     progress("Installing the loader", 0, 0);
-    let (loader_version, launch_version) = match loader {
-        Loader::Vanilla => (None, None),
-        _ => {
-            let i = loaders::install(client, loader, &mc, Some(loader_version), progress).await?;
-            (Some(i.loader_version), Some(i.id))
+    let install_loader = async {
+        match loader {
+            Loader::Vanilla => Ok((None, None)),
+            _ => {
+                let i = loaders::install(client, loader, &mc, Some(loader_version), progress).await?;
+                Ok::<_, Error>((Some(i.loader_version), Some(i.id)))
+            }
         }
     };
+    let (installed, images) = tokio::join!(install_loader, images);
+    let (loader_version, launch_version) = installed?;
 
     let mut inst = instance::create(&index.name, &mc, loader, loader_version, launch_version)?;
     inst.memory_max_mb = 4096;
     inst.memory_min_mb = inst.memory_min_mb.min(inst.memory_max_mb);
-    if let Some((icon, banner)) = project_images(client, project_id).await {
+    if let Some((icon, banner)) = images {
         inst.icon_url = icon;
         inst.banner_url = banner;
     }
     instance::save(&inst)?;
 
-    let result = fill_instance(client, &inst, &index, &archive, progress).await;
-    let _ = tokio::fs::remove_file(&archive).await;
-    match result {
+    match fill_instance(client, &inst, &index, archive, progress).await {
         Ok(()) => Ok(inst),
         Err(e) => {
             let _ = instance::delete(&inst.id);
@@ -860,6 +898,9 @@ fn count_overrides(archive: &Path) -> u32 {
 }
 
 pub async fn modpack_details(client: &reqwest::Client, project_id: &str, version_id: Option<&str>) -> Result<PackDetails> {
+    if let Some(hit) = version_id.and_then(|id| PACK_CACHE.lock().unwrap().as_ref().and_then(|m| m.get(id).cloned())) {
+        return Ok(hit);
+    }
     let version = pick_version(versions_of(client, project_id, None, &[]).await?, version_id, None)?;
     if let Some(hit) = PACK_CACHE.lock().unwrap().as_ref().and_then(|m| m.get(&version.id)) {
         return Ok(hit.clone());
@@ -1141,6 +1182,17 @@ mod tests {
         }
         let _ = instance::delete(&inst.id);
         assert!(log.iter().any(|l| l.contains("Loading Minecraft")), "il loader non è partito");
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn resolve_modpack_e2e() {
+        let client = net::client();
+        let (id, v) = resolve_modpack(&client, "fabulously-optimized", None).await.unwrap();
+        assert_eq!(id, "1KVo5zza");
+        assert!(v.is_none());
+        assert!(resolve_modpack(&client, "sodium", None).await.is_err());
+        assert!(resolve_modpack(&client, "this-does-not-exist-zzz", None).await.is_err());
     }
 
     #[tokio::test]

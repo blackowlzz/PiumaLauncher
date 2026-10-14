@@ -13,6 +13,7 @@
 
   const ratio = $derived(max > min ? Math.min(1, Math.max(0, (value - min) / (max - min))) : 0)
 
+  const FRAME_MS = 1000 / 30 - 2
   const CELL = 9
   const HEIGHT = 54
   let host: HTMLDivElement
@@ -78,6 +79,7 @@
     const ro = new ResizeObserver(([e]) => (width = Math.floor(e.contentRect.width)))
     ro.observe(host)
     let raf = 0
+    let drawn = 0
     const loop = (time: number) => {
       raf = requestAnimationFrame(loop)
       const still = document.documentElement.hasAttribute('data-reduce') || document.documentElement.hasAttribute('data-idle')
@@ -85,6 +87,8 @@
         prev = 0
         return
       }
+      if (time - drawn < FRAME_MS && Math.abs(live - ratio) < 0.001) return
+      drawn = time
       draw(still ? 0 : time)
     }
     raf = requestAnimationFrame(loop)

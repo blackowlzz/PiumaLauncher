@@ -1,8 +1,9 @@
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::time::Duration;
+use std::sync::Mutex;
+use std::time::{Duration, SystemTime};
 
 use serde::Serialize;
 use tokio::process::Command;
@@ -82,7 +83,30 @@ fn parse_major(version: &str) -> Option<u32> {
     }
 }
 
+type ProbeKey = (PathBuf, u64, Option<SystemTime>);
+
+static PROBES: Mutex<Option<HashMap<ProbeKey, JavaInstall>>> = Mutex::new(None);
+
+fn probe_key(path: &Path) -> Option<ProbeKey> {
+    let meta = std::fs::metadata(path).ok()?;
+    Some((path.to_path_buf(), meta.len(), meta.modified().ok()))
+}
+
 pub async fn probe(path: &Path) -> Option<JavaInstall> {
+    let key = probe_key(path);
+    if let Some(k) = &key {
+        if let Some(hit) = PROBES.lock().unwrap().as_ref().and_then(|m| m.get(k)) {
+            return Some(hit.clone());
+        }
+    }
+    let found = run_probe(path).await?;
+    if let Some(k) = key {
+        PROBES.lock().unwrap().get_or_insert_with(HashMap::new).insert(k, found.clone());
+    }
+    Some(found)
+}
+
+async fn run_probe(path: &Path) -> Option<JavaInstall> {
     let child = Command::new(path)
         .arg("-version")
         .stdin(Stdio::null())

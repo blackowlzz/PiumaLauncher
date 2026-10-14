@@ -130,7 +130,23 @@ pub async fn prepare(
     })
 }
 
+const NATIVES_STAMP: &str = ".piuma-natives";
+
+fn natives_stamp(jars: &[(PathBuf, Vec<String>)]) -> String {
+    let mut stamp = String::new();
+    for (jar, exclude) in jars {
+        let len = std::fs::metadata(jar).map_or(0, |m| m.len());
+        stamp.push_str(&format!("{}|{len}|{}\n", jar.to_string_lossy(), exclude.join(",")));
+    }
+    stamp
+}
+
 fn extract_natives(jars: Vec<(PathBuf, Vec<String>)>, dest: PathBuf) -> Result<()> {
+    let stamp = natives_stamp(&jars);
+    let stamp_file = dest.join(NATIVES_STAMP);
+    if std::fs::read_to_string(&stamp_file).is_ok_and(|s| s == stamp) {
+        return Ok(());
+    }
     if dest.exists() {
         std::fs::remove_dir_all(&dest)?;
     }
@@ -151,6 +167,7 @@ fn extract_natives(jars: Vec<(PathBuf, Vec<String>)>, dest: PathBuf) -> Result<(
             std::io::copy(&mut entry, &mut std::fs::File::create(out)?)?;
         }
     }
+    std::fs::write(stamp_file, stamp)?;
     Ok(())
 }
 

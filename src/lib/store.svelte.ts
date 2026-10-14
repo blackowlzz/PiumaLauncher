@@ -1,5 +1,6 @@
 import { listen } from '@tauri-apps/api/event'
 import { loadLanguage, t } from './i18n.svelte'
+import { ping, serverKey } from './quickplay.svelte'
 import {
   api,
   inTauri,
@@ -14,6 +15,10 @@ import {
   type AccountStore,
   type UpdateInfo,
   type GameStateEvent,
+  type CrashReport,
+  type QuickPlay,
+  type SavedServer,
+  type Imported,
   type InstallProgress,
   type RuntimeEntry,
   type JavaInstall,
@@ -21,7 +26,7 @@ import {
   type VersionEntry,
 } from './api'
 
-export type Page = 'home' | 'library' | 'explore' | 'accounts' | 'instance' | 'settings' | 'themes' | 'performance'
+export type Page = 'home' | 'library' | 'quickplay' | 'explore' | 'accounts' | 'instance' | 'settings' | 'themes' | 'performance'
 
 const MAX_STAT_SAMPLES = 90
 
@@ -51,6 +56,8 @@ export const app = $state({
   exploreIntent: null as { kind: ProjectType; targetId?: string } | null,
   update: null as UpdateInfo | null,
   updateDismissed: false,
+  crash: null as CrashReport | null,
+  joining: null as SavedServer | null,
 })
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined
@@ -91,7 +98,8 @@ export const activeAccount = () =>
   app.accounts.accounts.find((a) => a.id === app.accounts.active) ?? null
 
 export async function init() {
-  const [, settings] = await Promise.all([loadLanguage(), api.getSettings().catch(() => defaultSettings())])
+  const settings = await api.getSettings().catch(() => defaultSettings())
+  await loadLanguage(settings.language)
   app.settings = { ...defaultSettings(), ...settings }
   api.versionImages().then((m) => (app.versionImages = m)).catch(() => {})
   if (inTauri) await listenToBackend()
@@ -132,6 +140,8 @@ async function listenToBackend() {
     if (samples.length > MAX_STAT_SAMPLES) samples.shift()
   })
   await listen<InstallProgress>('install-progress', (e) => (app.install = e.payload))
+  await listen<CrashReport>('game-crash', (e) => (app.crash = e.payload))
+  await listen('cli-request', () => handleCli())
 }
 
 export function openProject(hit: ProjectHit) {
@@ -144,12 +154,76 @@ export function openInstance(id: string) {
   app.page = 'instance'
 }
 
-export async function play(id: string) {
+export async function play(id: string, quickPlay?: QuickPlay) {
   app.selectedId = id
   try {
-    await api.launch(id)
+    await api.launch(id, quickPlay)
   } catch (e) {
     notify(e)
+  }
+}
+
+export async function importPack(run: () => Promise<Imported>): Promise<boolean> {
+  if (app.installingId) return false
+  app.installingId = 'import'
+  app.install = null
+  try {
+    const r = await run()
+    await reloadInstances()
+    app.selectedId = r.instance.id
+    notify(
+      r.skipped
+        ? t('"{name}" imported, {n} files are no longer available', { name: r.instance.name, n: r.skipped })
+        : t('"{name}" imported', { name: r.instance.name }),
+    )
+    return true
+  } catch (e) {
+    notify(e)
+    return false
+  } finally {
+    app.installingId = null
+    app.install = null
+  }
+}
+
+export async function handleCli() {
+  const r = await api.takeCliRequest().catch(() => null)
+  if (!r) return
+  if (r.pack) {
+    const path = r.pack
+    app.page = 'library'
+    await importPack(() => api.importMrpackFile(path))
+    return
+  }
+  const quick: QuickPlay | undefined = r.server ? { kind: 'server', address: r.server } : r.world ? { kind: 'world', folder: r.world } : undefined
+  if (r.instance) {
+    const wanted = r.instance.toLowerCase()
+    const named = app.instances.filter((i) => i.name.toLowerCase() === wanted)
+    const inst = app.instances.find((i) => i.id === r.instance) ?? (named.length === 1 ? named[0] : null)
+    if (!inst) {
+      notify(named.length > 1 ? t('More than one instance is called "{name}"', { name: r.instance }) : t('No instance called "{name}"', { name: r.instance }))
+      return
+    }
+    await play(inst.id, quick)
+    return
+  }
+  if (r.server) {
+    const address = r.server
+    const saved = await api.listServers().catch(() => [] as SavedServer[])
+    ping(address)
+    app.joining = saved.find((s) => serverKey(s.address) === serverKey(address)) ?? { name: address, address, icon: null, instances: [] }
+    return
+  }
+  if (r.world) notify(t('Add --instance to say which instance the world belongs to'))
+}
+
+export async function createShortcut(id: string): Promise<boolean> {
+  try {
+    await api.createShortcut(id)
+    return true
+  } catch (e) {
+    notify(e)
+    return false
   }
 }
 

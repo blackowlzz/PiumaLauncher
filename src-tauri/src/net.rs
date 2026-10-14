@@ -1,17 +1,19 @@
 
 use std::collections::HashSet;
 use std::path::PathBuf;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use futures_util::stream::{self, StreamExt};
 use sha1::Sha1;
 use sha2::{Digest, Sha256};
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncWriteExt, BufWriter};
 
 use crate::error::{Error, Result};
 
 const PARALLEL_DOWNLOADS: usize = 12;
 const ATTEMPTS: u32 = 3;
+const WRITE_BUFFER: usize = 256 * 1024;
+const PROGRESS_INTERVAL: Duration = Duration::from_millis(80);
 
 static CLIENT: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();
 
@@ -105,7 +107,7 @@ async fn download_once(client: &reqwest::Client, job: &Job, progress: Option<Byt
     let tmp = job.path.with_file_name(tmp_name);
 
     let mut resp = client.get(&job.url).send().await?.error_for_status()?;
-    let mut file = tokio::fs::File::create(&tmp).await?;
+    let mut file = BufWriter::with_capacity(WRITE_BUFFER, tokio::fs::File::create(&tmp).await?);
     let total = resp.content_length();
     let mut received = 0u64;
     let mut hasher = Hasher::new(&job.check);
@@ -154,20 +156,29 @@ pub async fn download_all(
     jobs: Vec<Job>,
     progress: &(dyn Fn(u32, u32) + Sync),
 ) -> Result<()> {
-    let mut seen = HashSet::new();
-    let jobs: Vec<Job> = jobs.into_iter().filter(|j| seen.insert(j.path.clone())).collect();
-    let total = jobs.len() as u32;
-    progress(0, total);
+    progress(0, jobs.len() as u32);
+    let (missing, present): (Vec<Job>, Vec<Job>) = tokio::task::spawn_blocking(move || {
+        let mut seen = HashSet::new();
+        jobs.into_iter().filter(|j| seen.insert(j.path.clone())).partition(|j| !already_valid(j))
+    })
+    .await
+    .map_err(|e| Error::msg(e.to_string()))?;
+    let total = (missing.len() + present.len()) as u32;
+    let mut done = present.len() as u32;
+    progress(done, total);
 
-    let mut results = stream::iter(jobs)
+    let mut results = stream::iter(missing)
         .map(|job| async move { download(client, &job).await })
         .buffer_unordered(PARALLEL_DOWNLOADS);
 
-    let mut done = 0;
+    let mut last = Instant::now();
     while let Some(r) = results.next().await {
         r?;
         done += 1;
-        progress(done, total);
+        if done == total || last.elapsed() >= PROGRESS_INTERVAL {
+            last = Instant::now();
+            progress(done, total);
+        }
     }
     Ok(())
 }

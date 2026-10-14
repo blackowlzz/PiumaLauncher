@@ -13,6 +13,7 @@ use crate::paths;
 #[serde(rename_all = "camelCase")]
 pub struct World {
     pub folder: String,
+    pub name: Option<String>,
     pub size: u64,
     pub modified_ms: u64,
 }
@@ -47,6 +48,7 @@ pub fn list_worlds(instance_id: &str) -> Result<Vec<World>> {
             let path = e.path();
             World {
                 folder: e.file_name().to_string_lossy().into_owned(),
+                name: crate::servers::level_info(&path).map(|(n, ..)| n),
                 size: dir_size(&path),
                 modified_ms: millis(std::fs::metadata(path.join("level.dat")).and_then(|m| m.modified())),
             }
@@ -91,8 +93,10 @@ pub fn open_url(url: &str) -> Result<()> {
     Ok(())
 }
 
-fn open_path(dir: &Path) -> Result<()> {
-    std::fs::create_dir_all(dir)?;
+pub fn open_path(dir: &Path) -> Result<()> {
+    if !dir.exists() {
+        std::fs::create_dir_all(dir)?;
+    }
     let opener = if cfg!(windows) {
         "explorer"
     } else if cfg!(target_os = "macos") {

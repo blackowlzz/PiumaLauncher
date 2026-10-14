@@ -1,19 +1,4 @@
 import { api } from './api'
-import { bg } from './lang/bg'
-import { de } from './lang/de'
-import { el } from './lang/el'
-import { es } from './lang/es'
-import { fr } from './lang/fr'
-import { hu } from './lang/hu'
-import { it } from './lang/it'
-import { pl } from './lang/pl'
-import { pt } from './lang/pt'
-import { ro } from './lang/ro'
-import { ru } from './lang/ru'
-import { sq } from './lang/sq'
-import { sr } from './lang/sr'
-import { tr } from './lang/tr'
-import { uk } from './lang/uk'
 
 export const LANGUAGES = [
   { code: 'en', name: 'English' },
@@ -35,7 +20,18 @@ export const LANGUAGES = [
 ] as const
 
 type Dict = Record<string, string>
-const dicts: Record<string, Dict> = { en: {}, it, es, fr, de, pt, sq, hu, ru, bg, uk, pl, ro, sr, el, tr }
+const sources = import.meta.glob<Record<string, Dict>>('./lang/*.ts')
+const dicts: Record<string, Dict> = { en: {} }
+
+async function ensureDict(code: string): Promise<boolean> {
+  if (dicts[code]) return true
+  const load = sources[`./lang/${code}.ts`]
+  if (!load) return false
+  const dict = (await load())[code]
+  if (!dict) return false
+  dicts[code] = dict
+  return true
+}
 
 export const i18n = $state({ lang: 'en', ready: false, chosen: false })
 
@@ -52,11 +48,11 @@ export function stageText(stage: string): string {
   return m ? t(`${m[1]} {name}`, { name: m[2] }) : stage
 }
 
-export async function loadLanguage() {
+export async function loadLanguage(language?: string | null) {
   try {
-    const { language } = await api.getSettings()
-    if (language && dicts[language]) {
-      i18n.lang = language
+    const code = language === undefined ? (await api.getSettings()).language : language
+    if (code && (await ensureDict(code))) {
+      i18n.lang = code
       i18n.chosen = true
     }
   } finally {
@@ -65,7 +61,7 @@ export async function loadLanguage() {
 }
 
 export async function setLanguage(code: string) {
-  if (!dicts[code]) return
+  if (!(await ensureDict(code).catch(() => false))) return
   i18n.lang = code
   i18n.chosen = true
   document.documentElement.lang = code

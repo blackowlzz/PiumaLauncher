@@ -1,18 +1,23 @@
 <script lang="ts">
   import { api, type Instance, type JavaInstall, type World } from './api'
   import { locale, t } from './i18n.svelte'
-  import { app, askConfirm, installedJavas, isBusy, notify, play, reloadInstances, stop } from './store.svelte'
+  import { app, askConfirm, createShortcut, installedJavas, isBusy, notify, play, reloadInstances, stop } from './store.svelte'
   import { formatBytes, loaderNames, profileName, profiles } from './meta'
   import Cover from './Cover.svelte'
   import ContentTable from './ContentTable.svelte'
   import Select from './Select.svelte'
   import Sparkline from './Sparkline.svelte'
+  import ServerList from './ServerList.svelte'
+  import ShareModal from './ShareModal.svelte'
+  import Icon from './Icon.svelte'
+  import { opensWorlds } from './quickplay.svelte'
 
-  type Tab = 'overview' | 'mods' | 'worlds' | 'settings'
+  type Tab = 'overview' | 'mods' | 'worlds' | 'servers' | 'settings'
   const tabs: { id: Tab; label: string }[] = [
     { id: 'overview', label: 'Overview' },
     { id: 'mods', label: 'Content' },
     { id: 'worlds', label: 'Worlds' },
+    { id: 'servers', label: 'Servers' },
     { id: 'settings', label: 'Settings' },
   ]
 
@@ -21,6 +26,20 @@
   let javas: JavaInstall[] = $state([])
   let draft: Instance | null = $state(null)
   let busyAction = $state(false)
+  let linked = $state<'idle' | 'working' | 'done'>('idle')
+  let sharing = $state(false)
+  let linkTimer: ReturnType<typeof setTimeout> | undefined
+
+  async function shortcut() {
+    if (!inst || linked !== 'idle') return
+    linked = 'working'
+    const ok = await createShortcut(inst.id)
+    linked = ok ? 'done' : 'idle'
+    if (ok) {
+      clearTimeout(linkTimer)
+      linkTimer = setTimeout(() => (linked = 'idle'), 2600)
+    }
+  }
 
   const inst = $derived(app.instances.find((i) => i.id === app.detailId) ?? null)
   const game = $derived(inst ? app.games[inst.id] : undefined)
@@ -105,6 +124,7 @@
         </div>
       </div>
       <div class="acts">
+        <button class="stopbtn sharebtn" onclick={() => (sharing = true)}><Icon name="share" size={15} />{t('Share')}</button>
         {#if app.settings.liveConsole}
           <button class="stopbtn" onclick={() => api.openConsole(inst.id).catch(notify)}>{t('Console')}</button>
         {/if}
@@ -119,6 +139,8 @@
       {/each}
     </div>
   </header>
+
+  {#if sharing}<ShareModal {inst} onClose={() => (sharing = false)} />{/if}
 
   {#key tab}
   <div class="swap">
@@ -156,12 +178,17 @@
     <div class="list">
       {#each worlds as w (w.folder)}
         <div class="item row">
-          <span class="grow name">{w.folder}</span>
+          <span class="grow name">{w.name ?? w.folder}{#if w.name && w.name !== w.folder}<span class="muted small folder">{w.folder}</span>{/if}</span>
           <span class="muted small">{formatBytes(w.size)}</span>
           <span class="muted small when">{when(w.modifiedMs)}</span>
+          {#if opensWorlds(inst.mcVersion)}
+            <button class="wplay" onclick={() => play(inst.id, { kind: 'world', folder: w.folder })} disabled={busy || !app.accounts.active} aria-label={t('Play {name}', { name: w.name ?? w.folder })}><Icon name="play" size={12} />{t('Play')}</button>
+          {/if}
         </div>
       {/each}
     </div>
+  {:else if tab === 'servers'}
+    <ServerList instanceId={inst.id} />
   {:else if draft}
     <form class="settings" onsubmit={(e) => { e.preventDefault(); save() }}>
       <label>{t('Name')}<input bind:value={draft.name} /></label>
@@ -194,6 +221,13 @@
         <div class="eyebrow">{t('More')}</div>
         <div class="row wrap">
           <button type="button" onclick={() => api.openFolder(inst.id, 'game').catch(notify)}>{t('Open instance folder')}</button>
+          <button type="button" class="linkbtn" class:done={linked === 'done'} onclick={shortcut} disabled={linked === 'working'} aria-live="polite">
+            {#key linked}
+              <span class="lk">
+                {#if linked === 'done'}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" pathLength="1" /></svg>{t('Shortcut created')}{:else}<Icon name="shortcut" size={15} />{t('Create shortcut')}{/if}
+              </span>
+            {/key}
+          </button>
           <button type="button" onclick={duplicate} disabled={busyAction || busy}>{t('Duplicate')}</button>
           <button type="button" class="ghost" onclick={remove} disabled={busyAction || busy}>{t('Delete instance')}</button>
         </div>
@@ -235,8 +269,26 @@
   .toolbar { gap: 8px; }
   .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .when { min-width: 150px; text-align: right; }
+  .folder { margin-left: 8px; }
+  .wplay { display: inline-flex; align-items: center; gap: 6px; padding: 5px 14px; font-size: 13px; opacity: 0; transform: translateX(6px); transition: opacity 200ms ease, transform 300ms var(--spring), background var(--ease), border-color var(--ease); }
+  .item:hover .wplay, .wplay:focus-visible { opacity: 1; transform: none; }
+  @media (hover: none) { .wplay { opacity: 1; transform: none; } }
   .settings { display: grid; gap: 16px; max-width: 560px; }
   .danger-zone { display: grid; gap: 10px; border-top: 1px solid var(--line); padding-top: 16px; margin-top: 8px; }
   .wrap { flex-wrap: wrap; }
+  .sharebtn { display: inline-flex; align-items: center; gap: 8px; }
+  .linkbtn { transition: background var(--ease), border-color var(--ease), color var(--ease), transform 120ms var(--spring); }
+  .linkbtn.done { background: var(--inv-bg); color: var(--inv-text); border-color: var(--inv-bg); }
+  .linkbtn.done:hover:not(:disabled) { background: var(--inv-bg); border-color: var(--inv-bg); }
+  .linkbtn:disabled .lk { animation: breathe 900ms ease-in-out infinite; }
+  .lk { display: inline-flex; align-items: center; gap: 8px; animation: swapin 320ms var(--spring) backwards; }
+  .lk svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  .lk path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: tick 420ms var(--spring) 80ms forwards; }
+  .linkbtn.done { animation: ripple 700ms ease-out; }
+  @keyframes tick { to { stroke-dashoffset: 0; } }
+  @keyframes ripple { from { outline: 2px solid rgba(var(--glow), 0.5); outline-offset: 0; } to { outline: 2px solid rgba(var(--glow), 0); outline-offset: 9px; } }
+  @keyframes breathe { 50% { opacity: 0.45; } }
+  :global(:root[data-reduce]) .lk path { stroke-dashoffset: 0; }
+  @media (prefers-reduced-motion: reduce) { .lk path { stroke-dashoffset: 0; } }
 
 </style>

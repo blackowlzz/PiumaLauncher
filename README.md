@@ -23,6 +23,10 @@ PiumaLauncher is a fast, lightweight and open source Minecraft launcher for Wind
 - Per-instance memory, JVM profile (low usage, balanced or performance) and extra JVM arguments
 - Mods on/off, world list, duplicate and delete from the instance page
 - Live memory usage while the game runs
+- Share an instance with friends: export a `.mrpack` (works in other launchers too) or copy a short share code; import by pasting the code, choosing the file or dragging it onto the window
+- Desktop shortcuts and command line options to start an instance, a world or a server directly
+- Quick Play: jump straight into a recent world, or into a saved server after choosing which instance to use, with live status, players and ping
+- Crash analysis: when the game crashes, the launcher explains why (missing or incompatible mods, memory, Java, graphics drivers) and offers a one-click fix
 
 **Modrinth**
 - Search modpacks, mods, resource packs and shaders with filters for version, loader and category
@@ -65,8 +69,29 @@ You don't need to install Java. PiumaLauncher downloads Minecraft, its libraries
 | Keys | Action |
 |---|---|
 | `Ctrl+K` or `/` | Search in Explore |
-| `Ctrl+1` to `Ctrl+5` | Home, Library, Explore, Accounts, Settings |
+| `Ctrl+1` to `Ctrl+8` | Home, Quick Play, Library, Explore, Account, Themes, Performance, Settings |
 | `Esc` | Close the open panel |
+
+## Command line and shortcuts
+
+You can start an instance straight from a terminal or a desktop shortcut:
+
+```
+PiumaLauncher --instance "Cobblemon"
+PiumaLauncher --instance Cobblemon --server mc.hypixel.net
+PiumaLauncher --instance Cobblemon --world "My World"
+PiumaLauncher --server mc.hypixel.net
+```
+
+| Option | Meaning |
+|---|---|
+| `--instance`, `-i` | Instance name or id |
+| `--server`, `-s` | Join this server (without `--instance`, the launcher asks which instance to use) |
+| `--world`, `-w` | Open this world folder directly (Minecraft 1.20 or newer) |
+
+Passing a `.mrpack` file (`PiumaLauncher pack.mrpack`, or "Open with" on the file) imports it as a new instance.
+
+If PiumaLauncher is already open, the request goes to the open window instead of starting a second copy. To get a ready-made shortcut, open an instance's menu and choose **Create shortcut**: on Linux it appears in the applications menu and on the desktop, on Windows on the desktop.
 
 ## Privacy and security
 

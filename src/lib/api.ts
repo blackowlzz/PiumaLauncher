@@ -101,6 +101,99 @@ export interface GameStateEvent {
   code: number | null
 }
 
+export type CrashFix =
+  | { kind: 'disableMods'; files: string[] }
+  | { kind: 'installMods'; projects: string[] }
+  | { kind: 'memory'; mb: number }
+  | { kind: 'autoJava' }
+  | { kind: 'clearJvmArgs' }
+
+export type CrashCause =
+  | 'outOfMemory'
+  | 'heapTooLarge'
+  | 'javaVersion'
+  | 'jvmArgs'
+  | 'missingDeps'
+  | 'incompatibleMods'
+  | 'duplicateMods'
+  | 'mixin'
+  | 'suspectedMod'
+  | 'graphics'
+  | 'nativeCrash'
+  | 'unknown'
+
+export interface CrashReport {
+  instanceId: string
+  cause: CrashCause
+  subject: string | null
+  fix: CrashFix | null
+  excerpt: string[]
+  hasReport: boolean
+  code: number | null
+}
+
+export type QuickPlay = { kind: 'server'; address: string } | { kind: 'world'; folder: string }
+
+export interface SavedServer {
+  name: string
+  address: string
+  icon: string | null
+  instances: string[]
+}
+
+export interface ServerStatus {
+  motd: string
+  version: string
+  protocol: number
+  online: number
+  max: number
+  latencyMs: number
+  favicon: string | null
+  sample: string[]
+}
+
+export interface CliRequest {
+  instance: string | null
+  server: string | null
+  world: string | null
+  pack: string | null
+}
+
+export interface ExportOptions {
+  resourcepacks: boolean
+  shaderpacks: boolean
+  config: boolean
+  options: boolean
+  servers: boolean
+}
+
+export interface Exported {
+  path: string
+  linked: number
+  bundled: number
+}
+
+export interface ShareCode {
+  code: string
+  included: number
+  excluded: string[]
+}
+
+export interface Imported {
+  instance: Instance
+  skipped: number
+}
+
+export interface RecentWorld {
+  instanceId: string
+  folder: string
+  name: string
+  modifiedMs: number
+  mode: number | null
+  hardcore: boolean
+  icon: string | null
+}
+
 export const api = {
   listVersions: () => call<VersionEntry[]>('list_mc_versions'),
   listInstances: () => call<Instance[]>('list_instances'),
@@ -120,11 +213,27 @@ export const api = {
   detectJava: () => call<JavaInstall[]>('detect_java'),
   listRuntimes: () => call<RuntimeEntry[]>('list_runtimes'),
   installRuntime: (flavor: string, major: number) => call<JavaInstall>('install_runtime', { flavor, major }),
-  launch: (id: string) => call<void>('launch_instance', { id }),
+  launch: (id: string, quickPlay?: QuickPlay) => call<void>('launch_instance', { id, quickPlay: quickPlay ?? null }),
+  listServers: (instanceId?: string) => call<SavedServer[]>('list_servers', { instanceId: instanceId ?? null }),
+  addServer: (instanceIds: string[], name: string, address: string) => call<void>('add_server', { instanceIds, name, address }),
+  removeServer: (instanceIds: string[], address: string) => call<void>('remove_server', { instanceIds, address }),
+  pingServer: (address: string) => call<ServerStatus>('ping_server', { address }),
+  recentWorlds: (limit: number) => call<RecentWorld[]>('recent_worlds', { limit }),
+  takeCliRequest: () => call<CliRequest | null>('take_cli_request'),
+  createShortcut: (instanceId: string) => call<void>('create_shortcut', { instanceId }),
+  exportMrpack: (instanceId: string, options: ExportOptions) => call<Exported>('export_mrpack', { instanceId, options }),
+  shareCode: (instanceId: string) => call<ShareCode>('share_code', { instanceId }),
+  importShareCode: (code: string) => call<Imported>('import_share_code', { code }),
+  importModrinthLink: (link: string) => call<Imported>('import_modrinth_link', { link }),
+  importMrpackFile: (path: string) => call<Imported>('import_mrpack_file', { path }),
+  importMrpackBytes: (bytes: Uint8Array) => (inTauri ? invoke<Imported>('import_mrpack_bytes', bytes) : call<Imported>('import_mrpack_bytes')),
+  revealFile: (path: string) => call<void>('reveal_file', { path }),
   stop: (id: string) => call<void>('stop_instance', { id }),
   running: () => call<string[]>('running_instances'),
   consoleHistory: (instanceId: string) => call<{ seq: number; text: string }[]>('console_history', { instanceId }),
   openConsole: (instanceId: string) => call<void>('open_console', { instanceId }),
+  applyCrashFix: (instanceId: string) => call<void>('apply_crash_fix', { instanceId }),
+  openCrashReport: (instanceId: string) => call<void>('open_crash_report', { instanceId }),
   checkUpdate: () => call<UpdateInfo | null>('check_update'),
   thumbnail: (url: string, width: number) => call<string>('thumbnail', { url, width }),
   fetchSkin: (name: string) => call<SkinInfo | null>('fetch_skin', { name }),
@@ -227,6 +336,7 @@ export interface ProjectPage {
 
 export interface World {
   folder: string
+  name: string | null
   size: number
   modifiedMs: number
 }

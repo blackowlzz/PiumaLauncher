@@ -190,7 +190,8 @@
   onMount(() => {
     const offs: (() => void)[] = []
     void (async () => {
-      const [, settings] = await Promise.all([loadLanguage(), api.getSettings().catch(() => defaultSettings())])
+      const settings = await api.getSettings().catch(() => defaultSettings())
+      await loadLanguage(settings.language)
       applyTheme()
       if (settings.theme !== 'system') document.documentElement.dataset.theme = settings.theme
       api.listInstances().then((l) => (name = l.find((i) => i.id === instanceId)?.name ?? instanceId)).catch(() => {})

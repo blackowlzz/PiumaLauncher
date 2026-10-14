@@ -6,6 +6,7 @@
   import { t } from './i18n.svelte'
   import InstanceMenu from './InstanceMenu.svelte'
   import NewInstanceModal from './NewInstanceModal.svelte'
+  import ImportModal from './ImportModal.svelte'
   import Select from './Select.svelte'
   import { app, isBusy, isInstalled, openInstance, play, playInfo } from './store.svelte'
   import { formatDuration, loaderNames, relativeTime } from './meta'
@@ -15,6 +16,7 @@
   let sort: 'recent' | 'name' | 'time' = $state('recent')
   let view: 'grid' | 'list' = $state('grid')
   let creating = $state(false)
+  let importing = $state(false)
 
   const rows = $derived.by(() => {
     const q = query.trim().toLowerCase()
@@ -35,8 +37,12 @@
     <h1>{t('Library')}</h1>
     <p class="muted">{t('Manage your Minecraft instances.')}</p>
   </div>
-  <button class="primary" onclick={() => (creating = true)}>{t('New instance')}</button>
+  <div class="hacts">
+    <button onclick={() => (importing = true)}><Icon name="download" size={15} />{t('Import')}</button>
+    <button class="primary" onclick={() => (creating = true)}>{t('New instance')}</button>
+  </div>
 </header>
+{#if importing}<ImportModal onClose={() => (importing = false)} />{/if}
 
 <div class="toolbar">
   <label class="search grow">
@@ -113,6 +119,8 @@
 {#if creating}<NewInstanceModal onClose={() => (creating = false)} />{/if}
 
 <style>
+  .hacts { display: flex; gap: 8px; }
+  .hacts button { display: inline-flex; align-items: center; gap: 8px; }
   .head { display: flex; align-items: flex-start; gap: 16px; }
   .head p { margin-top: 6px; }
   .toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }

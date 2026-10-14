@@ -29,30 +29,48 @@ pub struct Storage {
     pub runtimes: Vec<Runtime>,
 }
 
+fn entry_size(e: &std::fs::DirEntry) -> u64 {
+    match e.file_type() {
+        Ok(t) if t.is_dir() => dir_size(&e.path()),
+        Ok(t) if t.is_file() => e.metadata().map_or(0, |m| m.len()),
+        _ => 0,
+    }
+}
+
 pub fn info() -> Storage {
     let root = paths::root();
+    let mut runtimes = vec![];
+    let mut runtimes_bytes = 0;
+    for e in std::fs::read_dir(paths::runtimes()).into_iter().flatten().flatten() {
+        let bytes = entry_size(&e);
+        runtimes_bytes += bytes;
+        let name = e.file_name().to_string_lossy().into_owned();
+        if e.file_type().is_ok_and(|t| t.is_dir()) && !name.starts_with('.') {
+            runtimes.push(Runtime { name, bytes });
+        }
+    }
+    runtimes.sort_by(|a, b| a.name.cmp(&b.name));
+
     let known = [
         ("instances", paths::instances()),
         ("versions", paths::versions()),
         ("libraries", paths::libraries()),
         ("assets", paths::assets()),
-        ("runtimes", paths::runtimes()),
         ("skins", root.join("skins")),
     ];
     let mut items: Vec<Item> = known.iter().map(|(key, p)| Item { key, bytes: dir_size(p) }).collect();
-    let total = dir_size(&root);
-    let used: u64 = items.iter().map(|i| i.bytes).sum();
-    items.push(Item { key: "other", bytes: total.saturating_sub(used) });
-
-    let mut runtimes: Vec<Runtime> = std::fs::read_dir(paths::runtimes())
+    items.insert(4, Item { key: "runtimes", bytes: runtimes_bytes });
+    let other = std::fs::read_dir(&root)
         .into_iter()
         .flatten()
         .flatten()
-        .filter(|e| e.path().is_dir())
-        .map(|e| Runtime { name: e.file_name().to_string_lossy().into_owned(), bytes: dir_size(&e.path()) })
-        .filter(|r| !r.name.starts_with('.'))
-        .collect();
-    runtimes.sort_by(|a, b| a.name.cmp(&b.name));
+        .filter(|e| {
+            let path = e.path();
+            path != paths::runtimes() && !known.iter().any(|(_, p)| *p == path)
+        })
+        .map(|e| entry_size(&e))
+        .sum();
+    items.push(Item { key: "other", bytes: other });
     Storage { root: root.to_string_lossy().into_owned(), items, runtimes }
 }
 

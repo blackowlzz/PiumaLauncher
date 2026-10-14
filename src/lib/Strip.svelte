@@ -5,7 +5,7 @@
 
   let { title, icon, action, onAction, cols = 'minmax(250px, 290px)', children }: {
     title: string
-    icon?: 'flame' | 'box'
+    icon?: 'flame' | 'box' | 'clock'
     action?: string
     onAction?: () => void
     cols?: string
