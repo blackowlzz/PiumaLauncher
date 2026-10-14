@@ -443,6 +443,7 @@ export const es: Record<string, string> = {
   "Import from code": "Importar desde código",
   "Modrinth link": "Enlace de Modrinth",
   "Import from link": "Importar desde enlace",
+  "Automatic optimization is on, so the launcher chooses the profile at each launch.": "La optimización automática está activada, así que el lanzador elige el perfil en cada inicio.",
   "or": "o",
   "Choose a .mrpack file": "Elegir un archivo .mrpack",
   "You can also drag it onto the window.": "También puedes arrastrarlo a la ventana.",

@@ -441,6 +441,7 @@ export const ru: Record<string, string> = {
   "Import from code": "Импортировать по коду",
   "Modrinth link": "Ссылка Modrinth",
   "Import from link": "Импортировать по ссылке",
+  "Automatic optimization is on, so the launcher chooses the profile at each launch.": "Автоматическая оптимизация включена, поэтому лаунчер выбирает профиль при каждом запуске.",
   "or": "или",
   "Choose a .mrpack file": "Выбрать файл .mrpack",
   "You can also drag it onto the window.": "Его также можно перетащить в окно.",

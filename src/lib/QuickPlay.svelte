@@ -4,7 +4,7 @@
   import { t } from './i18n.svelte'
   import { reveal, spotlight } from './actions'
   import { relativeTime } from './meta'
-  import { opensWorlds } from './quickplay.svelte'
+  import { opensWorlds } from './serverstatus.svelte'
   import Art from './Art.svelte'
   import Icon from './Icon.svelte'
   import ServerList from './ServerList.svelte'

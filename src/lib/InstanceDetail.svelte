@@ -10,7 +10,7 @@
   import ServerList from './ServerList.svelte'
   import ShareModal from './ShareModal.svelte'
   import Icon from './Icon.svelte'
-  import { opensWorlds } from './quickplay.svelte'
+  import { opensWorlds } from './serverstatus.svelte'
 
   type Tab = 'overview' | 'mods' | 'worlds' | 'servers' | 'settings'
   const tabs: { id: Tab; label: string }[] = [
@@ -198,8 +198,9 @@
       </div>
       <label>
         {t('JVM profile')}
-        <Select bind:value={draft.flagProfile} options={profiles().map((p) => ({ value: p.id, label: p.label }))} label={t('JVM profile')} />
+        <Select bind:value={draft.flagProfile} options={profiles().map((p) => ({ value: p.id, label: p.label }))} label={t('JVM profile')} onchange={save} />
         <span class="muted">{profiles().find((p) => p.id === draft!.flagProfile)?.hint}</span>
+        {#if app.settings.autoOptimize && draft.flagProfile !== 'none'}<span class="muted">{t('Automatic optimization is on, so the launcher chooses the profile at each launch.')}</span>{/if}
       </label>
       <label>
         Java

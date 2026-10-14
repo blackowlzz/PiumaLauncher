@@ -3,7 +3,7 @@
   import { app, askConfirm, isBusy, notify, play } from './store.svelte'
   import { locale, t } from './i18n.svelte'
   import { reveal, spotlight } from './actions'
-  import { ping, pingOf, signal } from './quickplay.svelte'
+  import { ping, pingOf, signal } from './serverstatus.svelte'
   import AddServerModal from './AddServerModal.svelte'
   import Count from './Count.svelte'
   import Icon from './Icon.svelte'

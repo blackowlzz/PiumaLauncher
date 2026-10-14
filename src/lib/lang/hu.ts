@@ -441,6 +441,7 @@ export const hu: Record<string, string> = {
   "Import from code": "Importálás kódból",
   "Modrinth link": "Modrinth-hivatkozás",
   "Import from link": "Importálás hivatkozásból",
+  "Automatic optimization is on, so the launcher chooses the profile at each launch.": "Az automatikus optimalizálás be van kapcsolva, ezért az indító minden induláskor kiválasztja a profilt.",
   "or": "vagy",
   "Choose a .mrpack file": ".mrpack fájl kiválasztása",
   "You can also drag it onto the window.": "Az ablakra is ráhúzhatod.",

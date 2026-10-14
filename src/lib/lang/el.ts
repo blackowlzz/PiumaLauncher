@@ -441,6 +441,7 @@ export const el: Record<string, string> = {
   "Import from code": "Εισαγωγή από κωδικό",
   "Modrinth link": "Σύνδεσμος Modrinth",
   "Import from link": "Εισαγωγή από σύνδεσμο",
+  "Automatic optimization is on, so the launcher chooses the profile at each launch.": "Η αυτόματη βελτιστοποίηση είναι ενεργή, οπότε το launcher επιλέγει το προφίλ σε κάθε εκκίνηση.",
   "or": "ή",
   "Choose a .mrpack file": "Επιλογή αρχείου .mrpack",
   "You can also drag it onto the window.": "Μπορείς επίσης να το σύρεις στο παράθυρο.",

@@ -1,6 +1,6 @@
 import { listen } from '@tauri-apps/api/event'
 import { loadLanguage, t } from './i18n.svelte'
-import { ping, serverKey } from './quickplay.svelte'
+import { ping, serverKey } from './serverstatus.svelte'
 import {
   api,
   inTauri,

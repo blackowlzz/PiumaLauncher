@@ -4,7 +4,7 @@
   import { app, isBusy, play } from './store.svelte'
   import { t } from './i18n.svelte'
   import { loaderNames } from './meta'
-  import { pingOf, rankInstances } from './quickplay.svelte'
+  import { pingOf, rankInstances } from './serverstatus.svelte'
   import Cover from './Cover.svelte'
   import Icon from './Icon.svelte'
 

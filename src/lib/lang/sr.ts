@@ -441,6 +441,7 @@ export const sr: Record<string, string> = {
   "Import from code": "Uvezi iz koda",
   "Modrinth link": "Modrinth link",
   "Import from link": "Uvezi sa linka",
+  "Automatic optimization is on, so the launcher chooses the profile at each launch.": "Automatska optimizacija je uključena, pa launcher bira profil pri svakom pokretanju.",
   "or": "ili",
   "Choose a .mrpack file": "Izaberi .mrpack fajl",
   "You can also drag it onto the window.": "Možeš i da ga prevučeš na prozor.",

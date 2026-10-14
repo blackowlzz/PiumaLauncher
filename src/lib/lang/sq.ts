@@ -441,6 +441,7 @@ export const sq: Record<string, string> = {
   "Import from code": "Importo nga kodi",
   "Modrinth link": "Lidhje Modrinth",
   "Import from link": "Importo nga lidhja",
+  "Automatic optimization is on, so the launcher chooses the profile at each launch.": "Optimizimi automatik është aktiv, prandaj nisësi zgjedh profilin në çdo nisje.",
   "or": "ose",
   "Choose a .mrpack file": "Zgjidh një skedar .mrpack",
   "You can also drag it onto the window.": "Mund ta tërheqësh edhe mbi dritare.",

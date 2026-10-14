@@ -441,6 +441,7 @@ export const ro: Record<string, string> = {
   "Import from code": "Importă din cod",
   "Modrinth link": "Link Modrinth",
   "Import from link": "Importă din link",
+  "Automatic optimization is on, so the launcher chooses the profile at each launch.": "Optimizarea automată este activă, deci launcherul alege profilul la fiecare pornire.",
   "or": "sau",
   "Choose a .mrpack file": "Alege un fișier .mrpack",
   "You can also drag it onto the window.": "Îl poți trage și peste fereastră.",

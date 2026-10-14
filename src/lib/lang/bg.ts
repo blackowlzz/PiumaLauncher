@@ -441,6 +441,7 @@ export const bg: Record<string, string> = {
   "Import from code": "Импортирай от код",
   "Modrinth link": "Връзка към Modrinth",
   "Import from link": "Импортирай от връзка",
+  "Automatic optimization is on, so the launcher chooses the profile at each launch.": "Автоматичната оптимизация е включена, затова лаунчерът избира профила при всяко стартиране.",
   "or": "или",
   "Choose a .mrpack file": "Избери файл .mrpack",
   "You can also drag it onto the window.": "Можете и да го плъзнете върху прозореца.",

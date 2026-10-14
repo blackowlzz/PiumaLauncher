@@ -506,6 +506,7 @@ export const it: Record<string, string> = {
   "Import from code": "Importa dal codice",
   "Modrinth link": "Link Modrinth",
   "Import from link": "Importa dal link",
+  "Automatic optimization is on, so the launcher chooses the profile at each launch.": "L'ottimizzazione automatica è attiva, quindi il launcher sceglie il profilo a ogni avvio.",
   "or": "oppure",
   "Choose a .mrpack file": "Scegli un file .mrpack",
   "You can also drag it onto the window.": "Puoi anche trascinarlo sulla finestra.",

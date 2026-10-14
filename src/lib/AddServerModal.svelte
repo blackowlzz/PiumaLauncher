@@ -4,7 +4,7 @@
   import { api } from './api'
   import { app, notify } from './store.svelte'
   import { locale, t } from './i18n.svelte'
-  import { ping, pingOf } from './quickplay.svelte'
+  import { ping, pingOf } from './serverstatus.svelte'
   import Cover from './Cover.svelte'
   import Icon from './Icon.svelte'
   import Motd from './Motd.svelte'

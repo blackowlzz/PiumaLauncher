@@ -441,6 +441,7 @@ export const tr: Record<string, string> = {
   "Import from code": "Koddan içe aktar",
   "Modrinth link": "Modrinth bağlantısı",
   "Import from link": "Bağlantıdan içe aktar",
+  "Automatic optimization is on, so the launcher chooses the profile at each launch.": "Otomatik optimizasyon açık, bu yüzden başlatıcı profili her açılışta kendisi seçer.",
   "or": "ya da",
   "Choose a .mrpack file": ".mrpack dosyası seç",
   "You can also drag it onto the window.": "Pencerenin üzerine de sürükleyebilirsin.",
