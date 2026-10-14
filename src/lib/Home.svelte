@@ -10,7 +10,7 @@
   import { reveal, spotlight } from './actions'
   import { locale, t } from './i18n.svelte'
   import { onMount } from 'svelte'
-  import { activeAccount, app, installModpack, isBusy, openInstance, openProject, play, selectedInstance, stop, weeklyPlaytime } from './store.svelte'
+  import { activeAccount, app, installModpack, isBusy, openInstance, openProject, play, refreshEffective, selectedInstance, stop, weeklyPlaytime } from './store.svelte'
   import { formatDuration, loaderNames, profileName, relativeTime } from './meta'
 
   const inst = $derived(selectedInstance())
@@ -18,7 +18,13 @@
   const running = $derived(game?.state === 'running')
   const busy = $derived(isBusy(inst?.id ?? null))
   const samples = $derived(inst ? (app.stats[inst.id] ?? []) : [])
+  const eff = $derived(inst ? app.effective[inst.id] : undefined)
   const ram = $derived(running && samples.length ? samples[samples.length - 1] : null)
+  $effect(() => {
+    if (!inst) return
+    void [inst.memoryMaxMb, inst.flagProfile, app.settings.autoOptimize, running]
+    refreshEffective(inst.id)
+  })
   const shownInstances = $derived(app.instances.slice(0, 8))
   const account = $derived(activeAccount())
   const week = $derived(weeklyPlaytime())
@@ -79,7 +85,7 @@
       <ul class="facts" use:reveal={3}>
         <li><Icon name="box" size={16} />Minecraft {inst.mcVersion}</li>
         {#if inst.loader !== 'vanilla'}<li><Icon name="wrench" size={16} />{loaderNames[inst.loader]}</li>{/if}
-        <li><Icon name="cpu" size={16} />{inst.memoryMaxMb} MB · {profileName(inst.flagProfile)}</li>
+        <li><Icon name="cpu" size={16} />{eff?.memoryMaxMb ?? inst.memoryMaxMb} MB · {profileName(eff?.flagProfile ?? inst.flagProfile)}</li>
         {#if ram !== null}<li class="live"><span class="dot"></span>{t('RAM in use: {ram} MB', { ram })}</li>{/if}
       </ul>
       <div class="cta" use:reveal={4}>

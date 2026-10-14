@@ -209,6 +209,7 @@ export const api = {
   removeAccount: (id: string) => call<void>('remove_account', { id }),
   setActiveAccount: (id: string) => call<void>('set_active_account', { id }),
   systemInfo: () => call<SystemInfo>('system_info'),
+  effectiveLaunch: (instanceId: string) => call<EffectiveLaunch>('effective_launch', { instanceId }),
   recommendPerformance: () => call<Recommendation>('recommend_performance'),
   detectJava: () => call<JavaInstall[]>('detect_java'),
   listRuntimes: () => call<RuntimeEntry[]>('list_runtimes'),
@@ -399,6 +400,12 @@ export const modrinth = {
     call<{ done: number; skipped: number }>('import_content', { instanceId, kind, files }),
   setModEnabled: (instanceId: string, fileName: string, enabled: boolean) =>
     call<void>('set_mod_enabled', { instanceId, fileName, enabled }),
+}
+
+export interface EffectiveLaunch {
+  memoryMaxMb: number
+  memoryMinMb: number
+  flagProfile: FlagProfile
 }
 
 export interface SkinInfo {

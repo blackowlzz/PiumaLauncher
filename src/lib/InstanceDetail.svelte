@@ -1,7 +1,7 @@
 <script lang="ts">
   import { api, type Instance, type JavaInstall, type World } from './api'
   import { locale, t } from './i18n.svelte'
-  import { app, askConfirm, createShortcut, installedJavas, isBusy, notify, play, reloadInstances, stop } from './store.svelte'
+  import { app, askConfirm, createShortcut, installedJavas, isBusy, notify, play, refreshEffective, reloadInstances, stop } from './store.svelte'
   import { formatBytes, loaderNames, profileName, profiles } from './meta'
   import Cover from './Cover.svelte'
   import ContentTable from './ContentTable.svelte'
@@ -22,6 +22,7 @@
   ]
 
   let tab: Tab = $state('overview')
+  const eff = $derived(app.detailId ? app.effective[app.detailId] : undefined)
   let worlds: World[] = $state([])
   let javas: JavaInstall[] = $state([])
   let draft: Instance | null = $state(null)
@@ -42,6 +43,11 @@
   }
 
   const inst = $derived(app.instances.find((i) => i.id === app.detailId) ?? null)
+  $effect(() => {
+    if (!inst) return
+    void [inst.memoryMaxMb, inst.flagProfile, app.settings.autoOptimize]
+    refreshEffective(inst.id)
+  })
   const game = $derived(inst ? app.games[inst.id] : undefined)
   const running = $derived(game?.state === 'running')
   const busy = $derived(isBusy(inst?.id ?? null))
@@ -156,15 +162,15 @@
       </div>
       <div>
         <div class="eyebrow">{t('Limit')}</div>
-        <div class="num">{inst.memoryMaxMb} MB</div>
+        <div class="num">{eff?.memoryMaxMb ?? inst.memoryMaxMb} MB</div>
       </div>
       <div>
         <div class="eyebrow">{t('Profile')}</div>
-        <div class="num sm">{profileName(inst.flagProfile)}</div>
+        <div class="num sm">{profileName(eff?.flagProfile ?? inst.flagProfile)}</div>
       </div>
     </section>
     <div class="chart">
-      <Sparkline values={samples} limit={inst.memoryMaxMb} />
+      <Sparkline values={samples} limit={eff?.memoryMaxMb ?? inst.memoryMaxMb} />
       {#if !samples.length}<p class="muted small hint">{t('The chart fills in while the game is running.')}</p>{/if}
     </div>
 

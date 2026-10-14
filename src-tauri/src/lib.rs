@@ -91,6 +91,7 @@ pub fn run() {
             commands::detect_java,
             commands::system_info,
             commands::recommend_performance,
+            commands::effective_launch,
             commands::list_runtimes,
             commands::install_runtime,
             commands::launch_instance,

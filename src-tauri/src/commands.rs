@@ -133,6 +133,12 @@ pub fn system_info() -> SystemInfo {
 }
 
 #[tauri::command(async)]
+pub fn effective_launch(instance_id: String) -> Result<crate::optimizer::Effective> {
+    let inst = instance::get(&instance_id)?;
+    Ok(crate::optimizer::effective(&inst, &crate::settings::load()))
+}
+
+#[tauri::command(async)]
 pub fn recommend_performance() -> crate::optimizer::Recommendation {
     crate::optimizer::recommend(&crate::optimizer::hardware(), 0)
 }

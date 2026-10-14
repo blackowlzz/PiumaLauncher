@@ -319,6 +319,8 @@ export async function mock(cmd: string, args: Record<string, unknown>): Promise<
       return { totalMemoryMb: 16384, cpuCores: 8 }
     case 'recommend_performance':
       return { tier: 'strong', memoryMaxMb: 6144, memoryMinMb: 6144, flagProfile: 'performance', tuning: { gc: 'auto', pauseMs: 0, gcThreads: 4, preTouch: false, disableExplicitGc: true, stringDedup: false }, reasons: ['A powerful computer: a large heap and a low-pause collector for the smoothest play.'] }
+    case 'effective_launch':
+      return { memoryMaxMb: 6144, memoryMinMb: 6144, flagProfile: 'performance' }
     case 'running_instances':
       return []
     default:

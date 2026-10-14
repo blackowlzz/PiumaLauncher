@@ -143,10 +143,13 @@ pub fn count_mods(instance_id: &str) -> u32 {
         .unwrap_or(0)
 }
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Effective {
     pub memory_max_mb: u32,
     pub memory_min_mb: u32,
     pub flag_profile: FlagProfile,
+    #[serde(skip)]
     pub tuning: Tuning,
 }
 

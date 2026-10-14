@@ -6,6 +6,7 @@ import {
   inTauri,
   modrinth,
   stats,
+  type EffectiveLaunch,
   type NewsItem,
   defaultSettings,
   type ProjectHit,
@@ -48,6 +49,7 @@ export const app = $state({
   runtimes: [] as RuntimeEntry[],
   javaBusy: null as string | null,
   stats: {} as Record<string, number[]>,
+  effective: {} as Record<string, EffectiveLaunch>,
   featured: [] as ProjectHit[],
   sessions: [] as Session[],
   installedVersions: [] as string[],
@@ -81,6 +83,14 @@ export function askConfirm(message: string, confirmLabel = t('Delete')): Promise
       },
     }
   })
+}
+
+export async function refreshEffective(id: string) {
+  try {
+    app.effective[id] = await api.effectiveLaunch(id)
+  } catch {
+    delete app.effective[id]
+  }
 }
 
 export async function reloadInstances() {
