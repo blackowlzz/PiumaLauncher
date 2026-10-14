@@ -22,6 +22,8 @@
   import CrashDialog from './lib/CrashDialog.svelte'
   import InstanceChooser from './lib/InstanceChooser.svelte'
   import DropZone from './lib/DropZone.svelte'
+  import ContextMenu from './lib/ContextMenu.svelte'
+  import ShareModal from './lib/ShareModal.svelte'
   import Themes from './lib/Themes.svelte'
   import Wardrobe from './lib/Wardrobe.svelte'
   import { applyTheme, isCustomized, resetTheme } from './lib/palette.svelte'
@@ -84,6 +86,13 @@
     void fitScale()
   })
 
+  function nativeMenu(e: MouseEvent) {
+    if (import.meta.env.DEV) return
+    const el = e.target as HTMLElement | null
+    const editable = !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
+    if (!editable && !window.getSelection()?.toString()) e.preventDefault()
+  }
+
   const order: Page[] = ['home', 'quickplay', 'library', 'explore', 'accounts', 'wardrobe', 'themes', 'performance', 'settings']
   async function shortcuts(e: KeyboardEvent) {
     const el = e.target as HTMLElement | null
@@ -127,7 +136,13 @@
   })
 </script>
 
-<svelte:window onkeydown={shortcuts} />
+<svelte:window onkeydown={shortcuts} oncontextmenu={nativeMenu} />
+
+<ContextMenu />
+{#if app.sharingId}
+  {@const shared = app.instances.find((i) => i.id === app.sharingId)}
+  {#if shared}<ShareModal inst={shared} onClose={() => (app.sharingId = null)} />{/if}
+{/if}
 
 <div class="shell">
   <TitleBar />

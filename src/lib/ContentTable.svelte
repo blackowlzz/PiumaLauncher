@@ -7,6 +7,7 @@
   import { t } from './i18n.svelte'
   import { formatBytes } from './meta'
   import { app, notify } from './store.svelte'
+  import { copyText, ctx, type MenuItem } from './contextmenu'
 
   let { inst, busy = false }: { inst: Instance; busy?: boolean } = $props()
 
@@ -111,9 +112,7 @@
   let transfer: 'copy' | 'move' | null = $state(null)
   const targets = $derived(app.instances.filter((i) => i.id !== inst.id && !(kind === 'mods' && i.loader === 'vanilla')))
 
-  async function sendTo(target: Instance) {
-    const mode = transfer
-    const files = chosen.map((e) => e.fileName)
+  async function sendTo(target: Instance, mode: 'copy' | 'move' | null = transfer, files = chosen.map((e) => e.fileName)) {
     transfer = null
     if (!mode || !files.length) return
     try {
@@ -127,6 +126,40 @@
     } catch (e) {
       notify(e)
     }
+  }
+
+  function rowMenu(e: ContentEntry): MenuItem[] {
+    const group = selected[e.fileName] && chosen.length > 1 ? chosen : [e]
+    const many = group.length > 1
+    const files = group.map((x) => x.fileName)
+    const allOn = group.every((x) => x.enabled)
+    const allOff = group.every((x) => !x.enabled)
+    const upd = group.filter((x) => x.update)
+    const slug = e.project?.slug
+    const type = kinds.find((k) => k.id === kind)!.type
+    const each = (fn: (x: ContentEntry) => Promise<void>) => async () => {
+      for (const x of group) await fn(x)
+    }
+    const to = (mode: 'copy' | 'move') => targets.map((i) => ({ label: `${i.name} · ${i.mcVersion}`, onclick: () => void sendTo(i, mode, files) }))
+    const items: MenuItem[] = [
+      { label: allOn ? t('Disable') : t('Enable'), icon: 'check', onclick: each((x) => setEnabled(x, !allOn)), disabled: busy },
+    ]
+    if (!allOn && !allOff) items.push({ label: t('Disable'), icon: 'x', onclick: each((x) => setEnabled(x, false)), disabled: busy })
+    if (upd.length) items.push({ label: many ? t('Update ({n})', { n: upd.length }) : t('Update'), icon: 'refresh', onclick: async () => { for (const x of upd) await update(x) }, disabled: busy })
+    items.push('sep')
+    items.push({ label: t('Copy to…'), icon: 'copy', children: to('copy'), disabled: !targets.length })
+    items.push({ label: t('Move to…'), icon: 'share', children: to('move'), disabled: busy || !targets.length })
+    items.push('sep')
+    if (!many && slug) {
+      items.push({ label: t('Open on Modrinth'), icon: 'globe', onclick: () => void api.openUrl(`https://modrinth.com/${type}/${slug}`).catch(notify) })
+      items.push({ label: t('Copy Modrinth link'), icon: 'copy', onclick: () => void copyText(`https://modrinth.com/${type}/${slug}`).then((ok) => ok && notify(t('Copied'))) })
+    }
+    if (!many) items.push({ label: t('Copy file name'), icon: 'file', onclick: () => void copyText(baseName(e.fileName)).then((ok) => ok && notify(t('Copied'))) })
+    items.push({ label: t('Open folder'), icon: 'folder', onclick: () => void api.openFolder(inst.id, kind === 'mods' ? 'mods' : 'game').catch(notify) })
+    items.push({ label: selected[e.fileName] ? t('Deselect') : t('Select'), icon: 'check', onclick: () => (selected[e.fileName] = !selected[e.fileName]) })
+    items.push('sep')
+    items.push({ label: many ? t('Remove ({n})', { n: group.length }) : t('Remove'), icon: 'trash', danger: true, onclick: each(remove), disabled: busy })
+    return items
   }
 
   function browse() {
@@ -252,7 +285,7 @@
     {/if}
 
     {#each rows as e, n (e.fileName)}
-      <div class="tr" class:off={!e.enabled} class:wip={working[e.fileName]} class:anim={n < 12} style:--d="{n * 30}ms" out:fade={{ duration: 160 }}>
+      <div class="tr" use:ctx={() => rowMenu(e)} class:off={!e.enabled} class:wip={working[e.fileName]} class:anim={n < 12} style:--d="{n * 30}ms" out:fade={{ duration: 160 }}>
         <label class="chk"><input type="checkbox" bind:checked={selected[e.fileName]} aria-label={title(e)} /></label>
 
         <div class="proj">

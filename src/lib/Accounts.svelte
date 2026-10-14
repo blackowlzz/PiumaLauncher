@@ -2,6 +2,7 @@
   import Head from './Head.svelte'
   import Verified from './Verified.svelte'
   import { reveal, spotlight } from './actions'
+  import { copyText, ctx, type MenuItem } from './contextmenu'
   import { api, type DeviceLogin } from './api'
   import { t } from './i18n.svelte'
   import { app, notify, reloadAccounts } from './store.svelte'
@@ -58,6 +59,17 @@
     } catch {}
   }
 
+  function accountMenu(a: (typeof app.accounts.accounts)[number]): MenuItem[] {
+    const items: MenuItem[] = []
+    if (app.accounts.active !== a.id) items.push({ label: t('Use'), icon: 'check', onclick: () => void guard(() => api.setActiveAccount(a.id)) })
+    if (a.kind === 'microsoft') items.push({ label: t('Skin'), icon: 'feather', onclick: () => openWardrobe(a.id) })
+    items.push({ label: t('Copy name'), icon: 'copy', onclick: () => void copyText(a.name).then((ok) => ok && notify(t('Copied'))) })
+    items.push({ label: t('Copy UUID'), icon: 'copy', onclick: () => void copyText(a.uuid).then((ok) => ok && notify(t('Copied'))) })
+    items.push('sep')
+    items.push({ label: t('Remove'), icon: 'trash', danger: true, onclick: () => void guard(() => api.removeAccount(a.id)) })
+    return items
+  }
+
   function openWardrobe(id: string) {
     app.wardrobeId = id
     app.page = 'wardrobe'
@@ -73,7 +85,7 @@
 <div class="grid">
   {#each app.accounts.accounts as a, n (a.id)}
     {@const active = app.accounts.active === a.id}
-    <article class="acard" class:active use:spotlight use:reveal={n}>
+    <article class="acard" class:active use:spotlight use:reveal={n} use:ctx={() => accountMenu(a)}>
       <div class="top">
         <Head name={a.name} size={68} />
         <div class="tags">

@@ -5,6 +5,8 @@
   import { reveal } from './actions'
   import { t } from './i18n.svelte'
   import InstanceMenu from './InstanceMenu.svelte'
+  import { ctx } from './contextmenu'
+  import { instanceItems } from './instanceMenu'
   import NewInstanceModal from './NewInstanceModal.svelte'
   import ImportModal from './ImportModal.svelte'
   import Select from './Select.svelte'
@@ -76,7 +78,7 @@
   <div class="grid">
     {#each rows as { inst, secs, last }, n (inst.id)}
       {@const state = app.games[inst.id]?.state}
-      <article class="card" class:sel={app.selectedId === inst.id} use:reveal={n}>
+      <article class="card" class:sel={app.selectedId === inst.id} use:reveal={n} use:ctx={() => instanceItems(inst)}>
         <button class="open" onclick={() => openInstance(inst.id)} aria-label={t('Open {name}', { name: inst.name })}>
           <div class="cover">
             <Cover {inst} />
@@ -102,7 +104,7 @@
 {:else}
   <div class="list">
     {#each rows as { inst, secs, last }, n (inst.id)}
-      <div class="item row" use:reveal={n}>
+      <div class="item row" use:reveal={n} use:ctx={() => instanceItems(inst)}>
         <button class="ghost rowopen grow" onclick={() => openInstance(inst.id)}>
           <span class="thumb"><Cover {inst} /></span>
           <span class="rt"><span class="n">{inst.name}</span><span class="muted small">{status(inst, last)}{secs ? ` · ${formatDuration(secs)}` : ''}</span></span>

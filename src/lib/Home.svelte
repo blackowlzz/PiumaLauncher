@@ -5,6 +5,8 @@
   import Count from './Count.svelte'
   import Icon from './Icon.svelte'
   import InstanceMenu from './InstanceMenu.svelte'
+  import { ctx } from './contextmenu'
+  import { instanceItems } from './instanceMenu'
   import ProjectCard from './ProjectCard.svelte'
   import Strip from './Strip.svelte'
   import { reveal, spotlight } from './actions'
@@ -141,7 +143,7 @@
         <div class="inst">
           {#each shownInstances as i, n (i.id)}
             {@const g = app.games[i.id]}
-            <div class="mini" class:sel={i.id === inst?.id} use:spotlight use:reveal={n}>
+            <div class="mini" class:sel={i.id === inst?.id} use:spotlight use:reveal={n} use:ctx={() => instanceItems(i)}>
               <button class="thumb" onclick={() => openInstance(i.id)} aria-label={t('Open {name}', { name: i.name })}><Cover inst={i} /></button>
               <div class="mt">
                 <span class="mn">{i.name}</span>

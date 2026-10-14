@@ -9,6 +9,7 @@
   import Sparkline from './Sparkline.svelte'
   import ServerList from './ServerList.svelte'
   import ShareModal from './ShareModal.svelte'
+  import { copyText, ctx } from './contextmenu'
   import Icon from './Icon.svelte'
   import { opensWorlds } from './serverstatus.svelte'
 
@@ -183,7 +184,11 @@
     </div>
     <div class="list">
       {#each worlds as w (w.folder)}
-        <div class="item row">
+        <div class="item row" use:ctx={() => [
+          { label: t('Play'), icon: 'play', onclick: () => void play(inst.id, { kind: 'world', folder: w.folder }), disabled: busy || !app.accounts.active || !opensWorlds(inst.mcVersion) },
+          { label: t('Copy name'), icon: 'copy', onclick: () => void copyText(w.name ?? w.folder).then((ok) => ok && notify(t('Copied'))) },
+          { label: t('Open instance folder'), icon: 'folder', onclick: () => void api.openFolder(inst.id, 'saves').catch(notify) },
+        ]}>
           <span class="grow name">{w.name ?? w.folder}{#if w.name && w.name !== w.folder}<span class="muted small folder">{w.folder}</span>{/if}</span>
           <span class="muted small">{formatBytes(w.size)}</span>
           <span class="muted small when">{when(w.modifiedMs)}</span>

@@ -4,7 +4,9 @@
   import LoaderCover from './LoaderCover.svelte'
   import Icon from './Icon.svelte'
   import { locale, t } from './i18n.svelte'
-  import { photoFor } from './store.svelte'
+  import { api } from './api'
+  import { copyText, ctx, type MenuItem } from './contextmenu'
+  import { notify, photoFor } from './store.svelte'
 
   let { hit, busy = false, disabled = false, index, onInstall, onOpen }: {
     hit: ProjectHit
@@ -18,10 +20,18 @@
   const photo = $derived(hit.bannerUrl ?? photoFor(hit.latestMc ?? undefined, hit.title))
   const fmt = (n: number) => new Intl.NumberFormat(locale(), { notation: 'compact' }).format(n)
   const tags = $derived(hit.categories.slice(0, 3))
+  const link = $derived(`https://modrinth.com/project/${hit.slug}`)
+  const menu = (): MenuItem[] => [
+    ...(onOpen ? [{ label: t('Details'), icon: 'list' as const, onclick: onOpen }] : []),
+    { label: t('Install'), icon: 'download', onclick: onInstall, disabled: busy || disabled },
+    'sep',
+    { label: t('Open on Modrinth'), icon: 'globe', onclick: () => void api.openUrl(link).catch(notify) },
+    { label: t('Copy Modrinth link'), icon: 'copy', onclick: () => void copyText(link).then((ok) => ok && notify(t('Copied'))) },
+  ]
   const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 </script>
 
-<article class="card" class:rise={index !== undefined} style:--d="{(index ?? 0) * 35}ms">
+<article class="card" use:ctx={menu} class:rise={index !== undefined} style:--d="{(index ?? 0) * 35}ms">
   <div class="media">
     {#if photo}
       <img class="photo" use:thumb={{ src: photo, w: 640 }} alt="" decoding="async" />

@@ -4,6 +4,7 @@
   import { locale, t } from './i18n.svelte'
   import { reveal, spotlight } from './actions'
   import { ping, pingOf, signal } from './serverstatus.svelte'
+  import { copyText, ctx, type MenuItem } from './contextmenu'
   import AddServerModal from './AddServerModal.svelte'
   import Count from './Count.svelte'
   import Icon from './Icon.svelte'
@@ -42,6 +43,16 @@
   function join(s: SavedServer) {
     if (instanceId) play(instanceId, { kind: 'server', address: s.address })
     else app.joining = s
+  }
+
+  function serverMenu(s: SavedServer): MenuItem[] {
+    return [
+      { label: t('Join'), icon: 'play', onclick: () => join(s), disabled: busy || (!!instanceId && !app.accounts.active) },
+      { label: t('Copy address'), icon: 'copy', onclick: () => void copyText(s.address).then((ok) => ok && notify(t('Copied'))) },
+      { label: t('Refresh'), icon: 'refresh', onclick: () => ping(s.address, true) },
+      'sep',
+      { label: t('Remove'), icon: 'trash', danger: true, onclick: () => void remove(s), disabled: busy },
+    ]
   }
 
   async function remove(s: SavedServer) {
@@ -87,7 +98,7 @@
       {@const p = pingOf(s.address)}
       {@const st = p?.state === 'online' ? p.status : null}
       {@const level = st ? signal(st.latencyMs) : 0}
-      <div class="srv" class:pending={!p || p.state === 'pending'} class:off={p?.state === 'offline'} use:spotlight use:reveal={n}>
+      <div class="srv" class:pending={!p || p.state === 'pending'} class:off={p?.state === 'offline'} use:spotlight use:reveal={n} use:ctx={() => serverMenu(s)}>
         <div class="fav">
           {#if st?.favicon ?? s.icon}<img src={st?.favicon ?? s.icon} alt="" />{:else}<Icon name="server" size={22} />{/if}
         </div>

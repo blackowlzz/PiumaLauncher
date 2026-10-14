@@ -1,5 +1,6 @@
 import { listen } from '@tauri-apps/api/event'
 import { loadLanguage, t } from './i18n.svelte'
+import type { MenuItem } from './contextmenu'
 import { ping, serverKey } from './serverstatus.svelte'
 import {
   api,
@@ -61,6 +62,8 @@ export const app = $state({
   updateDismissed: false,
   crash: null as CrashReport | null,
   joining: null as SavedServer | null,
+  ctx: null as { x: number; y: number; items: MenuItem[] } | null,
+  sharingId: null as string | null,
 })
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined
