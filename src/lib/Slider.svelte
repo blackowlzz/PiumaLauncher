@@ -49,6 +49,8 @@
     const r = live
     const t = time / 1000 * 0.8
     const fillW = r * width
+    const tint = getComputedStyle(canvas).getPropertyValue('--inv-bg').trim()
+    const rgb = /^#[0-9a-f]{6}$/i.test(tint) ? [1, 3, 5].map((k) => parseInt(tint.slice(k, k + 2), 16)).join(', ') : '250, 250, 250'
     const cols = Math.ceil(fillW / CELL)
     const rows = Math.floor(HEIGHT / CELL)
     const mid = (rows - 1) / 2
@@ -60,16 +62,15 @@
         const fade = Math.min(1, Math.max(0, (reach - d) / 0.22 + 0.5))
         if (fade <= 0) continue
         const n = noise(i, j, t)
-        const light = 18 + (22 + 50 * r) * n * (1 - d * 0.55) * edge
-        const alpha = (0.35 + 0.65 * Math.min(1, n * 1.2 + r * 0.35)) * fade
-        ctx.fillStyle = `hsla(${262 + n * 14}, ${70 + 25 * r}%, ${light}%, ${alpha})`
+        const alpha = (0.1 + 0.5 * n * (1 - d * 0.55) * edge) * (0.6 + 0.4 * r) * fade
+        ctx.fillStyle = `rgba(${rgb}, ${alpha})`
         ctx.fillRect(i * CELL, j * CELL + (HEIGHT - rows * CELL) / 2, CELL - 1, CELL - 1)
       }
     }
     if (r > 0.9) {
       const glow = ctx.createLinearGradient(fillW - 60, 0, fillW, 0)
-      glow.addColorStop(0, 'rgba(180,140,255,0)')
-      glow.addColorStop(1, `rgba(200,170,255,${(r - 0.9) * 4})`)
+      glow.addColorStop(0, `rgba(${rgb}, 0)`)
+      glow.addColorStop(1, `rgba(${rgb}, ${(r - 0.9) * 3})`)
       ctx.fillStyle = glow
       ctx.fillRect(Math.max(0, fillW - 60), 0, Math.min(60, fillW), HEIGHT)
     }
@@ -119,7 +120,7 @@
   .slider { position: relative; width: 100%; height: 54px; }
   canvas { position: absolute; inset: 0; width: 100%; }
   .rail { position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--line-strong); }
-  .mark { position: absolute; top: 50%; left: var(--p); transition: left 120ms ease-out; width: 3px; height: 30px; margin: -15px 0 0 -3px; border-radius: 2px; background: #c9b2ff; box-shadow: 0 0 12px 2px rgba(155, 107, 255, 0.7); pointer-events: none; }
+  .mark { position: absolute; top: 50%; left: var(--p); transition: left 120ms ease-out; width: 3px; height: 30px; margin: -15px 0 0 -3px; border-radius: 2px; background: var(--inv-bg); box-shadow: 0 0 12px 2px rgba(var(--glow), 0.35); pointer-events: none; }
   input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; border: 0; background: transparent; appearance: none; -webkit-appearance: none; cursor: pointer; opacity: 0; }
   input:hover, input:focus { background: transparent; border: 0; }
   input::-webkit-slider-runnable-track { height: 54px; background: transparent; }

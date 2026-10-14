@@ -289,7 +289,7 @@
   .num { width: 130px; }
   .wide { width: 100%; }
   .presets { display: flex; flex-wrap: wrap; gap: 6px; }
-  .presets .on { background: #7c4dff; color: #fff; border-color: #7c4dff; box-shadow: 0 0 14px rgba(124, 77, 255, 0.55); }
+  .presets .on { background: var(--inv-bg); color: var(--inv-text); border-color: var(--inv-bg); }
   .card { position: relative; overflow: hidden; margin: 12px 0 4px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); isolation: isolate; }
   .field { position: absolute; inset: 0; }
   .body { position: relative; display: grid; gap: 6px; padding: 16px 18px; }
