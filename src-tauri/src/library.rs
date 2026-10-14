@@ -136,6 +136,7 @@ pub fn duplicate(instance_id: &str) -> Result<Instance> {
         original.loader_version.clone(),
         original.launch_version.clone(),
     )?;
+    copy.custom_performance = original.custom_performance;
     copy.memory_max_mb = original.memory_max_mb;
     copy.memory_min_mb = original.memory_min_mb;
     copy.flag_profile = original.flag_profile;

@@ -2,6 +2,7 @@ import type { Instance, ProjectHit } from './api'
 
 const base: Omit<Instance, 'id' | 'name' | 'mcVersion' | 'loader' | 'loaderVersion'> = {
   launchVersion: null,
+  customPerformance: false,
   memoryMaxMb: 2048,
   memoryMinMb: 512,
   flagProfile: 'low',

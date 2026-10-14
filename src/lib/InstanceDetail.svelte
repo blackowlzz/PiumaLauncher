@@ -45,7 +45,7 @@
   const inst = $derived(app.instances.find((i) => i.id === app.detailId) ?? null)
   $effect(() => {
     if (!inst) return
-    void [inst.memoryMaxMb, inst.flagProfile, app.settings.autoOptimize]
+    void [inst.customPerformance, inst.memoryMaxMb, inst.flagProfile, app.settings.autoOptimize, app.settings.defaultMemoryMaxMb, app.settings.defaultFlagProfile]
     refreshEffective(inst.id)
   })
   const game = $derived(inst ? app.games[inst.id] : undefined)
@@ -198,16 +198,30 @@
   {:else if draft}
     <form class="settings" onsubmit={(e) => { e.preventDefault(); save() }}>
       <label>{t('Name')}<input bind:value={draft.name} /></label>
-      <div class="row">
-        <label class="grow">{t('Max RAM (MB)')}<input type="number" min="512" step="256" bind:value={draft.memoryMaxMb} /></label>
-        <label class="grow">{t('Initial RAM (MB)')}<input type="number" min="128" step="128" bind:value={draft.memoryMinMb} /></label>
+      <div class="perf">
+        <label class="own">
+          <span>
+            <strong>{t('Custom memory and profile for this instance')}</strong>
+            <span class="muted">{draft.customPerformance ? t('This instance uses its own values below.') : t('This instance uses the values from Performance: {mem} MB · {profile}.', { mem: app.settings.defaultMemoryMaxMb, profile: profileName(app.settings.defaultFlagProfile) })}</span>
+          </span>
+          <span class="switch">
+            <input type="checkbox" bind:checked={draft.customPerformance} aria-label={t('Custom memory and profile for this instance')} />
+            <span class="track"></span>
+          </span>
+        </label>
+        {#if app.settings.autoOptimize}<span class="muted">{t('Automatic optimization is on, so the launcher raises these values at each launch if your computer needs it.')}</span>{/if}
+        {#if draft.customPerformance}
+          <div class="row">
+            <label class="grow">{t('Max RAM (MB)')}<input type="number" min="512" step="256" bind:value={draft.memoryMaxMb} /></label>
+            <label class="grow">{t('Initial RAM (MB)')}<input type="number" min="128" step="128" bind:value={draft.memoryMinMb} /></label>
+          </div>
+          <label>
+            {t('JVM profile')}
+            <Select bind:value={draft.flagProfile} options={profiles().map((p) => ({ value: p.id, label: p.label }))} label={t('JVM profile')} />
+            <span class="muted">{profiles().find((p) => p.id === draft!.flagProfile)?.hint}</span>
+          </label>
+        {/if}
       </div>
-      <label>
-        {t('JVM profile')}
-        <Select bind:value={draft.flagProfile} options={profiles().map((p) => ({ value: p.id, label: p.label }))} label={t('JVM profile')} onchange={save} />
-        <span class="muted">{profiles().find((p) => p.id === draft!.flagProfile)?.hint}</span>
-        {#if app.settings.autoOptimize && draft.flagProfile !== 'none'}<span class="muted">{t('Automatic optimization is on, so the launcher chooses the profile at each launch.')}</span>{/if}
-      </label>
       <label>
         Java
         <Select
@@ -298,4 +312,7 @@
   :global(:root[data-reduce]) .lk path { stroke-dashoffset: 0; }
   @media (prefers-reduced-motion: reduce) { .lk path { stroke-dashoffset: 0; } }
 
+  .perf { display: grid; gap: 14px; }
+  .own { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .own > span:first-child { display: grid; gap: 2px; }
 </style>

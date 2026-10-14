@@ -539,4 +539,12 @@ export const it: Record<string, string> = {
   "A skin must be a 64x64 or 64x32 PNG": "Una skin deve essere un PNG da 64x64 o 64x32",
   "This is not a valid image": "Immagine non valida",
   "Could not load the skin and cape of this account.": "Impossibile caricare skin e mantello di questo account.",
+  "Custom memory and profile for this instance": "Memoria e profilo personalizzati per questa istanza",
+  "This instance uses its own values below.": "Questa istanza usa i valori qui sotto.",
+  "This instance uses the values from Performance: {mem} MB · {profile}.": "Questa istanza usa i valori di Performance: {mem} MB · {profile}.",
+  "Automatic optimization is on, so the launcher raises these values at each launch if your computer needs it.": "L'ottimizzazione automatica è attiva: a ogni avvio il launcher alza questi valori se il tuo computer lo richiede.",
+  "Default memory and profile": "Memoria e profilo predefiniti",
+  "Used by every instance unless it has its own custom values.": "Valgono per ogni istanza che non ha valori personalizzati.",
+  "Saves these values as the defaults for every instance.": "Salva questi valori come predefiniti per ogni istanza.",
+  "The optimizer is on: at each launch it can raise memory and picks the Java flags. The values below are the minimum it starts from.": "L'ottimizzatore è attivo: a ogni avvio può alzare la memoria e sceglie i flag Java. I valori qui sotto sono il minimo da cui parte.",
 }

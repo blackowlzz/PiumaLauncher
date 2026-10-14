@@ -17,6 +17,8 @@ pub struct Instance {
     pub loader_version: Option<String>,
     #[serde(default)]
     pub launch_version: Option<String>,
+    #[serde(default)]
+    pub custom_performance: bool,
     #[serde(default = "default_max")]
     pub memory_max_mb: u32,
     #[serde(default = "default_min")]
@@ -112,6 +114,7 @@ pub fn create(
         loader,
         loader_version,
         launch_version,
+        custom_performance: false,
         memory_max_mb: defaults.default_memory_max_mb,
         memory_min_mb: defaults.default_memory_min_mb,
         flag_profile: defaults.default_flag_profile,

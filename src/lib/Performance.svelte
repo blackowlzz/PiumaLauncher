@@ -111,7 +111,7 @@
           {#each rec.reasons as r}<p class="why">{t(r)}</p>{/each}
           <div class="actions">
             <button class="primary" disabled={isSaved} onclick={applyRecommendation}>{isSaved ? t('Saved') : t('Save')}</button>
-            <span class="muted small">{t('Saves these values as the defaults for new instances.')}</span>
+            <span class="muted small">{t('Saves these values as the defaults for every instance.')}</span>
           </div>
         </div>
       </div>
@@ -128,12 +128,13 @@
         <span class="track"></span>
       </label>
     </div>
-    {#if s.autoOptimize}<p class="warn small">{t('The optimizer is on, so memory and Java flags are chosen at launch. The manual values above are used only if you turn it off.')}</p>{/if}
+    {#if s.autoOptimize}<p class="warn small">{t('The optimizer is on: at each launch it can raise memory and picks the Java flags. The values below are the minimum it starts from.')}</p>{/if}
   </section>
   <section class="group">
-    <h2>{t('Memory for new instances')}</h2>
+    <h2>{t('Default memory and profile')}</h2>
     <p class="muted small intro">
-      {#if sys}{t('Your computer has {ram} of RAM and {cores} threads.', { ram: gb(totalMb), cores })}{:else}{t('Used when you create a new instance.')}{/if}
+      {#if sys}{t('Your computer has {ram} of RAM and {cores} threads.', { ram: gb(totalMb), cores })}{/if}
+      {t('Used by every instance unless it has its own custom values.')}
     </p>
 
     <div class="item col">

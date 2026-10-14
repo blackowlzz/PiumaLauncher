@@ -838,6 +838,7 @@ pub(crate) async fn install_archive(
     let (loader_version, launch_version) = installed?;
 
     let mut inst = instance::create(&index.name, &mc, loader, loader_version, launch_version)?;
+    inst.custom_performance = true;
     inst.memory_max_mb = 4096;
     inst.memory_min_mb = inst.memory_min_mb.min(inst.memory_max_mb);
     if let Some((icon, banner)) = images {
@@ -1199,6 +1200,7 @@ mod tests {
         eprintln!("aggiunte: {added:?}");
         assert!(added.iter().any(|n| n.to_lowercase().contains("modmenu")));
 
+        inst.custom_performance = true;
         inst.flag_profile = crate::flags::FlagProfile::Low;
         inst.memory_max_mb = 3072;
         let log = crate::launch::tests::run_and_capture(&client, &inst, 60).await;
@@ -1244,6 +1246,7 @@ mod tests {
             loader: Loader::Fabric,
             loader_version: None,
             launch_version: None,
+            custom_performance: true,
             memory_max_mb: 1024,
             memory_min_mb: 256,
             flag_profile: crate::flags::FlagProfile::Low,

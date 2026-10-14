@@ -46,6 +46,7 @@ export interface Instance {
   loader: Loader
   loaderVersion: string | null
   launchVersion: string | null
+  customPerformance: boolean
   memoryMaxMb: number
   memoryMinMb: number
   flagProfile: FlagProfile

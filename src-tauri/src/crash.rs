@@ -271,7 +271,7 @@ fn memory(text: &[String], ctx: &Ctx) -> Option<Found> {
     let big = has(text, &["Could not reserve enough space", "Invalid maximum heap size", "insufficient memory for the Java Runtime", "Cannot allocate memory"]);
     if !big.is_empty() {
         let mb = round_down(ctx.effective_max / 2).max(1024);
-        let fix = (!ctx.auto && mb < ctx.inst.memory_max_mb).then_some(Fix::Memory { mb });
+        let fix = (!ctx.auto && mb < ctx.effective_max).then_some(Fix::Memory { mb });
         return Some(Found::new("heapTooLarge", None, fix, big));
     }
     let oom = has(text, &["java.lang.OutOfMemoryError"]);
@@ -563,6 +563,7 @@ pub async fn apply(client: &reqwest::Client, id: &str, progress: modrinth::Progr
             }
         }
         Fix::Memory { mb } => {
+            inst.custom_performance = true;
             inst.memory_max_mb = mb;
             inst.memory_min_mb = inst.memory_min_mb.min(mb);
             instance::save(&inst)?;
@@ -602,6 +603,7 @@ mod tests {
                 loader: Loader::Fabric,
                 loader_version: None,
                 launch_version: None,
+                custom_performance: true,
                 memory_max_mb: 4096,
                 memory_min_mb: 1024,
                 flag_profile: FlagProfile::Balanced,

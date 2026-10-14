@@ -98,8 +98,7 @@ pub fn recommend(hw: &Hardware, mod_count: u32) -> Recommendation {
 
     let memory_min_mb = match tier {
         Tier::Weak => round_down(memory_max_mb as u64 / 4, 128).max(256) as u32,
-        Tier::Modest => round_down(memory_max_mb as u64 / 2, 128) as u32,
-        Tier::Capable | Tier::Strong => memory_max_mb,
+        Tier::Modest | Tier::Capable | Tier::Strong => round_down((memory_max_mb as u64 / 2).min(2048), 128) as u32,
     };
 
     let flag_profile = match tier {
@@ -154,20 +153,25 @@ pub struct Effective {
 }
 
 pub fn effective(inst: &Instance, settings: &Settings) -> Effective {
+    let (base_max, base_min, base_profile) = if inst.custom_performance {
+        (inst.memory_max_mb, inst.memory_min_mb, inst.flag_profile)
+    } else {
+        (settings.default_memory_max_mb, settings.default_memory_min_mb, settings.default_flag_profile)
+    };
     if !settings.auto_optimize {
         return Effective {
-            memory_max_mb: inst.memory_max_mb,
-            memory_min_mb: inst.memory_min_mb,
-            flag_profile: inst.flag_profile,
+            memory_max_mb: base_max,
+            memory_min_mb: base_min.min(base_max),
+            flag_profile: base_profile,
             tuning: settings.tuning.clone(),
         };
     }
     let hw = hardware();
     let rec = recommend(&hw, count_mods(&inst.id));
     let ceiling = (hw.total_mb * 75 / 100).max(1024) as u32;
-    let memory_max_mb = rec.memory_max_mb.max(inst.memory_max_mb.min(ceiling));
+    let memory_max_mb = rec.memory_max_mb.max(base_max.min(ceiling));
     let memory_min_mb = rec.memory_min_mb.min(memory_max_mb);
-    let flag_profile = if inst.flag_profile == FlagProfile::None { FlagProfile::None } else { rec.flag_profile };
+    let flag_profile = if base_profile == FlagProfile::None { FlagProfile::None } else { rec.flag_profile };
     let mut tuning = rec.tuning;
     tuning.gc = settings.tuning.gc;
     tuning.pause_ms = settings.tuning.pause_ms;

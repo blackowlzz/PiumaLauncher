@@ -22,7 +22,7 @@
   const ram = $derived(running && samples.length ? samples[samples.length - 1] : null)
   $effect(() => {
     if (!inst) return
-    void [inst.memoryMaxMb, inst.flagProfile, app.settings.autoOptimize, running]
+    void [inst.customPerformance, inst.memoryMaxMb, inst.flagProfile, app.settings.autoOptimize, app.settings.defaultMemoryMaxMb, app.settings.defaultFlagProfile, running]
     refreshEffective(inst.id)
   })
   const shownInstances = $derived(app.instances.slice(0, 8))

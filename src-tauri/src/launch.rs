@@ -459,6 +459,7 @@ pub(crate) mod tests {
             loader,
             loader_version,
             launch_version,
+            custom_performance: true,
             memory_max_mb: 1024,
             memory_min_mb: 256,
             flag_profile: FlagProfile::Low,
