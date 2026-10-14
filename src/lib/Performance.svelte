@@ -99,20 +99,14 @@
 
     {#if rec}
       <div class="card" data-tier={rec.tier}>
-        <PixelField level={level} />
+        <div class="field"><PixelField level={level} /></div>
         <div class="body">
-          <div class="eyebrow">{t('Detected')}</div>
-          <div class="tier">{tierName}</div>
-          <div class="facts">
-            <div><span class="muted small">{t('Memory')}</span><b>{gb(rec.memoryMaxMb)}</b></div>
-            <div><span class="muted small">{t('Java profile')}</span><b>{profiles().find((p) => p.id === rec?.flagProfile)?.label}</b></div>
-            <div><span class="muted small">{t('Threads')}</span><b>{cores}</b></div>
+          <div class="top">
+            <div class="tier">{tierName}</div>
+            <button class="primary" disabled={isSaved} onclick={applyRecommendation}>{isSaved ? t('Saved') : t('Save')}</button>
           </div>
           {#each rec.reasons as r}<p class="why">{t(r)}</p>{/each}
-          <div class="actions">
-            <button class="primary" disabled={isSaved} onclick={applyRecommendation}>{isSaved ? t('Saved') : t('Save')}</button>
-            <span class="muted small">{t('Saves these values as the defaults for every instance.')}</span>
-          </div>
+          <p class="muted small why">{t('Saves these values as the defaults for every instance.')}</p>
         </div>
       </div>
     {/if}
@@ -296,14 +290,12 @@
   .wide { width: 100%; }
   .presets { display: flex; flex-wrap: wrap; gap: 6px; }
   .presets .on { background: #7c4dff; color: #fff; border-color: #7c4dff; box-shadow: 0 0 14px rgba(124, 77, 255, 0.55); }
-  .card { position: relative; overflow: hidden; margin: 14px 0 4px; border-radius: 20px; border: 1px solid var(--line-strong); background: var(--surface-2); isolation: isolate; }
-  .body { position: relative; display: grid; gap: 12px; padding: 24px 26px; }
-  .eyebrow { color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
-  .tier { font-size: 30px; font-weight: 700; letter-spacing: -0.035em; line-height: 1.05; }
-  .facts { display: flex; flex-wrap: wrap; gap: 14px 40px; margin-top: 4px; }
-  .facts div { display: grid; gap: 2px; }
-  .facts b { font-size: 17px; font-weight: 600; letter-spacing: -0.02em; }
-  .why { margin: 0; max-width: 460px; color: var(--muted); font-size: 13px; line-height: 1.5; }
-  .actions { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; margin-top: 6px; }
+  .card { position: relative; overflow: hidden; margin: 12px 0 4px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); isolation: isolate; }
+  .field { position: absolute; inset: 0; }
+  .body { position: relative; display: grid; gap: 6px; padding: 16px 18px; }
+  .body .why { max-width: 46%; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .tier { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+  .why { margin: 0; max-width: 60%; color: var(--muted); font-size: 13px; line-height: 1.5; }
   .warn { color: var(--text); background: var(--surface-2); border-radius: 12px; padding: 10px 14px; margin: 0; }
 </style>

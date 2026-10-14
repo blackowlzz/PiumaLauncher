@@ -76,7 +76,7 @@
     <div class="scrim"></div>
   </div>
   <div class="copy">
-    <p class="greet" use:reveal>{#if inst}{t('Your instance')}{:else}{t('Welcome')}{account ? `, ${account.name}` : ''}{/if}</p>
+    {#if !inst}<p class="greet" use:reveal>{t('Welcome')}{account ? `, ${account.name}` : ''}</p>{/if}
     {#key inst?.id ?? 'none'}
       <h1 class="title" aria-label={words.join(' ')}>
         {#each words as w, i}<span class="w" aria-hidden="true"><span style:--i={i}>{w}</span></span>{' '}{/each}
@@ -209,7 +209,7 @@
   .scrim { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0, 0, 0, 0.82) 0%, rgba(0, 0, 0, 0.45) 50%, rgba(0, 0, 0, 0.05) 100%), linear-gradient(to top, rgba(0, 0, 0, 0.6), transparent 50%); }
   .hero:not(.photo) .scrim { background: linear-gradient(90deg, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.25) 50%, transparent 100%); }
   .hero :global(.art) { background: #000; color: #fff; --fade: #000; --glow: 255, 255, 255; }
-  .greet { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255, 255, 255, 0.75); }
+  .greet { font-size: 15px; font-weight: 500; color: rgba(255, 255, 255, 0.8); }
   .title { font-size: clamp(30px, 3.4vw, 46px); font-weight: 650; letter-spacing: -0.04em; line-height: 1.05; }
   .hero .facts { color: rgba(255, 255, 255, 0.85); }
   .hero .live { color: #fff; }

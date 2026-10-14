@@ -36,20 +36,21 @@
     prev = time
     live += (level - live) * (1 - Math.exp(-dt * 5))
     const t = (time / 1000) * 0.8
+    const tint = getComputedStyle(canvas).getPropertyValue('--inv-bg').trim()
+    const rgb = /^#[0-9a-f]{6}$/i.test(tint) ? [1, 3, 5].map((k) => parseInt(tint.slice(k, k + 2), 16)).join(', ') : '250, 250, 250'
     const cols = Math.ceil(width / CELL)
     const rows = Math.ceil(height / CELL)
     for (let i = 0; i < cols; i++) {
       const x = i / cols
-      const side = Math.max(0, (x - 0.25) / 0.75)
+      const side = Math.max(0, (x - 0.5) / 0.5)
       for (let j = 0; j < rows; j++) {
         const n = noise(i, j, t)
         const vert = 1 - Math.abs(j / rows - 0.5) * 0.7
         const strength = side * vert * (0.3 + 0.7 * live)
         const fade = Math.min(1, Math.max(0, (strength * 1.5 * (0.55 + n * 0.6) - 0.12) / 0.4))
         if (fade <= 0) continue
-        const light = 16 + (20 + 46 * live) * n * vert
-        const alpha = (0.2 + 0.6 * n) * fade
-        ctx.fillStyle = `hsla(${262 + n * 16}, ${68 + 25 * live}%, ${light}%, ${alpha})`
+        const alpha = (0.1 + 0.5 * n * vert) * fade * (0.55 + 0.45 * live)
+        ctx.fillStyle = `rgba(${rgb}, ${alpha})`
         ctx.fillRect(i * CELL, j * CELL, CELL - 1, CELL - 1)
       }
     }
