@@ -1,13 +1,16 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
   import SkinViewer from './SkinViewer.svelte'
   import Icon from './Icon.svelte'
   import { api, type Wardrobe } from './api'
   import { t } from './i18n.svelte'
-  import { notify } from './store.svelte'
+  import Head from './Head.svelte'
+  import { app, notify } from './store.svelte'
   import { refreshSkin } from './skins.svelte'
 
-  let { accountId, name, onBack }: { accountId: string; name: string; onBack: () => void } = $props()
+  const premium = $derived(app.accounts.accounts.filter((a) => a.kind === 'microsoft'))
+  const account = $derived(premium.find((a) => a.id === app.wardrobeId) ?? premium.find((a) => a.id === app.accounts.active) ?? premium[0] ?? null)
+  const accountId = $derived(account?.id ?? '')
+  const name = $derived(account?.name ?? '')
 
   let data = $state<Wardrobe | null>(null)
   let loading = $state(true)
@@ -21,6 +24,10 @@
   const activeCape = $derived(data?.capes.find((c) => c.active) ?? null)
 
   async function load() {
+    if (!account) {
+      loading = false
+      return
+    }
     try {
       data = await api.wardrobeLoad(accountId)
     } catch (e) {
@@ -30,7 +37,17 @@
     }
   }
 
-  onMount(load)
+  let loadedFor = ''
+
+  $effect(() => {
+    const id = accountId
+    if (id === loadedFor) return
+    loadedFor = id
+    data = null
+    picked = null
+    loading = true
+    load()
+  })
 
   function readFile(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
@@ -114,12 +131,25 @@
   }
 </script>
 
-<header class="head row">
-  <button class="ghost" onclick={onBack}>← {t('Back')}</button>
-  <h1>{t('Skin and cape')} · {name}</h1>
+<header class="head">
+  <h1>{t('Wardrobe')}</h1>
 </header>
 
-{#if loading}
+{#if premium.length === 0}
+  <p class="muted">{t('Add a Premium account to change your skin and cape.')}</p>
+  <div class="row"><button class="primary" onclick={() => (app.page = 'accounts')}>{t('Go to accounts')}</button></div>
+{:else}
+  <div class="accs" role="group" aria-label={t('Account')}>
+    {#each premium as a (a.id)}
+      <button class="acc" aria-pressed={a.id === account?.id} onclick={() => (app.wardrobeId = a.id)}>
+        <Head name={a.name} size={28} />{a.name}
+      </button>
+    {/each}
+  </div>
+{/if}
+
+{#if premium.length === 0}
+{:else if loading}
   <p class="muted">{t('Loading…')}</p>
 {:else if !data}
   <p class="muted">{t('Could not load the skin and cape of this account.')}</p>
@@ -140,7 +170,7 @@
         <h2>{t('Skin')}</h2>
         <p class="muted small">{t('Pick a 64x64 or 64x32 PNG from your computer.')}</p>
         <input bind:this={input} type="file" accept="image/png" hidden onchange={choose} />
-        <div class="line">
+        <div class="actions">
           <button onclick={() => input?.click()} disabled={busy}>{t('Choose file…')}</button>
           {#if picked}
             <div class="seg" role="group">
@@ -150,7 +180,7 @@
           {/if}
         </div>
         {#if picked}
-          <div class="line">
+          <div class="actions">
             <button class="primary" onclick={applySkin} disabled={busy}>{t('Apply skin')}</button>
             <button class="ghost" onclick={() => (picked = null)} disabled={busy}>{t('Cancel')}</button>
           </div>
@@ -180,14 +210,17 @@
 {/if}
 
 <style>
-  .row { display: flex; align-items: center; gap: 14px; }
+  .row { display: flex; align-items: center; gap: 14px; margin-top: 14px; }
+  .accs { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 22px; }
+  .acc { display: flex; align-items: center; gap: 10px; padding: 6px 16px 6px 8px; border-radius: 999px; }
+  .acc[aria-pressed='true'] { border-color: var(--text); background: var(--surface-2); }
   .wrap { display: grid; grid-template-columns: minmax(280px, 400px) minmax(0, 1fr); gap: 28px; align-items: start; }
   .stage { display: grid; justify-items: center; gap: 14px; padding: 22px; border: 1px solid var(--line); border-radius: 26px; background: var(--surface); }
   .side { display: grid; gap: 16px; }
   .box { display: grid; gap: 12px; padding: 22px; border: 1px solid var(--line); border-radius: 26px; background: var(--surface); }
   .box h2 { margin: 0; font-size: 15px; font-weight: 650; color: var(--text); }
   .box p { margin: 0; }
-  .line { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
   .capes { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
   .cape { display: grid; justify-items: center; gap: 8px; padding: 12px 8px; border-radius: 16px; }
   .cape.on { border-color: var(--text); background: var(--surface-2); }

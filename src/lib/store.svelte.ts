@@ -26,13 +26,14 @@ import {
   type VersionEntry,
 } from './api'
 
-export type Page = 'home' | 'library' | 'quickplay' | 'explore' | 'accounts' | 'instance' | 'settings' | 'themes' | 'performance'
+export type Page = 'home' | 'library' | 'quickplay' | 'explore' | 'accounts' | 'instance' | 'settings' | 'themes' | 'performance' | 'wardrobe'
 
 const MAX_STAT_SAMPLES = 90
 
 export const app = $state({
   page: 'home' as Page,
   detailId: null as string | null,
+  wardrobeId: null as string | null,
   instances: [] as Instance[],
   accounts: { accounts: [], active: null } as AccountStore,
   versions: [] as VersionEntry[],

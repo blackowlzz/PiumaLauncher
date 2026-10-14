@@ -1,15 +1,12 @@
 <script lang="ts">
   import Head from './Head.svelte'
   import Verified from './Verified.svelte'
-  import Wardrobe from './Wardrobe.svelte'
   import { reveal, spotlight } from './actions'
   import { api, type DeviceLogin } from './api'
   import { t } from './i18n.svelte'
   import { app, notify, reloadAccounts } from './store.svelte'
 
   let name = $state('')
-  let styling = $state<string | null>(null)
-  const styled = $derived(app.accounts.accounts.find((a) => a.id === styling) ?? null)
   let login = $state<DeviceLogin | null>(null)
   let starting = $state(false)
   let copied = $state(false)
@@ -61,12 +58,14 @@
     } catch {}
   }
 
+  function openWardrobe(id: string) {
+    app.wardrobeId = id
+    app.page = 'wardrobe'
+  }
+
   const count = $derived(app.accounts.accounts.length)
 </script>
 
-{#if styled}
-  <Wardrobe accountId={styled.id} name={styled.name} onBack={() => (styling = null)} />
-{:else}
 <header class="head">
   <h1>{t('Accounts')}</h1>
 </header>
@@ -87,7 +86,7 @@
         <div class="uuid" title={a.uuid}>{a.uuid}</div>
       </div>
       <div class="acts">
-        {#if a.kind === 'microsoft'}<button onclick={() => (styling = a.id)}>{t('Skin')}</button>{/if}
+        {#if a.kind === 'microsoft'}<button onclick={() => openWardrobe(a.id)}>{t('Skin')}</button>{/if}
         {#if !active}<button class="primary" onclick={() => guard(() => api.setActiveAccount(a.id))}>{t('Use')}</button>{/if}
         <button class="ghost" onclick={() => guard(() => api.removeAccount(a.id))}>{t('Remove')}</button>
       </div>
@@ -130,7 +129,6 @@
     {/if}
   </article>
 </div>
-{/if}
 
 <style>
   .head { display: grid; gap: 6px; }

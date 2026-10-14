@@ -23,18 +23,20 @@
   import InstanceChooser from './lib/InstanceChooser.svelte'
   import DropZone from './lib/DropZone.svelte'
   import Themes from './lib/Themes.svelte'
+  import Wardrobe from './lib/Wardrobe.svelte'
   import { applyTheme, isCustomized, resetTheme } from './lib/palette.svelte'
   import UpdateBanner from './lib/UpdateBanner.svelte'
   import TitleBar from './lib/TitleBar.svelte'
   import { maybeBench } from './lib/bench'
   import { smoothScroll } from './lib/smoothscroll'
 
-  const tabs: { id: Page; label: string; icon: 'home' | 'grid' | 'server' | 'compass' | 'user' | 'settings' | 'palette' | 'cpu' }[] = [
+  const tabs: { id: Page; label: string; icon: 'home' | 'grid' | 'feather' | 'server' | 'compass' | 'user' | 'settings' | 'palette' | 'cpu' }[] = [
     { id: 'home', label: 'Home', icon: 'home' },
     { id: 'quickplay', label: 'Quick Play', icon: 'server' },
     { id: 'library', label: 'Library', icon: 'grid' },
     { id: 'explore', label: 'Explore', icon: 'compass' },
     { id: 'accounts', label: 'Account', icon: 'user' },
+    { id: 'wardrobe', label: 'Wardrobe', icon: 'feather' },
     { id: 'themes', label: 'Themes', icon: 'palette' },
     { id: 'performance', label: 'Performance', icon: 'cpu' },
     { id: 'settings', label: 'Settings', icon: 'settings' },
@@ -82,7 +84,7 @@
     void fitScale()
   })
 
-  const order: Page[] = ['home', 'quickplay', 'library', 'explore', 'accounts', 'themes', 'performance', 'settings']
+  const order: Page[] = ['home', 'quickplay', 'library', 'explore', 'accounts', 'wardrobe', 'themes', 'performance', 'settings']
   async function shortcuts(e: KeyboardEvent) {
     const el = e.target as HTMLElement | null
     const typing = !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
@@ -93,7 +95,7 @@
       app.page = 'explore'
       await tick()
       document.querySelector<HTMLInputElement>('main input[type="search"]')?.focus()
-    } else if (mod && /^[1-8]$/.test(e.key)) {
+    } else if (mod && /^[1-9]$/.test(e.key)) {
       e.preventDefault()
       app.page = order[Number(e.key) - 1]
     }
@@ -169,6 +171,8 @@
             <QuickPlay />
           {:else if app.page === 'accounts'}
             <Accounts />
+          {:else if app.page === 'wardrobe'}
+            <Wardrobe />
           {:else if app.page === 'themes'}
             <Themes />
           {:else if app.page === 'performance'}
