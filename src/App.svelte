@@ -1,12 +1,13 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte'
   import { fly } from 'svelte/transition'
-  import { app, handleCli, init, installModpack, notify, saveSettings, type Page } from './lib/store.svelte'
-  import { inTauri } from './lib/api'
+  import { app, handleCli, init, installContentInto, installProject, notify, saveSettings, type Page } from './lib/store.svelte'
+  import { inTauri, type PackVersion } from './lib/api'
   import { t } from './lib/i18n.svelte'
   import LanguageMenu from './lib/LanguageMenu.svelte'
   import Welcome from './lib/Welcome.svelte'
   import ProjectDetail from './lib/ProjectDetail.svelte'
+  import InstallTargetDialog from './lib/InstallTargetDialog.svelte'
   import Icon from './lib/Icon.svelte'
   import Home from './lib/Home.svelte'
   import Library from './lib/Library.svelte'
@@ -71,15 +72,38 @@
   }
 
   let zoom = 1
+  let fitting = false
+  let refit = false
+  let settle: ReturnType<typeof setTimeout> | undefined
   async function fitScale() {
     if (!inTauri) return
-    const s = app.settings.uiScale
-    const physical = innerWidth * zoom
-    const z = s === 'auto' ? (physical < 1700 ? 1 : physical < 2200 ? 1.15 : physical < 2900 ? 1.3 : 1.5) : Number(s) / 100
-    if (z === zoom) return
-    zoom = z
-    const { getCurrentWebview } = await import('@tauri-apps/api/webview')
-    await getCurrentWebview().setZoom(z)
+    if (fitting) {
+      refit = true
+      return
+    }
+    fitting = true
+    try {
+      do {
+        refit = false
+        const [{ getCurrentWindow }, { getCurrentWebview }] = await Promise.all([import('@tauri-apps/api/window'), import('@tauri-apps/api/webview')])
+        const win = getCurrentWindow()
+        const [size, factor] = await Promise.all([win.innerSize(), win.scaleFactor()])
+        const physical = size.width / factor
+        const s = app.settings.uiScale
+        const z = s === 'auto' ? (physical < 1700 ? 1 : physical < 2200 ? 1.15 : physical < 2900 ? 1.3 : 1.5) : Number(s) / 100
+        if (z !== zoom) {
+          zoom = z
+          await getCurrentWebview().setZoom(z)
+        }
+      } while (refit)
+    } finally {
+      fitting = false
+    }
+  }
+  const onResize = () => {
+    void fitScale()
+    clearTimeout(settle)
+    settle = setTimeout(() => void fitScale(), 250)
   }
   $effect(() => {
     void app.settings.uiScale
@@ -110,9 +134,15 @@
     }
   }
 
-  async function installFromDetail(versionId?: string) {
-    const hit = app.detail
-    if (hit && (await installModpack(hit.projectId, versionId, hit.latestMc))) app.detail = null
+  async function installFromDetail(version?: PackVersion) {
+    const d = app.detail
+    if (d && (await installProject(d.hit, d.type, version))) app.detail = null
+  }
+
+  function pickInstances(instanceIds: string[]) {
+    const p = app.picker
+    app.picker = null
+    if (p) void installContentInto(instanceIds, p.hit, p.type, p.version?.id)
   }
 
   onMount(() => {
@@ -124,14 +154,15 @@
     addEventListener('blur', idle)
     const onScheme = () => (systemDark = !scheme.matches)
     scheme.addEventListener('change', onScheme)
-    addEventListener('resize', fitScale)
+    addEventListener('resize', onResize)
     init().then(maybeBench).then(handleCli).catch((e) => notify(t('Startup error: {error}', { error: e })))
     return () => {
       document.removeEventListener('visibilitychange', idle)
       removeEventListener('focus', idle)
       removeEventListener('blur', idle)
       scheme.removeEventListener('change', onScheme)
-      removeEventListener('resize', fitScale)
+      removeEventListener('resize', onResize)
+      clearTimeout(settle)
     }
   })
 </script>
@@ -210,8 +241,14 @@
 </div>
 
 {#if app.detail}
-  {#key app.detail.projectId}
-    <ProjectDetail hit={app.detail} busy={app.installingId === app.detail.projectId} disabled={app.installingId !== null} onInstall={installFromDetail} onClose={() => (app.detail = null)} />
+  {#key app.detail.hit.projectId}
+    <ProjectDetail hit={app.detail.hit} type={app.detail.type} busy={app.installingId === app.detail.hit.projectId} disabled={app.installingId !== null} onInstall={installFromDetail} onClose={() => (app.detail = null)} />
+  {/key}
+{/if}
+
+{#if app.picker}
+  {#key app.picker.hit.projectId}
+    <InstallTargetDialog hit={app.picker.hit} type={app.picker.type} version={app.picker.version} onConfirm={pickInstances} onClose={() => (app.picker = null)} />
   {/key}
 {/if}
 

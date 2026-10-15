@@ -271,6 +271,7 @@ export interface ProjectHit {
   author: string
   categories: string[]
   latestMc: string | null
+  gameVersions: string[]
 }
 
 export interface SearchResult {
@@ -296,6 +297,12 @@ export interface ProjectMeta {
 export interface VersionMeta {
   id: string
   number: string
+}
+
+export interface InstalledProject {
+  projectId: string
+  fileName: string
+  update: boolean
 }
 
 export interface ContentEntry extends ModFile {
@@ -385,14 +392,16 @@ export const modrinth = {
   projectPage: (projectId: string) => call<ProjectPage>('project_page', { projectId }),
   installModpack: (projectId: string, versionId?: string, mcVersion?: string) =>
     call<Instance>('install_modpack', { projectId, versionId, mcVersion }),
-  installContent: (instanceId: string, projectId: string, kind: ContentKind) =>
-    call<string[]>('install_content', { instanceId, projectId, kind }),
+  installContent: (instanceId: string, projectId: string, kind: ContentKind, versionId?: string) =>
+    call<string[]>('install_content', { instanceId, projectId, kind, versionId }),
   listContent: (instanceId: string, kind: ContentKind) =>
     call<ModFile[]>('list_content', { instanceId, kind }),
   removeContent: (instanceId: string, kind: ContentKind, fileName: string) =>
     call<void>('remove_content', { instanceId, kind, fileName }),
   contentDetails: (instanceId: string, kind: ContentKind) =>
     call<ContentEntry[]>('content_details', { instanceId, kind }),
+  installedProjects: (instanceId: string, kind: ContentKind, updates = false) =>
+    call<InstalledProject[]>('installed_projects', { instanceId, kind, updates }),
   updateContent: (instanceId: string, kind: ContentKind, fileName: string) =>
     call<string>('update_content', { instanceId, kind, fileName }),
   transferContent: (fromId: string, toId: string, kind: ContentKind, files: string[], removeSource: boolean) =>

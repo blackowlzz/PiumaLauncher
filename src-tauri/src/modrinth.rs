@@ -59,6 +59,7 @@ pub struct ProjectHit {
     pub author: String,
     pub categories: Vec<String>,
     pub latest_mc: Option<String>,
+    pub game_versions: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -129,6 +130,7 @@ pub async fn search(
             .into_iter()
             .map(|h| ProjectHit {
                 latest_mc: h.versions.last().cloned(),
+                game_versions: h.versions,
                 banner_url: h.featured_gallery.or_else(|| h.gallery.into_iter().next()),
                 project_id: h.project_id,
                 slug: h.slug,
@@ -148,6 +150,8 @@ pub async fn search(
 struct Version {
     #[serde(default)]
     id: String,
+    #[serde(default)]
+    project_id: String,
     #[serde(default)]
     version_number: String,
     #[serde(default)]
@@ -218,6 +222,24 @@ async fn versions_of(
     Ok(resp.json().await?)
 }
 
+async fn pinned_version(client: &reqwest::Client, project: &str, version_id: &str, mc: &str, tags: &[&str], kind: Content) -> Result<Version> {
+    if !safe_id(version_id) {
+        return Err(Error::msg("invalid version id"));
+    }
+    let v: Version = client.get(format!("{API}/version/{version_id}")).send().await?.error_for_status()?.json().await?;
+    if v.project_id != project {
+        return Err(Error::msg("this version does not belong to the project"));
+    }
+    if !version_fits(&v, mc, tags, kind) {
+        return Err(Error::msg(format!("This version is not compatible with Minecraft {mc} on this instance")));
+    }
+    Ok(v)
+}
+
+fn version_fits(v: &Version, mc: &str, tags: &[&str], kind: Content) -> bool {
+    v.game_versions.iter().any(|g| g == mc) && (kind != Content::Mods || v.loaders.iter().any(|l| tags.contains(&l.as_str())))
+}
+
 fn best(versions: Vec<Version>) -> Option<Version> {
     let first_release = versions.iter().position(|v| v.version_type == "release");
     versions.into_iter().nth(first_release.unwrap_or(0))
@@ -277,6 +299,7 @@ pub async fn install_content(
     inst: &Instance,
     project_id: &str,
     kind: Content,
+    version_id: Option<&str>,
     progress: Progress<'_>,
 ) -> Result<Vec<String>> {
     let tags: &[&str] = if kind == Content::Mods { loader_tags(inst.loader) } else { &[] };
@@ -295,7 +318,11 @@ pub async fn install_content(
             continue;
         }
         let is_root = project == project_id;
-        let Some(version) = best(versions_of(client, &project, Some(&inst.mc_version), tags).await?) else {
+        let found = match version_id.filter(|_| is_root) {
+            Some(id) => Some(pinned_version(client, &project, id, &inst.mc_version, tags, kind).await?),
+            None => best(versions_of(client, &project, Some(&inst.mc_version), tags).await?),
+        };
+        let Some(version) = found else {
             if is_root {
                 return Err(Error::msg(format!("No version compatible with Minecraft {}", inst.mc_version)));
             }
@@ -629,6 +656,50 @@ pub async fn content_details(client: &reqwest::Client, inst: &Instance, kind: Co
             }
         })
         .collect())
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InstalledProject {
+    pub project_id: String,
+    pub file_name: String,
+    pub update: bool,
+}
+
+pub async fn installed_projects(client: &reqwest::Client, inst: &Instance, kind: Content, check_updates: bool) -> Result<Vec<InstalledProject>> {
+    let files = list_content(&inst.id, kind)?;
+    let dir = paths::game_dir(&inst.id).join(kind.folder());
+    let hashes: Vec<(String, String)> = tokio::task::spawn_blocking(move || {
+        files.into_iter().filter_map(|f| sha1_of(&dir.join(&f.file_name)).ok().map(|h| (f.file_name, h))).collect()
+    })
+    .await
+    .map_err(|e| Error::msg(e.to_string()))?;
+    if hashes.is_empty() {
+        return Ok(vec![]);
+    }
+    let unique: Vec<String> = hashes.iter().map(|(_, h)| h.clone()).collect::<HashSet<_>>().into_iter().collect();
+    let (versions, updates) = if check_updates {
+        let (v, u) = tokio::join!(lookup_versions(client, &unique), lookup_updates(client, inst, kind, &unique));
+        (v?, u.unwrap_or_default())
+    } else {
+        (lookup_versions(client, &unique).await?, HashMap::new())
+    };
+    Ok(pick_installed(hashes, &versions, &updates))
+}
+
+fn pick_installed(hashes: Vec<(String, String)>, versions: &HashMap<String, ApiVersion>, updates: &HashMap<String, ApiVersion>) -> Vec<InstalledProject> {
+    let mut seen = HashSet::new();
+    hashes
+        .into_iter()
+        .filter_map(|(file_name, hash)| {
+            let version = versions.get(&hash)?;
+            seen.insert(version.project_id.clone()).then(|| InstalledProject {
+                project_id: version.project_id.clone(),
+                update: updates.get(&hash).is_some_and(|u| u.id != version.id),
+                file_name,
+            })
+        })
+        .collect()
 }
 
 pub async fn update_content(client: &reqwest::Client, inst: &Instance, kind: Content, file_name: &str) -> Result<String> {
@@ -1196,7 +1267,7 @@ mod tests {
         eprintln!("{} mod installate, es. {:?}", mods.len(), mods.iter().take(3).map(|m| &m.file_name).collect::<Vec<_>>());
         assert!(!mods.is_empty());
 
-        let added = install_content(&client, &inst, "mOgUt4GM", Content::Mods, &progress).await.unwrap();
+        let added = install_content(&client, &inst, "mOgUt4GM", Content::Mods, None, &progress).await.unwrap();
         eprintln!("aggiunte: {added:?}");
         assert!(added.iter().any(|n| n.to_lowercase().contains("modmenu")));
 
@@ -1280,5 +1351,38 @@ mod tests {
         let after = content_details(&client, &inst, Content::Mods).await.unwrap();
         assert!(after.iter().find(|e| e.file_name == new_name).unwrap().update.is_none());
         let _ = std::fs::remove_dir_all(paths::instance_dir(&id));
+    }
+
+    fn api_version(id: &str, project: &str) -> ApiVersion {
+        serde_json::from_value(serde_json::json!({ "id": id, "project_id": project, "version_number": "1.0" })).unwrap()
+    }
+
+    #[test]
+    fn installed_projects_dedupe_and_flag_updates() {
+        let hashes = vec![("a.jar".to_string(), "h1".to_string()), ("a-old.jar".to_string(), "h2".to_string()), ("manual.jar".to_string(), "h3".to_string()), ("b.jar".to_string(), "h4".to_string())];
+        let versions = HashMap::from([
+            ("h1".to_string(), api_version("v1", "P1")),
+            ("h2".to_string(), api_version("v0", "P1")),
+            ("h4".to_string(), api_version("w1", "P2")),
+        ]);
+        let updates = HashMap::from([("h1".to_string(), api_version("v2", "P1")), ("h4".to_string(), api_version("w1", "P2"))]);
+        let out = pick_installed(hashes, &versions, &updates);
+        assert_eq!(out.len(), 2);
+        assert_eq!((out[0].project_id.as_str(), out[0].file_name.as_str(), out[0].update), ("P1", "a.jar", true));
+        assert_eq!((out[1].project_id.as_str(), out[1].update), ("P2", false));
+    }
+
+    fn version(mc: &[&str], loaders: &[&str]) -> Version {
+        serde_json::from_value(serde_json::json!({ "version_type": "release", "game_versions": mc, "loaders": loaders })).unwrap()
+    }
+
+    #[test]
+    fn pinned_versions_must_match_game_and_loader() {
+        let v = version(&["1.21.1", "1.21"], &["fabric"]);
+        assert!(version_fits(&v, "1.21.1", &["fabric"], Content::Mods));
+        assert!(version_fits(&v, "1.21.1", &["quilt", "fabric"], Content::Mods));
+        assert!(!version_fits(&v, "1.20.1", &["fabric"], Content::Mods));
+        assert!(!version_fits(&v, "1.21.1", &["forge"], Content::Mods));
+        assert!(version_fits(&version(&["1.21.1"], &["minecraft"]), "1.21.1", &[], Content::Resourcepacks));
     }
 }

@@ -559,7 +559,7 @@ pub async fn apply(client: &reqwest::Client, id: &str, progress: modrinth::Progr
         }
         Fix::InstallMods { projects } => {
             for p in &projects {
-                modrinth::install_content(client, &inst, p, Content::Mods, progress).await?;
+                modrinth::install_content(client, &inst, p, Content::Mods, None, progress).await?;
             }
         }
         Fix::Memory { mb } => {

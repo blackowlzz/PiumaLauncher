@@ -562,4 +562,7 @@ export const tr: Record<string, string> = {
   "Players": "Oyuncular",
   "Ping": "Ping",
   "Instance": "Örnek",
+  "Installed": "Yüklendi",
+  "Choose an instance to install \"{name}\" into.": "\"{name}\" öğesinin yükleneceği örneği seçin.",
+  "Not compatible": "Uyumsuz",
 }

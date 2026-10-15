@@ -562,4 +562,7 @@ export const hu: Record<string, string> = {
   "Players": "Játékosok",
   "Ping": "Ping",
   "Instance": "Példány",
+  "Installed": "Telepítve",
+  "Choose an instance to install \"{name}\" into.": "Válaszd ki, melyik példányba telepítsd: \"{name}\".",
+  "Not compatible": "Nem kompatibilis",
 }

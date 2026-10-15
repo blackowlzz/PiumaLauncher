@@ -562,4 +562,7 @@ export const bg: Record<string, string> = {
   "Players": "Играчи",
   "Ping": "Пинг",
   "Instance": "Инстанция",
+  "Installed": "Инсталирано",
+  "Choose an instance to install \"{name}\" into.": "Изберете инстанция за инсталиране на \"{name}\".",
+  "Not compatible": "Несъвместимо",
 }

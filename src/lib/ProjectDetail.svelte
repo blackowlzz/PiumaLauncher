@@ -1,9 +1,9 @@
 <script lang="ts">
   import { thumb } from './img'
-  import { onMount } from 'svelte'
-  import { api, modrinth, type PackDetails, type PackFile, type PackVersion, type ProjectHit, type ProjectPage } from './api'
+  import { onMount, untrack } from 'svelte'
+  import { api, modrinth, type PackDetails, type PackFile, type PackVersion, type ProjectHit, type ProjectPage, type ProjectType } from './api'
   import Icon from './Icon.svelte'
-  import LoaderCover from './LoaderCover.svelte'
+  import Placeholder from './Placeholder.svelte'
   import { locale, stageText, t } from './i18n.svelte'
   import Select from './Select.svelte'
   import { renderMarkdown } from './markdown'
@@ -11,16 +11,18 @@
   import { portal } from './actions'
   import { app, notify, photoFor } from './store.svelte'
 
-  let { hit, busy = false, disabled = false, onInstall, onClose }: {
+  let { hit, type, busy = false, disabled = false, onInstall, onClose }: {
     hit: ProjectHit
+    type: ProjectType
     busy?: boolean
     disabled?: boolean
-    onInstall: (versionId?: string) => void
+    onInstall: (version?: PackVersion) => void
     onClose: () => void
   } = $props()
 
+  const isModpack = $derived(type === 'modpack')
   type Tab = 'contents' | 'about' | 'versions' | 'gallery'
-  let tab: Tab = $state('contents')
+  let tab: Tab = $state(untrack(() => (type === 'modpack' ? 'contents' : 'about')))
   let details = $state<PackDetails | null>(null)
   let failure = $state<string | null>(null)
   let loading = $state(true)
@@ -104,7 +106,7 @@
   }
 
   onMount(() => {
-    load()
+    if (isModpack) load()
     modrinth.projectPage(hit.projectId).then((p) => (page = p)).catch(() => {})
     closeBtn?.focus()
     return () => token++
@@ -149,7 +151,7 @@
 <button class="backdrop" onclick={close} aria-label={t('Close')} tabindex="-1"></button>
 <div class="modal" role="dialog" aria-modal="true" aria-label={hit.title}>
   <header class="hero">
-    {#if cover}<img class="photo" use:thumb={{ src: cover, w: 1280 }} alt="" decoding="async" />{:else}<LoaderCover loader="vanilla" />{/if}
+    {#if cover}<img class="photo" use:thumb={{ src: cover, w: 1280 }} alt="" decoding="async" />{:else}<Placeholder />{/if}
     <div class="veil"></div>
     <button class="x" bind:this={closeBtn} onclick={close} aria-label={t('Close')} title={t('Close')}><Icon name="x" size={17} /></button>
     <div class="id">
@@ -158,7 +160,8 @@
         <h2>{hit.title}</h2>
         <div class="by">{hit.author} · {t('{n} downloads', { n: fmt(hit.downloads) })}</div>
       </div>
-      <button class="primary go" onclick={() => onInstall(versionId)} {disabled}>{busy ? t('Installing…') : isLatest ? t('Install') : t('Install {v}', { v: chosen?.number ?? '' })}</button>
+      <button class="x ext" onclick={() => void api.openUrl(`https://modrinth.com/project/${hit.slug}`).catch(notify)} aria-label={t('Open on Modrinth')} title={t('Open on Modrinth')}><Icon name="globe" size={17} /></button>
+      <button class="primary go" onclick={() => onInstall(versionId ? chosen : undefined)} {disabled}>{busy ? t('Installing…') : isLatest ? t('Install') : t('Install {v}', { v: chosen?.number ?? '' })}</button>
     </div>
   </header>
 
@@ -183,7 +186,7 @@
   </div>
 
   <div class="tabs" role="tablist">
-    <button role="tab" aria-selected={tab === 'contents'} class:on={tab === 'contents'} onclick={() => (tab = 'contents')}>{t('Contents')}{details ? ` · ${details.files.length}` : ''}</button>
+    {#if isModpack}<button role="tab" aria-selected={tab === 'contents'} class:on={tab === 'contents'} onclick={() => (tab = 'contents')}>{t('Contents')}{details ? ` · ${details.files.length}` : ''}</button>{/if}
     <button role="tab" aria-selected={tab === 'about'} class:on={tab === 'about'} onclick={() => (tab = 'about')}>{t('Description')}</button>
     <button role="tab" aria-selected={tab === 'versions'} class:on={tab === 'versions'} onclick={() => (tab = 'versions')}>{t('Versions')}{page ? ` · ${page.versions.length}` : ''}</button>
     {#if page?.gallery.length}<button role="tab" aria-selected={tab === 'gallery'} class:on={tab === 'gallery'} onclick={() => (tab = 'gallery')}>{t('Gallery')}</button>{/if}
@@ -276,8 +279,8 @@
                 <div class="vf">{t('{n} downloads', { n: fmt(v.downloads) })}</div>
               </div>
               <div class="vact">
-                <button class="sm" onclick={() => pick(v)}>{t('Contents')}</button>
-                <button class="sm primary" onclick={() => onInstall(v.id)} {disabled}>{t('Install')}</button>
+                {#if isModpack}<button class="sm" onclick={() => pick(v)}>{t('Contents')}</button>{/if}
+                <button class="sm primary" onclick={() => onInstall(v)} {disabled}>{t('Install')}</button>
               </div>
             </div>
           {/each}
@@ -313,6 +316,7 @@
   .photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2; }
   .veil { position: absolute; inset: 0; z-index: -1; background: linear-gradient(to top, rgba(0, 0, 0, 0.92), rgba(0, 0, 0, 0.25) 80%); }
   .x { position: absolute; top: 14px; right: 14px; width: 36px; height: 36px; padding: 0; border-radius: 50%; background: rgba(0, 0, 0, 0.55); border-color: rgba(255, 255, 255, 0.25); color: #fff; display: grid; place-items: center; }
+  .x.ext { position: static; flex: none; }
   .x:hover:not(:disabled) { background: rgba(0, 0, 0, 0.8); border-color: rgba(255, 255, 255, 0.6); }
   .id { position: absolute; left: 24px; right: 24px; bottom: 20px; display: flex; align-items: center; gap: 16px; }
   .icon { border-radius: 16px; border: 2px solid rgba(255, 255, 255, 0.9); background: #111; object-fit: cover; }

@@ -562,4 +562,7 @@ export const uk: Record<string, string> = {
   "Players": "Гравці",
   "Ping": "Пінг",
   "Instance": "Екземпляр",
+  "Installed": "Встановлено",
+  "Choose an instance to install \"{name}\" into.": "Оберіть екземпляр для встановлення \"{name}\".",
+  "Not compatible": "Несумісно",
 }

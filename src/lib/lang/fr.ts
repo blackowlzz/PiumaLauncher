@@ -562,4 +562,7 @@ export const fr: Record<string, string> = {
   "Players": "Joueurs",
   "Ping": "Ping",
   "Instance": "Instance",
+  "Installed": "Installé",
+  "Choose an instance to install \"{name}\" into.": "Choisissez l'instance dans laquelle installer \"{name}\".",
+  "Not compatible": "Non compatible",
 }

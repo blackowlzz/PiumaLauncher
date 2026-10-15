@@ -162,3 +162,14 @@ input[type='checkbox'] { width: 16px; height: 16px; accent-color: var(--inv-bg);
 
 :root[data-intro], :root[data-intro] * { scrollbar-width: none; }
 :root[data-intro] ::-webkit-scrollbar { display: none; }
+
+img[data-ph]:not([data-bare]) {
+  background-color: var(--surface-2);
+  background-image: url('./assets/piuma-ph.png') !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: auto clamp(20px, 45%, 84px) !important;
+  object-fit: none;
+  border: 0;
+  outline: 0;
+}

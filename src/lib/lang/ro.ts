@@ -562,4 +562,7 @@ export const ro: Record<string, string> = {
   "Players": "Jucători",
   "Ping": "Ping",
   "Instance": "Instanță",
+  "Installed": "Instalat",
+  "Choose an instance to install \"{name}\" into.": "Alege instanța în care să instalezi \"{name}\".",
+  "Not compatible": "Incompatibil",
 }

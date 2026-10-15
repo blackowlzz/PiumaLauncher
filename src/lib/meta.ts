@@ -1,5 +1,16 @@
-import type { FlagProfile, Loader } from './api'
+import type { ContentKind, FlagProfile, Instance, Loader, PackVersion, ProjectHit, ProjectType } from './api'
 import { locale, t } from './i18n.svelte'
+
+export const contentKindOf = (type: ProjectType): ContentKind => (type === 'mod' ? 'mods' : type === 'resourcepack' ? 'resourcepacks' : 'shaderpacks')
+
+export function isCompatible(hit: ProjectHit, type: ProjectType, inst: Instance, version?: PackVersion): boolean {
+  const games = version?.mcVersions ?? hit.gameVersions
+  if (games.length && !games.includes(inst.mcVersion)) return false
+  if (type !== 'mod') return true
+  const accepted = inst.loader === 'quilt' ? ['quilt', 'fabric'] : [inst.loader]
+  const known = (version?.loaders ?? hit.categories).filter((c) => ['fabric', 'quilt', 'forge', 'neoforge'].includes(c))
+  return !known.length || known.some((l) => accepted.includes(l))
+}
 
 export const profiles = (): { id: FlagProfile; label: string; hint: string }[] => [
   { id: 'low', label: t('Low usage'), hint: t('Least RAM possible; gives memory back to the system while the game is idle.') },

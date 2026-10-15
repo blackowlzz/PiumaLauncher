@@ -1,17 +1,19 @@
 <script lang="ts">
   import { thumb } from './img'
   import type { ProjectHit } from './api'
-  import LoaderCover from './LoaderCover.svelte'
+  import Placeholder from './Placeholder.svelte'
   import Icon from './Icon.svelte'
   import { locale, t } from './i18n.svelte'
   import { api } from './api'
   import { copyText, ctx, type MenuItem } from './contextmenu'
   import { notify, photoFor } from './store.svelte'
 
-  let { hit, busy = false, disabled = false, index, onInstall, onOpen }: {
+  let { hit, busy = false, disabled = false, installed = false, update = false, index, onInstall, onOpen }: {
     hit: ProjectHit
     busy?: boolean
     disabled?: boolean
+    installed?: boolean
+    update?: boolean
     index?: number
     onInstall: () => void
     onOpen?: () => void
@@ -36,9 +38,10 @@
     {#if photo}
       <img class="photo" use:thumb={{ src: photo, w: 640 }} alt="" decoding="async" />
     {:else}
-      <LoaderCover loader="vanilla" />
+      <Placeholder />
     {/if}
     <span class="dl"><Icon name="download" size={13} />{fmt(hit.downloads)}</span>
+    {#if installed}<span class="ins"><Icon name="check" size={12} />{t('Installed')}</span>{/if}
   </div>
 
   {#if onOpen}<button class="open" onclick={onOpen} aria-label={t('Open {name}', { name: hit.title })}></button>{/if}
@@ -50,7 +53,7 @@
       {#each tags as c}<span class="tag">{cap(c)}</span>{/each}
     </div>
     <div class="foot">
-      <button class="primary sm" onclick={onInstall} {disabled}>{busy ? t('Installing…') : t('Install')}</button>
+      <button class="sm" class:primary={!installed || update} onclick={onInstall} {disabled}>{busy ? t('Installing…') : update ? t('Update') : installed ? t('Installed') : t('Install')}</button>
       {#if hit.latestMc}<span class="ver">{hit.latestMc}</span>{/if}
     </div>
   </div>
@@ -76,4 +79,5 @@
   .foot button { pointer-events: auto; }
   .ver { font-size: 12.5px; color: var(--muted); }
   .sm { padding: 7px 20px; }
+  .ins { position: absolute; bottom: 10px; left: 10px; display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; color: var(--inv-text); background: var(--inv-bg); border-radius: 999px; padding: 3px 10px 3px 8px; }
 </style>

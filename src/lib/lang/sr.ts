@@ -562,4 +562,7 @@ export const sr: Record<string, string> = {
   "Players": "Igrači",
   "Ping": "Ping",
   "Instance": "Instanca",
+  "Installed": "Инсталирано",
+  "Choose an instance to install \"{name}\" into.": "Изабери инстанцу у коју желиш да инсталираш \"{name}\".",
+  "Not compatible": "Некомпатибилно",
 }

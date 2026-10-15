@@ -1,5 +1,6 @@
 import { api, inTauri } from './api'
 
+const BLANK = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
 const pending = new Map<string, Promise<string>>()
 
 function fetchThumb(src: string, w: number): Promise<string> {
@@ -17,6 +18,16 @@ export function thumb(node: HTMLImageElement, opts: { src: string; w: number }) 
   let started = ''
   let io: IntersectionObserver | undefined
 
+  const onLoad = () => {
+    if (node.src !== BLANK) delete node.dataset.ph
+  }
+  const onError = () => {
+    node.dataset.ph = ''
+    if (node.src !== BLANK) node.src = BLANK
+  }
+  node.addEventListener('load', onLoad)
+  node.addEventListener('error', onError)
+
   async function load() {
     const { src, w } = current
     const id = `${w}|${src}`
@@ -33,6 +44,8 @@ export function thumb(node: HTMLImageElement, opts: { src: string; w: number }) 
   function watch() {
     io?.disconnect()
     if (!current.src) return
+    node.dataset.ph = ''
+    node.src = BLANK
     if (!inTauri || typeof IntersectionObserver === 'undefined') {
       node.src = current.src
       return
@@ -55,9 +68,14 @@ export function thumb(node: HTMLImageElement, opts: { src: string; w: number }) 
       if (next.src === current.src && next.w === current.w) return
       current = next
       started = ''
-      node.removeAttribute('src')
+      delete node.dataset.ph
+      node.src = BLANK
       watch()
     },
-    destroy: () => io?.disconnect(),
+    destroy() {
+      io?.disconnect()
+      node.removeEventListener('load', onLoad)
+      node.removeEventListener('error', onError)
+    },
   }
 }

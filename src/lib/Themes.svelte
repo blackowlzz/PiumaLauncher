@@ -111,7 +111,7 @@
   .swatch { position: relative; width: 38px; height: 38px; border-radius: 12px; border: 1px solid var(--line-strong); overflow: hidden; cursor: pointer; flex: none; display: block; }
   .swatch input { position: absolute; inset: -6px; width: 60px; height: 60px; opacity: 0; cursor: pointer; padding: 0; border: 0; }
   .n { font-weight: 500; }
-  .hex { width: 96px; font-family: ui-monospace, monospace; font-size: 13px; text-transform: lowercase; padding: 8px 12px; }
+  .hex { width: 96px; font-family: inherit; font-size: 13px; text-transform: lowercase; padding: 8px 12px; }
   .preview { border: 1px solid; border-radius: 16px; padding: 18px; }
   .pcard { border: 1px solid; border-radius: 14px; padding: 16px; display: grid; gap: 4px; justify-items: start; }
   .pt { font-size: 18px; font-weight: 650; letter-spacing: -0.03em; }

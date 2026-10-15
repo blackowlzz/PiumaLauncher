@@ -43,6 +43,7 @@ async function search(a: Record<string, unknown>) {
     author: h.author,
     categories: h.categories,
     latestMc: h.versions?.at(-1) ?? null,
+    gameVersions: h.versions ?? [],
   }))
   return { hits, total: raw.total_hits, pageSize: 20 }
 }
@@ -91,6 +92,13 @@ export async function mock(cmd: string, args: Record<string, unknown>): Promise<
             { fileName: 'iris-1.8.8.jar.disabled', size: 2_300_000, enabled: false },
           ]
         : [{ fileName: 'Faithful-64x.zip', size: 18_000_000, enabled: true }]
+    case 'installed_projects':
+      return args.kind === 'mods'
+        ? [
+            { projectId: 'AANobbMI', fileName: 'sodium-fabric-0.6.13.jar', update: true },
+            { projectId: 'gvQqBUqZ', fileName: 'lithium-fabric-0.14.3.jar', update: false },
+          ]
+        : []
     case 'content_details': {
       const files = (await mock('list_content', args)) as { fileName: string; size: number; enabled: boolean }[]
       if (args.kind !== 'mods') return files.map((f) => ({ ...f, project: null, version: null, update: null }))

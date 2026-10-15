@@ -562,4 +562,7 @@ export const ru: Record<string, string> = {
   "Players": "Игроки",
   "Ping": "Пинг",
   "Instance": "Экземпляр",
+  "Installed": "Установлено",
+  "Choose an instance to install \"{name}\" into.": "Выберите экземпляр для установки \"{name}\".",
+  "Not compatible": "Несовместимо",
 }

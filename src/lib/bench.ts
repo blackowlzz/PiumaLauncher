@@ -67,7 +67,7 @@ export async function maybeBench() {
   const detail: Record<string, unknown> = {}
   const hit = app.featured[0]
   if (hit) {
-    app.detail = hit
+    app.detail = { hit, type: 'modpack' }
     await sleep(9000)
     detail.contents = paneInfo()
     ;(document.querySelectorAll('.modal [role=tab]')[2] as HTMLElement | undefined)?.click()

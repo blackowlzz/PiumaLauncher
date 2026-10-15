@@ -2,6 +2,7 @@ import { listen } from '@tauri-apps/api/event'
 import { loadLanguage, t } from './i18n.svelte'
 import type { MenuItem } from './contextmenu'
 import { ping, serverKey } from './serverstatus.svelte'
+import { contentKindOf } from './meta'
 import {
   api,
   inTauri,
@@ -10,6 +11,7 @@ import {
   type EffectiveLaunch,
   type NewsItem,
   defaultSettings,
+  type PackVersion,
   type ProjectHit,
   type Settings,
   type ProjectType,
@@ -56,7 +58,9 @@ export const app = $state({
   installedVersions: [] as string[],
   news: [] as NewsItem[],
   installingId: null as string | null,
-  detail: null as ProjectHit | null,
+  detail: null as { hit: ProjectHit; type: ProjectType } | null,
+  picker: null as { hit: ProjectHit; type: ProjectType; version?: PackVersion } | null,
+  contentRev: 0,
   exploreIntent: null as { kind: ProjectType; targetId?: string } | null,
   update: null as UpdateInfo | null,
   updateDismissed: false,
@@ -158,8 +162,8 @@ async function listenToBackend() {
   await listen('cli-request', () => handleCli())
 }
 
-export function openProject(hit: ProjectHit) {
-  app.detail = hit
+export function openProject(hit: ProjectHit, type: ProjectType = 'modpack') {
+  app.detail = { hit, type }
 }
 
 export function openInstance(id: string) {
@@ -246,6 +250,51 @@ export const stop = (id: string) => api.stop(id).catch(notify)
 export const isBusy = (id: string | null) => {
   const state = id ? app.games[id]?.state : undefined
   return state === 'preparing' || state === 'running'
+}
+
+export function installProject(hit: ProjectHit, type: ProjectType, version?: PackVersion): Promise<boolean> {
+  if (type === 'modpack') return installModpack(hit.projectId, version?.id, hit.latestMc)
+  app.picker = { hit, type, version }
+  return Promise.resolve(false)
+}
+
+export async function installContentInto(instanceIds: string[], hit: ProjectHit, type: ProjectType, versionId?: string): Promise<boolean> {
+  if (app.installingId || !instanceIds.length) return false
+  app.installingId = hit.projectId
+  app.install = null
+  const added: string[] = []
+  let failed: unknown = null
+  for (const id of instanceIds) {
+    try {
+      added.push(...(await modrinth.installContent(id, hit.projectId, contentKindOf(type), versionId)))
+    } catch (e) {
+      failed ??= e
+    }
+  }
+  app.contentRev++
+  app.installingId = null
+  app.install = null
+  if (added.length) notify(t('Installed: {files}', { files: [...new Set(added)].join(', ') }))
+  if (failed) notify(failed)
+  return !failed
+}
+
+export async function updateInstalled(instanceId: string, type: ProjectType, fileName: string, projectId: string): Promise<boolean> {
+  if (app.installingId) return false
+  app.installingId = projectId
+  app.install = null
+  try {
+    const name = await modrinth.updateContent(instanceId, contentKindOf(type), fileName)
+    app.contentRev++
+    notify(t('Installed: {files}', { files: name }))
+    return true
+  } catch (e) {
+    notify(e)
+    return false
+  } finally {
+    app.installingId = null
+    app.install = null
+  }
 }
 
 export async function installModpack(projectId: string, versionId?: string, mcVersion?: string | null): Promise<boolean> {

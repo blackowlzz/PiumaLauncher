@@ -562,4 +562,7 @@ export const el: Record<string, string> = {
   "Players": "Παίκτες",
   "Ping": "Ping",
   "Instance": "Στιγμιότυπο",
+  "Installed": "Εγκαταστάθηκε",
+  "Choose an instance to install \"{name}\" into.": "Επιλέξτε σε ποιο instance θα εγκατασταθεί το \"{name}\".",
+  "Not compatible": "Μη συμβατό",
 }

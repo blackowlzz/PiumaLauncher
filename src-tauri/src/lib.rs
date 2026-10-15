@@ -108,6 +108,7 @@ pub fn run() {
             commands::transfer_content,
             commands::import_content,
             commands::content_details,
+            commands::installed_projects,
             commands::update_content,
             commands::modrinth_categories,
             commands::sessions,

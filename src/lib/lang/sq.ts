@@ -562,4 +562,7 @@ export const sq: Record<string, string> = {
   "Players": "Lojtarët",
   "Ping": "Ping",
   "Instance": "Instanca",
+  "Installed": "Instaluar",
+  "Choose an instance to install \"{name}\" into.": "Zgjidh instancën ku do të instalohet \"{name}\".",
+  "Not compatible": "Jo i përputhshëm",
 }

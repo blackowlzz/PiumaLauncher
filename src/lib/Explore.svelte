@@ -8,13 +8,13 @@
 <script lang="ts">
   import { thumb } from './img'
   import { onMount } from 'svelte'
-  import { modrinth, type ContentKind, type ModFile, type ProjectHit, type ProjectType, type SearchResult } from './api'
+  import { modrinth, type InstalledProject, type ModFile, type ProjectHit, type ProjectType, type SearchResult } from './api'
   import { locale, stageText, t } from './i18n.svelte'
-  import { app, installModpack, notify, openProject } from './store.svelte'
+  import { app, installProject, notify, openProject, updateInstalled } from './store.svelte'
   import Icon from './Icon.svelte'
   import ProjectCard from './ProjectCard.svelte'
   import Select from './Select.svelte'
-  import { formatBytes } from './meta'
+  import { contentKindOf, formatBytes } from './meta'
 
   const types: { id: ProjectType; label: string }[] = [
     { id: 'modpack', label: 'Modpack' },
@@ -23,7 +23,6 @@
     { id: 'shader', label: 'Shader' },
   ]
   const loaderChoices = ['fabric', 'quilt', 'forge', 'neoforge']
-  const folderKind = (ty: ProjectType): ContentKind => (ty === 'mod' ? 'mods' : ty === 'resourcepack' ? 'resourcepacks' : 'shaderpacks')
 
   const restore = !app.exploreIntent ? saved : null
   let first = !!restore
@@ -39,9 +38,9 @@
   let hits: ProjectHit[] = $state([])
   let total = $state(0)
   let loading = $state(false)
-  let installing: string | null = $state(null)
   let catalog: Partial<Record<ProjectType, string[]>> = $state({})
   let installed: ModFile[] = $state([])
+  let installedMap: Map<string, InstalledProject> = $state(new Map())
 
   onMount(() => (app.exploreIntent = null))
 
@@ -49,6 +48,11 @@
   const targets = $derived(type === 'mod' ? app.instances.filter((i) => i.loader !== 'vanilla') : app.instances)
   const target = $derived(targets.find((i) => i.id === targetId) ?? targets[0] ?? null)
   const cats = $derived(catalog[type] ?? [])
+  const cantInstall = $derived(type !== 'modpack' && !target)
+
+  $effect(() => {
+    if (target && targetId !== target.id) targetId = target.id
+  })
 
   $effect(() => {
     const ty = type
@@ -120,38 +124,43 @@
     return () => clearTimeout(timer)
   })
 
+  let refreshSeq = 0
   async function refreshInstalled() {
-    installed = type !== 'modpack' && target ? await modrinth.listContent(target.id, folderKind(type)).catch(() => []) : []
+    const seq = ++refreshSeq
+    const inst = target
+    if (type === 'modpack' || !inst) {
+      installed = []
+      installedMap = new Map()
+      return
+    }
+    const kind = contentKindOf(type)
+    const files = modrinth.listContent(inst.id, kind).catch(() => [])
+    const ids = modrinth.installedProjects(inst.id, kind, true).catch((): InstalledProject[] => [])
+    const list = await files
+    if (seq !== refreshSeq) return
+    installed = list
+    const found = await ids
+    if (seq === refreshSeq) installedMap = new Map(found.map((p) => [p.projectId, p]))
   }
   $effect(() => {
-    void [type, target?.id]
+    void [type, target?.id, app.contentRev]
     refreshInstalled()
   })
 
-  async function install(hit: ProjectHit, versionId?: string) {
-    if (type === 'modpack') {
-      await installModpack(hit.projectId, versionId, hit.latestMc)
-      return
-    }
-    if (!target) return
-    installing = hit.projectId
-    app.install = null
-    try {
-      const added = await modrinth.installContent(target.id, hit.projectId, folderKind(type))
-      await refreshInstalled()
-      notify(t('Installed: {files}', { files: added.join(', ') }))
-    } catch (e) {
-      notify(e)
-    } finally {
-      installing = null
-      app.install = null
-    }
+  function act(h: ProjectHit) {
+    const entry = installedMap.get(h.projectId)
+    if (entry?.update && target) void updateInstalled(target.id, type, entry.fileName, h.projectId)
+    else void installProject(h, type)
+  }
+  const label = (h: ProjectHit) => {
+    const entry = installedMap.get(h.projectId)
+    return app.installingId === h.projectId ? t('Installing…') : entry?.update ? t('Update') : entry ? t('Installed') : t('Install')
   }
 
   const remove = async (f: ModFile) => {
     if (!target) return
     try {
-      await modrinth.removeContent(target.id, folderKind(type), f.fileName)
+      await modrinth.removeContent(target.id, contentKindOf(type), f.fileName)
       await refreshInstalled()
     } catch (e) {
       notify(e)
@@ -160,8 +169,7 @@
 
   const toggle = (list: string[], v: string) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v])
   const fmt = (n: number) => new Intl.NumberFormat(locale(), { notation: 'compact' }).format(n)
-  const cantInstall = $derived(type !== 'modpack' && !target)
-  const progress = $derived(app.install && (installing || app.installingId) ? app.install : null)
+  const progress = $derived(app.install && app.installingId ? app.install : null)
   const percent = $derived(progress && progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : null)
 
   function reset() {
@@ -211,6 +219,7 @@
       </div>
     {/if}
 
+
     {#if cantInstall}
       <p class="muted note">{type === 'mod' ? t('To install mods you need a Fabric or Quilt instance: create one from the Library.') : t('To install this you need an instance: create one from the Library.')}</p>
     {/if}
@@ -220,7 +229,7 @@
     {#if view === 'grid'}
       <div class="cards" aria-busy={loading}>
         {#each hits as h, n (h.projectId)}
-          <ProjectCard index={n % 20} hit={h} busy={app.installingId === h.projectId || installing === h.projectId} disabled={app.installingId !== null || installing !== null || cantInstall} onInstall={() => install(h)} onOpen={type === 'modpack' ? () => openProject(h) : undefined} />
+          <ProjectCard index={n % 20} hit={h} busy={app.installingId === h.projectId} disabled={app.installingId !== null} installed={installedMap.has(h.projectId)} update={!!installedMap.get(h.projectId)?.update} onInstall={() => act(h)} onOpen={() => openProject(h, type)} />
         {/each}
         {#if loading && !hits.length}
           {#each Array(8) as _, n}<div class="sk" style:--d="{n * 40}ms"></div>{/each}
@@ -236,10 +245,8 @@
               <p class="muted desc">{h.description}</p>
               <div class="muted small">{t('{n} downloads', { n: fmt(h.downloads) })}{h.latestMc ? ` · ${t('up to {version}', { version: h.latestMc })}` : ''}</div>
             </div>
-            {#if type === 'modpack'}<button onclick={() => openProject(h)}>{t('Details')}</button>{/if}
-            <button class="primary" onclick={() => install(h)} disabled={app.installingId !== null || installing !== null || cantInstall}>
-              {app.installingId === h.projectId || installing === h.projectId ? t('Installing…') : t('Install')}
-            </button>
+            <button onclick={() => openProject(h, type)}>{t('Details')}</button>
+            <button class:primary={!installedMap.has(h.projectId) || installedMap.get(h.projectId)?.update} onclick={() => act(h)} disabled={app.installingId !== null}>{label(h)}</button>
           </div>
         {/each}
       </div>

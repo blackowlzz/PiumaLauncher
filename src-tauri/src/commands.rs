@@ -353,9 +353,9 @@ pub async fn install_modpack(app: AppHandle, project_id: String, version_id: Opt
 }
 
 #[tauri::command]
-pub async fn install_content(app: AppHandle, instance_id: String, project_id: String, kind: Content) -> Result<Vec<String>> {
+pub async fn install_content(app: AppHandle, instance_id: String, project_id: String, kind: Content, version_id: Option<String>) -> Result<Vec<String>> {
     let inst = instance::get(&instance_id)?;
-    modrinth::install_content(&net::client(), &inst, &project_id, kind, &progress_emitter(&app)).await
+    modrinth::install_content(&net::client(), &inst, &project_id, kind, version_id.as_deref(), &progress_emitter(&app)).await
 }
 
 #[tauri::command(async)]
@@ -367,6 +367,12 @@ pub fn list_content(instance_id: String, kind: Content) -> Result<Vec<ModFile>> 
 pub async fn content_details(instance_id: String, kind: Content) -> Result<Vec<modrinth::ContentEntry>> {
     let inst = instance::get(&instance_id)?;
     modrinth::content_details(&net::client(), &inst, kind).await
+}
+
+#[tauri::command]
+pub async fn installed_projects(instance_id: String, kind: Content, updates: bool) -> Result<Vec<modrinth::InstalledProject>> {
+    let inst = instance::get(&instance_id)?;
+    modrinth::installed_projects(&net::client(), &inst, kind, updates).await
 }
 
 #[tauri::command]
