@@ -539,6 +539,12 @@ fn analyze(inst: Instance, code: Option<i32>, since: SystemTime, tail: Vec<Strin
 pub async fn inspect(app: &AppHandle, inst: Instance, code: Option<i32>, since: SystemTime, tail: Tail) {
     let lines = tail.take();
     let Ok(Some(report)) = tokio::task::spawn_blocking(move || analyze(inst, code, since, lines)).await else { return };
+    crate::diag::log(format!(
+        "Crash detected in {}: {}{}",
+        report.instance_id,
+        report.cause,
+        report.subject.as_deref().map(|s| format!(" ({s})")).unwrap_or_default()
+    ));
     LAST.lock().unwrap().insert(report.instance_id.clone(), report.clone());
     let _ = app.emit("game-crash", report);
 }

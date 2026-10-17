@@ -1,7 +1,14 @@
 use std::cmp::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
+use std::sync::Mutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
+use tauri::{AppHandle, Emitter, Manager};
+use tauri_plugin_updater::UpdaterExt;
+
+use crate::error::{Error, Result};
+use crate::{diag, Running};
 
 const REPO: &str = "blackowlzz/PiumaLauncher";
 const PUBLISH_DELAY_SECS: u64 = 300;
@@ -12,6 +19,76 @@ const DOWNLOAD_URL: &str = "https://www.piumalauncher.it/download";
 pub struct UpdateInfo {
     pub version: String,
     pub url: String,
+    pub auto: bool,
+}
+
+static FOUND: Mutex<Option<tauri_plugin_updater::Update>> = Mutex::new(None);
+static INSTALLING: AtomicBool = AtomicBool::new(false);
+
+#[derive(Serialize, Clone)]
+struct InstallProgress {
+    done: u64,
+    total: Option<u64>,
+}
+
+fn info(version: &str, auto: bool) -> UpdateInfo {
+    UpdateInfo { version: version.trim_start_matches('v').to_string(), url: DOWNLOAD_URL.to_string(), auto }
+}
+
+pub async fn check_app(app: &AppHandle, client: &reqwest::Client) -> Option<UpdateInfo> {
+    let found = match app.updater() {
+        Ok(updater) => updater.check().await,
+        Err(e) => Err(e),
+    };
+    match found {
+        Ok(Some(update)) => {
+            let out = info(&update.version, true);
+            *FOUND.lock().unwrap() = Some(update);
+            Some(out)
+        }
+        Ok(None) => None,
+        Err(e) => {
+            diag::log(format!("Updater unavailable ({e}), falling back to the release page"));
+            check(client).await
+        }
+    }
+}
+
+fn games_running(app: &AppHandle) -> bool {
+    app.try_state::<Running>().is_some_and(|r| !r.0.lock().unwrap().is_empty())
+}
+
+pub async fn install(app: &AppHandle) -> Result<()> {
+    if games_running(app) {
+        return Err(Error::msg("Close the game before updating the launcher"));
+    }
+    if INSTALLING.swap(true, AtomicOrdering::SeqCst) {
+        return Err(Error::msg("The update is already being installed"));
+    }
+    let result = async {
+        let update = FOUND.lock().unwrap().clone().ok_or_else(|| Error::msg("No update to install"))?;
+        let mut done = 0u64;
+        let bytes = update
+            .download(
+                |chunk, total| {
+                    done += chunk as u64;
+                    let _ = app.emit("update-progress", InstallProgress { done, total });
+                },
+                || {},
+            )
+            .await
+            .map_err(|e| Error::msg(format!("Couldn't download the update: {e}")))?;
+        diag::log(format!("Installing update {} ({} KB, signature verified)", update.version, bytes.len() / 1024));
+        let _ = app.emit("update-installing", ());
+        update.install(&bytes).map_err(|e| Error::msg(format!("Couldn't install the update: {e}")))
+    }
+    .await;
+    if let Err(e) = result {
+        INSTALLING.store(false, AtomicOrdering::SeqCst);
+        diag::log(format!("Update failed: {e}"));
+        return Err(e);
+    }
+    app.restart()
 }
 
 #[derive(Deserialize)]
@@ -86,10 +163,7 @@ pub async fn check(client: &reqwest::Client) -> Option<UpdateInfo> {
     if !settled(release.published_at.as_deref(), now) {
         return None;
     }
-    is_newer(&release.tag_name, env!("CARGO_PKG_VERSION")).then(|| UpdateInfo {
-        version: release.tag_name.trim_start_matches('v').to_string(),
-        url: DOWNLOAD_URL.to_string(),
-    })
+    is_newer(&release.tag_name, env!("CARGO_PKG_VERSION")).then(|| info(&release.tag_name, false))
 }
 
 #[cfg(test)]

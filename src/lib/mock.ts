@@ -256,7 +256,21 @@ export async function mock(cmd: string, args: Record<string, unknown>): Promise<
     }
     case 'reset_data':
     case 'open_data_dir':
+    case 'open_logs':
       return null
+    case 'leftover_processes':
+      return 0
+    case 'list_backups':
+      return []
+    case 'scan_launchers':
+      return [
+        { key: 'a', source: 'prism', name: 'Fabulously Optimized', gameDir: '/prism/instances/fo/.minecraft', mcVersion: '1.21.1', loader: 'fabric', loaderVersion: '0.16.5', sure: true, memoryMinMb: null, memoryMaxMb: null, mods: 84, worlds: 3, shared: false },
+        { key: 'b', source: 'curseforge', name: 'All the Mods 10', gameDir: '/cf/atm10', mcVersion: '1.21.1', loader: 'neoforge', loaderVersion: '21.1.77', sure: true, memoryMinMb: null, memoryMaxMb: null, mods: 412, worlds: 1, shared: false },
+        { key: 'c', source: 'folder', name: 'old-pack', gameDir: '/old-pack', mcVersion: null, loader: 'forge', loaderVersion: null, sure: false, memoryMinMb: null, memoryMaxMb: null, mods: 30, worlds: 0, shared: false },
+        { key: 'd', source: 'official', name: 'Latest release', gameDir: '/.minecraft', mcVersion: '1.21.4', loader: 'vanilla', loaderVersion: null, sure: true, memoryMinMb: null, memoryMaxMb: null, mods: 0, worlds: 5, shared: true },
+      ]
+    case 'diagnostics':
+      return 'PiumaLauncher (preview)\nOS: browser'
     case 'restart_app':
       location.reload()
       return null

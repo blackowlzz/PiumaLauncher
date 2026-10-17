@@ -12,7 +12,7 @@ use tokio::sync::oneshot;
 
 use crate::accounts::{self, Account, AccountKind};
 use crate::error::{Error, Result};
-use crate::{console, crash, flags};
+use crate::{backup, console, crash, diag, flags, options_sync, procs};
 use crate::install::{self, Prepared};
 use crate::instance::Instance;
 use crate::java::{self, JavaInstall};
@@ -29,8 +29,8 @@ fn ensure_shim() -> Result<()> {
     let dir = paths::shim_dir();
     let file = dir.join("PiumaShim.class");
     if std::fs::read(&file).ok().as_deref() != Some(SHIM_CLASS) {
-        std::fs::create_dir_all(&dir)?;
-        std::fs::write(&file, SHIM_CLASS)?;
+        std::fs::create_dir_all(&dir).map_err(Error::at(&dir))?;
+        crate::fsx::retry(|| std::fs::write(&file, SHIM_CLASS)).map_err(Error::at(&file))?;
     }
     Ok(())
 }
@@ -203,24 +203,45 @@ pub fn build_args(prep: &Prepared, inst: &Instance, acc: &Account, session: Opti
     Ok(args)
 }
 
-async fn start(app: &AppHandle, inst: &Instance, acc: &Account, quick: Option<&QuickPlay>) -> Result<(Child, Option<String>)> {
+async fn start(app: &AppHandle, inst: &Instance, acc: &Account, quick: Option<&QuickPlay>, close_leftovers: bool) -> Result<(Child, Option<String>, bool)> {
     let client = net::client();
     let progress = |stage: &str, done: u32, total: u32| {
         emit_state(app, &inst.id, "preparing", Some(stage), done, total, None, None)
     };
     emit_state(app, &inst.id, "preparing", Some("Preparing"), 0, 0, None, None);
 
+    if close_leftovers {
+        progress("Closing the old game", 0, 0);
+        let id = inst.id.clone();
+        let closed = tokio::task::spawn_blocking(move || procs::close_leftovers(&id))
+            .await
+            .map_err(|e| Error::msg(e.to_string()))??;
+        diag::log(format!("Closed {closed} leftover game process(es) for {}", inst.id));
+    }
+
     let session = match acc.kind {
         AccountKind::Microsoft => {
             progress("Signing in", 0, 0);
-            Some(microsoft::session(&acc.id).await?)
+            let s = microsoft::launch_session(&acc.id).await?;
+            if s.offline {
+                diag::log(format!("{}: Microsoft unreachable, playing offline with the saved session", inst.id));
+            }
+            Some(s)
         }
         AccountKind::Offline => None,
     };
     let acc = &accounts::get(&acc.id).unwrap_or_else(|| acc.clone());
 
     let game_dir = paths::game_dir(&inst.id);
-    tokio::fs::create_dir_all(&game_dir).await?;
+    tokio::fs::create_dir_all(&game_dir).await.map_err(Error::at(&game_dir))?;
+    {
+        let id = inst.id.clone();
+        let app = app.clone();
+        let _ = tokio::task::spawn_blocking(move || {
+            backup::auto(&id, "launch", &|done, total| emit_state(&app, &id, "preparing", Some("Backing up worlds"), done, total, None, None))
+        })
+        .await;
+    }
     let prep = install::prepare(&client, inst.launch_id(), &inst.id, game_dir.clone(), &progress).await?;
 
     progress("Looking for Java", 0, 0);
@@ -255,6 +276,7 @@ async fn start(app: &AppHandle, inst: &Instance, acc: &Account, quick: Option<&Q
             }
         }
     };
+    diag::log(format!("{}: Java {} at {}", inst.id, java.major, java.path));
     if java.major < required {
         return Err(Error::msg(format!("This version requires Java {required}, but you have Java {}", java.major)));
     }
@@ -262,6 +284,7 @@ async fn start(app: &AppHandle, inst: &Instance, acc: &Account, quick: Option<&Q
     if session.is_some() {
         ensure_shim()?;
     }
+    options_sync::apply(inst);
     let args = build_args(&prep, inst, acc, session.as_ref(), &java, quick)?;
     let mut cmd = Command::new(&java.path);
     cmd.args(args)
@@ -271,7 +294,13 @@ async fn start(app: &AppHandle, inst: &Instance, acc: &Account, quick: Option<&Q
         .stderr(Stdio::piped());
     #[cfg(windows)]
     cmd.creation_flags(0x0800_0000);
-    let mut child = cmd.spawn()?;
+    let mut child = cmd.spawn().map_err(|e| match e.kind() {
+        std::io::ErrorKind::PermissionDenied => Error::msg(format!(
+            "Windows refused to start Java ({}). Your antivirus may be blocking it, or pick another Java in the instance settings",
+            java.path
+        )),
+        _ => Error::at(std::path::Path::new(&java.path))(e),
+    })?;
     if let Some(s) = &session {
         let sent = match child.stdin.take() {
             Some(mut stdin) => {
@@ -286,7 +315,8 @@ async fn start(app: &AppHandle, inst: &Instance, acc: &Account, quick: Option<&Q
             return Err(Error::msg("Couldn't hand the Microsoft session to the game"));
         }
     }
-    Ok((child, session.map(|s| s.token)))
+    let offline = session.as_ref().is_some_and(|s| s.offline);
+    Ok((child, session.map(|s| s.token), offline))
 }
 
 fn forward_lines<R: AsyncRead + Unpin + Send + 'static>(app: AppHandle, id: String, reader: R, secret: Option<String>, console: bool, tail: crash::Tail) -> tauri::async_runtime::JoinHandle<()> {
@@ -306,13 +336,28 @@ fn forward_lines<R: AsyncRead + Unpin + Send + 'static>(app: AppHandle, id: Stri
     })
 }
 
-pub async fn run(app: AppHandle, inst: Instance, acc: Account, quick: Option<QuickPlay>, mut kill_rx: oneshot::Receiver<()>) {
+pub async fn run(app: AppHandle, inst: Instance, acc: Account, quick: Option<QuickPlay>, close_leftovers: bool, mut kill_rx: oneshot::Receiver<()>) {
     let id = inst.id.clone();
     crash::forget(&id);
-    match start(&app, &inst, &acc, quick.as_ref()).await {
-        Err(e) => emit_state(&app, &id, "error", None, 0, 0, Some(e.to_string()), None),
-        Ok((mut child, secret)) => {
-            emit_state(&app, &id, "running", None, 0, 0, None, None);
+    let kind = match acc.kind {
+        AccountKind::Microsoft => "Microsoft",
+        AccountKind::Offline => "offline",
+    };
+    diag::log(format!(
+        "Launching {id}: Minecraft {} {:?} {} with {kind} account",
+        inst.mc_version,
+        inst.loader,
+        inst.loader_version.as_deref().unwrap_or("")
+    ));
+    match start(&app, &inst, &acc, quick.as_ref(), close_leftovers).await {
+        Err(e) => {
+            diag::log(format!("Launch of {id} failed: {e}"));
+            emit_state(&app, &id, "error", None, 0, 0, Some(e.to_string()), None)
+        }
+        Ok((mut child, secret, offline)) => {
+            diag::log(format!("{id} started (pid {})", child.id().map_or("?".into(), |p| p.to_string())));
+            let notice = offline.then(|| "Playing offline: singleplayer works, online servers will be back when you reconnect".to_string());
+            emit_state(&app, &id, "running", None, 0, 0, notice, None);
             let prefs = settings::load();
             let console = prefs.live_console;
             if console {
@@ -356,6 +401,12 @@ pub async fn run(app: AppHandle, inst: Instance, acc: Account, quick: Option<Qui
                 }
             }
             stats::record(&id, started_ms, started.elapsed().as_secs());
+            options_sync::capture(&inst);
+            diag::log(match (stopped, code) {
+                (true, _) => format!("{id} stopped from the launcher after {}s", started.elapsed().as_secs()),
+                (false, Some(c)) => format!("{id} exited with code {c} after {}s", started.elapsed().as_secs()),
+                (false, None) => format!("{id} ended without an exit code after {}s", started.elapsed().as_secs()),
+            });
             emit_state(&app, &id, "exited", None, 0, 0, None, code);
             if !stopped {
                 let _ = tokio::time::timeout(std::time::Duration::from_secs(2), futures_util::future::join_all(readers)).await;

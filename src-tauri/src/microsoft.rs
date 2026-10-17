@@ -61,6 +61,7 @@ struct Tokens {
 
 pub struct Session {
     pub token: String,
+    pub offline: bool,
 }
 
 struct Profile {
@@ -94,9 +95,9 @@ fn write_private(path: &std::path::Path, bytes: &[u8]) -> Result<()> {
     }
     {
         use std::io::Write;
-        opts.open(&tmp)?.write_all(bytes)?;
+        opts.open(&tmp).and_then(|mut f| f.write_all(bytes)).map_err(Error::at(&tmp))?;
     }
-    std::fs::rename(&tmp, path)?;
+    crate::fsx::retry(|| std::fs::rename(&tmp, path)).map_err(Error::at(path))?;
     Ok(())
 }
 
@@ -199,7 +200,7 @@ pub async fn session(account_id: &str) -> Result<Session> {
     let mut map = load_tokens();
     let saved = map.get(account_id).cloned().ok_or_else(expired)?;
     if saved.mc_expires_at > now() + EXPIRY_MARGIN_SECS {
-        return Ok(Session { token: saved.mc_token });
+        return Ok(Session { token: saved.mc_token, offline: false });
     }
 
     let client = net::client();
@@ -220,11 +221,28 @@ pub async fn session(account_id: &str) -> Result<Session> {
         _ => return Err(expired()),
     };
     let (tokens, profile) = exchange(&client, &access, refresh).await?;
-    let session = Session { token: tokens.mc_token.clone() };
+    let session = Session { token: tokens.mc_token.clone(), offline: false };
     map.insert(account_id.to_string(), tokens);
     save_tokens(&map)?;
     accounts::refresh_microsoft(account_id, &profile.name, &profile.uuid)?;
     Ok(session)
+}
+
+fn unreachable(e: &Error) -> bool {
+    match e {
+        Error::Http(e) => e.is_connect() || e.is_timeout() || e.status().is_some_and(|s| s.is_server_error()),
+        _ => false,
+    }
+}
+
+pub async fn launch_session(account_id: &str) -> Result<Session> {
+    match session(account_id).await {
+        Err(e) if unreachable(&e) => {
+            let saved = load_tokens().remove(account_id).ok_or_else(expired)?;
+            Ok(Session { token: saved.mc_token, offline: true })
+        }
+        other => other,
+    }
 }
 
 fn expired() -> Error {
@@ -311,6 +329,14 @@ fn str_at(v: &Value, pointer: &str) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn only_network_failures_allow_offline_play() {
+        let refused = reqwest::Client::new().get("http://127.0.0.1:9/").send().await.unwrap_err();
+        assert!(unreachable(&Error::Http(refused)));
+        assert!(!unreachable(&expired()));
+        assert!(!unreachable(&Error::msg("This Microsoft account doesn't own Minecraft: Java Edition")));
+    }
 
     #[test]
     fn token_file_is_private_and_replaced_atomically() {

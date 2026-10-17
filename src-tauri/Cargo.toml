@@ -1,6 +1,6 @@
 [package]
 name = "piuma-launcher"
-version = "0.6.4"
+version = "0.6.5"
 description = "Lightweight open source Minecraft launcher"
 edition = "2021"
 license = "GPL-3.0-or-later"
@@ -21,6 +21,7 @@ hex = "0.4.3"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
 md-5 = "0.11.0"
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "json", "query", "form"] }
+rusqlite = { version = "0.40.2", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0.153"
 sha1 = "0.11.0"
@@ -28,6 +29,7 @@ sha2 = "0.11.0"
 sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
 tar = "0.4.46"
 tauri = { version = "2", features = [] }
+tauri-plugin-updater = "2"
 thiserror = "2.0.21"
 tokio = { version = "1.53.2", features = ["rt-multi-thread", "macros", "fs", "process", "io-util", "time"] }
 uuid = { version = "1.28.0", features = ["v4"] }

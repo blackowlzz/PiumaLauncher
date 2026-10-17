@@ -9,6 +9,7 @@
   import { instanceItems } from './instanceMenu'
   import NewInstanceModal from './NewInstanceModal.svelte'
   import ImportModal from './ImportModal.svelte'
+  import MigrateModal from './MigrateModal.svelte'
   import Select from './Select.svelte'
   import { app, isBusy, isInstalled, openInstance, play, playInfo } from './store.svelte'
   import { formatDuration, loaderNames, relativeTime } from './meta'
@@ -19,6 +20,7 @@
   let view: 'grid' | 'list' = $state('grid')
   let creating = $state(false)
   let importing = $state(false)
+  let migrating = $state(false)
 
   const rows = $derived.by(() => {
     const q = query.trim().toLowerCase()
@@ -44,7 +46,8 @@
     <button class="primary" onclick={() => (creating = true)}>{t('New instance')}</button>
   </div>
 </header>
-{#if importing}<ImportModal onClose={() => (importing = false)} />{/if}
+{#if importing}<ImportModal onClose={() => (importing = false)} onMigrate={() => ((importing = false), (migrating = true))} />{/if}
+{#if migrating}<MigrateModal onClose={() => (migrating = false)} />{/if}
 
 <div class="toolbar">
   <label class="search grow">

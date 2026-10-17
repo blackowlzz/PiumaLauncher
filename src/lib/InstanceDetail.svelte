@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { api, type Instance, type JavaInstall, type World } from './api'
+  import { api, type Backup, type Instance, type JavaInstall, type World } from './api'
   import { locale, t } from './i18n.svelte'
   import { app, askConfirm, createShortcut, installedJavas, isBusy, notify, play, refreshEffective, reloadInstances, stop } from './store.svelte'
   import { formatBytes, loaderNames, profileName, profiles } from './meta'
@@ -25,6 +25,14 @@
   let tab: Tab = $state('overview')
   const eff = $derived(app.detailId ? app.effective[app.detailId] : undefined)
   let worlds: World[] = $state([])
+  let backups: Backup[] = $state([])
+  let expanded: string | null = $state(null)
+  let backingUp: string | null = $state(null)
+  let restoring: string | null = $state(null)
+  const backupsOf = (folder: string) => backups.filter((b) => b.world === folder)
+  const orphans = $derived([...new Set(backups.map((b) => b.world))].filter((w) => !worlds.some((x) => x.folder === w)))
+  const reasonLabel = (r: string) =>
+    ({ manual: t('Manual'), launch: t('Before playing'), update: t('Before mod changes'), restore: t('Before restoring') })[r] ?? r
   let javas: JavaInstall[] = $state([])
   let draft: Instance | null = $state(null)
   let busyAction = $state(false)
@@ -61,7 +69,52 @@
   })
 
   async function loadWorlds() {
-    if (inst) worlds = await api.listWorlds(inst.id).catch(() => [])
+    if (!inst) return
+    const [w, b] = await Promise.all([api.listWorlds(inst.id).catch(() => [] as World[]), api.listBackups(inst.id).catch(() => [] as Backup[])])
+    worlds = w
+    backups = b
+  }
+
+  async function backupNow(folder: string) {
+    if (!inst || backingUp) return
+    backingUp = folder
+    try {
+      await api.backupWorld(inst.id, folder)
+      expanded = folder
+      notify(t('Backup created'))
+      await loadWorlds()
+    } catch (e) {
+      notify(e)
+    } finally {
+      backingUp = null
+    }
+  }
+
+  async function restore(b: Backup, asCopy: boolean) {
+    if (!inst || restoring) return
+    const date = when(b.createdMs)
+    const exists = worlds.some((w) => w.folder === b.world)
+    if (!asCopy && exists && !(await askConfirm(t('Bring "{name}" back to {date}? The current world is backed up first, so you can undo this.', { name: b.world, date }), t('Restore')))) return
+    restoring = b.id
+    try {
+      const folder = await api.restoreBackup(inst.id, b.world, b.id, asCopy)
+      notify(asCopy ? t('Restored as "{name}"', { name: folder }) : t('"{name}" restored', { name: folder }))
+      await loadWorlds()
+    } catch (e) {
+      notify(e)
+    } finally {
+      restoring = null
+    }
+  }
+
+  async function removeBackup(b: Backup) {
+    if (!inst || !(await askConfirm(t('Delete the backup of {date}?', { date: when(b.createdMs) })))) return
+    try {
+      await api.deleteBackup(inst.id, b.world, b.id)
+      await loadWorlds()
+    } catch (e) {
+      notify(e)
+    }
   }
 
   $effect(() => {
@@ -111,6 +164,26 @@
   const when = (ms: number) =>
     new Date(ms).toLocaleString(locale(), { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 </script>
+
+{#snippet backupList(world: string, list: Backup[], exists: boolean)}
+  <div class="backups">
+    {#if exists}
+      <div class="row bhead">
+        <span class="muted small grow">{list.length ? t('Restoring brings the world back to that moment.') : t('No backups yet.')}</span>
+        <button onclick={() => backupNow(world)} disabled={running || backingUp !== null}>{backingUp === world ? t('Backing up…') : t('Back up now')}</button>
+      </div>
+    {/if}
+    {#each list as b (b.id)}
+      <div class="row brow">
+        <span class="grow">{when(b.createdMs)}<span class="tag reason">{reasonLabel(b.reason)}</span></span>
+        <span class="muted small">{formatBytes(b.size)}</span>
+        {#if exists}<button class="ghost" onclick={() => restore(b, true)} disabled={running || restoring !== null}>{t('Restore as copy')}</button>{/if}
+        <button onclick={() => restore(b, false)} disabled={running || restoring !== null}>{restoring === b.id ? t('Restoring…') : t('Restore')}</button>
+        <button class="ghost iconbtn" onclick={() => removeBackup(b)} disabled={restoring !== null} aria-label={t('Delete')}><Icon name="trash" size={14} /></button>
+      </div>
+    {/each}
+  </div>
+{/snippet}
 
 {#if !inst}
   <p class="muted">{t('Instance not found.')}</p>
@@ -180,20 +253,44 @@
   {:else if tab === 'worlds'}
     <div class="row toolbar">
       <p class="muted grow">{worlds.length ? (worlds.length === 1 ? t('1 world') : t('{n} worlds', { n: worlds.length })) : t('Worlds will appear here after your first game.')}</p>
+      {#if backups.length}<button class="ghost" onclick={() => api.openBackups(inst.id).catch(notify)}>{t('Backups folder')}</button>{/if}
       <button onclick={() => api.openFolder(inst.id, 'saves').catch(notify)}>{t('Open folder')}</button>
     </div>
     <div class="list">
       {#each worlds as w (w.folder)}
-        <div class="item row" use:ctx={() => [
+        {@const own = backupsOf(w.folder)}
+        <div class="item wrow">
+        <div class="row" use:ctx={() => [
           { label: t('Play'), icon: 'play', onclick: () => void play(inst.id, { kind: 'world', folder: w.folder }), disabled: busy || !app.accounts.active || !opensWorlds(inst.mcVersion) },
+          { label: t('Back up now'), icon: 'clock', onclick: () => void backupNow(w.folder), disabled: running || backingUp !== null },
           { label: t('Copy name'), icon: 'copy', onclick: () => void copyText(w.name ?? w.folder).then((ok) => ok && notify(t('Copied'))) },
           { label: t('Open instance folder'), icon: 'folder', onclick: () => void api.openFolder(inst.id, 'saves').catch(notify) },
         ]}>
           <span class="grow name">{w.name ?? w.folder}{#if w.name && w.name !== w.folder}<span class="muted small folder">{w.folder}</span>{/if}</span>
           <span class="muted small">{formatBytes(w.size)}</span>
           <span class="muted small when">{when(w.modifiedMs)}</span>
+          <button class="ghost bk" class:on={expanded === w.folder} onclick={() => (expanded = expanded === w.folder ? null : w.folder)} aria-expanded={expanded === w.folder}>
+            <Icon name="clock" size={13} />{own.length === 1 ? t('1 backup') : t('{n} backups', { n: own.length })}
+          </button>
           {#if opensWorlds(inst.mcVersion)}
             <button class="wplay" onclick={() => play(inst.id, { kind: 'world', folder: w.folder })} disabled={busy || !app.accounts.active} aria-label={t('Play {name}', { name: w.name ?? w.folder })}><Icon name="play" size={12} />{t('Play')}</button>
+          {/if}
+        </div>
+        {#if expanded === w.folder}
+          {@render backupList(w.folder, own, true)}
+        {/if}
+        </div>
+      {/each}
+      {#each orphans as world (world)}
+        <div class="item wrow">
+          <div class="row">
+            <span class="grow name">{world}<span class="muted small folder">{t('Deleted world')}</span></span>
+            <button class="ghost bk" class:on={expanded === world} onclick={() => (expanded = expanded === world ? null : world)} aria-expanded={expanded === world}>
+              <Icon name="clock" size={13} />{backupsOf(world).length === 1 ? t('1 backup') : t('{n} backups', { n: backupsOf(world).length })}
+            </button>
+          </div>
+          {#if expanded === world}
+            {@render backupList(world, backupsOf(world), false)}
           {/if}
         </div>
       {/each}
@@ -296,6 +393,13 @@
   .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .when { min-width: 150px; text-align: right; }
   .folder { margin-left: 8px; }
+  .wrow { display: grid; gap: 10px; }
+  .bk { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; font-size: 13px; color: var(--muted); }
+  .bk.on { color: var(--text); background: var(--surface-2); }
+  .backups { display: grid; gap: 2px; padding: 10px 14px; border-radius: 14px; background: var(--surface-2); animation: swapin 260ms var(--spring) backwards; }
+  .bhead { padding-bottom: 6px; }
+  .brow { gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 14px; }
+  .reason { margin-left: 10px; }
   .wplay { display: inline-flex; align-items: center; gap: 6px; padding: 5px 14px; font-size: 13px; opacity: 0; transform: translateX(6px); transition: opacity 200ms ease, transform 300ms var(--spring), background var(--ease), border-color var(--ease); }
   .item:hover .wplay, .wplay:focus-visible { opacity: 1; transform: none; }
   @media (hover: none) { .wplay { opacity: 1; transform: none; } }

@@ -2,8 +2,14 @@ import { invoke } from '@tauri-apps/api/core'
 
 export const inTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 
+const UNLOGGED = new Set(['diag_log', 'ping_server', 'thumbnail', 'fetch_skin', 'check_update'])
+
 async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-  if (inTauri) return invoke<T>(cmd, args)
+  if (inTauri)
+    return invoke<T>(cmd, args).catch((e) => {
+      if (!UNLOGGED.has(cmd)) invoke('diag_log', { line: `${cmd} failed: ${e}` }).catch(() => {})
+      throw e
+    })
   if (import.meta.env.DEV) {
     const { mock } = await import('./mock')
     return (await mock(cmd, args ?? {})) as T
@@ -72,6 +78,7 @@ export interface DeviceLogin {
 export interface UpdateInfo {
   version: string
   url: string
+  auto: boolean
 }
 
 export interface AccountStore {
@@ -215,7 +222,12 @@ export const api = {
   detectJava: () => call<JavaInstall[]>('detect_java'),
   listRuntimes: () => call<RuntimeEntry[]>('list_runtimes'),
   installRuntime: (flavor: string, major: number) => call<JavaInstall>('install_runtime', { flavor, major }),
-  launch: (id: string, quickPlay?: QuickPlay) => call<void>('launch_instance', { id, quickPlay: quickPlay ?? null }),
+  launch: (id: string, quickPlay?: QuickPlay, closeLeftovers = false) => call<void>('launch_instance', { id, quickPlay: quickPlay ?? null, closeLeftovers }),
+  leftoverProcesses: (instanceId: string) => call<number>('leftover_processes', { instanceId }),
+  diagnostics: () => call<string>('diagnostics'),
+  openLogs: () => call<void>('open_logs'),
+  scanLaunchers: (folder?: string) => call<FoundInstance[]>('scan_launchers', { folder: folder ?? null }),
+  importFromLauncher: (choice: LauncherChoice, folder?: string) => call<Instance>('import_from_launcher', { choice, folder: folder ?? null }),
   listServers: (instanceId?: string) => call<SavedServer[]>('list_servers', { instanceId: instanceId ?? null }),
   addServer: (instanceIds: string[], name: string, address: string) => call<void>('add_server', { instanceIds, name, address }),
   removeServer: (instanceIds: string[], address: string) => call<void>('remove_server', { instanceIds, address }),
@@ -237,6 +249,7 @@ export const api = {
   applyCrashFix: (instanceId: string) => call<void>('apply_crash_fix', { instanceId }),
   openCrashReport: (instanceId: string) => call<void>('open_crash_report', { instanceId }),
   checkUpdate: () => call<UpdateInfo | null>('check_update'),
+  installUpdate: () => call<void>('install_update'),
   thumbnail: (url: string, width: number) => call<string>('thumbnail', { url, width }),
   fetchSkin: (name: string) => call<SkinInfo | null>('fetch_skin', { name }),
   wardrobeLoad: (accountId: string) => call<Wardrobe>('wardrobe_load', { accountId }),
@@ -254,6 +267,11 @@ export const api = {
   versionImages: () => call<Record<string, string>>('version_images'),
   setLanguage: (code: string) => call<void>('set_language', { code }),
   listWorlds: (instanceId: string) => call<World[]>('list_worlds', { instanceId }),
+  listBackups: (instanceId: string) => call<Backup[]>('list_backups', { instanceId }),
+  backupWorld: (instanceId: string, world: string) => call<Backup>('backup_world', { instanceId, world }),
+  restoreBackup: (instanceId: string, world: string, id: string, asCopy: boolean) => call<string>('restore_backup', { instanceId, world, id, asCopy }),
+  deleteBackup: (instanceId: string, world: string, id: string) => call<void>('delete_backup', { instanceId, world, id }),
+  openBackups: (instanceId: string) => call<void>('open_backups', { instanceId }),
   openFolder: (instanceId: string, which: 'game' | 'mods' | 'saves') =>
     call<void>('open_folder', { instanceId, which }),
   openUrl: (url: string) => call<void>('open_url', { url }),
@@ -346,6 +364,14 @@ export interface ProjectPage {
   versions: PackVersion[]
 }
 
+export interface Backup {
+  id: string
+  world: string
+  createdMs: number
+  size: number
+  reason: 'manual' | 'launch' | 'update' | 'restore' | string
+}
+
 export interface World {
   folder: string
   name: string | null
@@ -435,6 +461,31 @@ export interface Wardrobe {
   capes: Cape[]
 }
 
+export type LauncherSource = 'prism' | 'polymc' | 'multimc' | 'curseforge' | 'modrinth' | 'atlauncher' | 'official' | 'folder'
+
+export interface FoundInstance {
+  key: string
+  source: LauncherSource
+  name: string
+  gameDir: string
+  mcVersion: string | null
+  loader: Loader
+  loaderVersion: string | null
+  sure: boolean
+  memoryMinMb: number | null
+  memoryMaxMb: number | null
+  mods: number
+  worlds: number
+  shared: boolean
+}
+
+export interface LauncherChoice {
+  key: string
+  mcVersion: string
+  loader: Loader
+  loaderVersion: string | null
+}
+
 export interface Settings {
   language: string | null
   theme: 'system' | 'light' | 'dark'
@@ -453,6 +504,10 @@ export interface Settings {
   tuning: Tuning
   autoOptimize: boolean
   liveConsole: boolean
+  lastInstance: string | null
+  autoBackup: boolean
+  syncOptions: boolean
+  syncCategories: string[]
 }
 
 export const defaultSettings = (): Settings => ({
@@ -473,6 +528,10 @@ export const defaultSettings = (): Settings => ({
   tuning: { gc: 'auto', pauseMs: 0, gcThreads: 0, preTouch: false, disableExplicitGc: false, stringDedup: false },
   autoOptimize: false,
   liveConsole: false,
+  lastInstance: null,
+  autoBackup: true,
+  syncOptions: false,
+  syncCategories: ['controls', 'audio', 'interface'],
 })
 
 export interface RuntimeEntry {

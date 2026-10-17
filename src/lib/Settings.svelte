@@ -44,13 +44,37 @@
 
   const total = $derived(storage ? storage.items.reduce((n, i) => n + i.bytes, 0) : 0)
   const label = (key: string) =>
-    ({ instances: t('Instances'), versions: t('Game versions'), libraries: t('Libraries'), assets: t('Assets'), runtimes: t('Java runtimes'), skins: t('Skin cache'), other: t('Other') })[key] ?? key
+    ({ instances: t('Instances'), backups: t('World backups'), versions: t('Game versions'), libraries: t('Libraries'), assets: t('Assets'), runtimes: t('Java runtimes'), skins: t('Skin cache'), other: t('Other') })[key] ?? key
 
   const themes = [
     { id: 'system', label: () => t('System') },
     { id: 'light', label: () => t('Light') },
     { id: 'dark', label: () => t('Dark') },
   ] as const
+
+  const syncKinds = [
+    { key: 'controls', label: () => t('Controls'), hint: () => t('Keybinds, sensitivity, auto-jump, toggle crouch and sprint') },
+    { key: 'audio', label: () => t('Audio'), hint: () => t('Volumes, output device, subtitles') },
+    { key: 'interface', label: () => t('Language and interface'), hint: () => t('Language, GUI scale, chat, accessibility, skin layers') },
+    { key: 'video', label: () => t('Video'), hint: () => t('Render distance, FOV, brightness, graphics. Modpacks often tune these, so it starts off.') },
+  ]
+
+  function toggleSyncKind(key: string, on: boolean) {
+    const rest = app.settings.syncCategories.filter((c) => c !== key)
+    app.settings.syncCategories = on ? [...rest, key] : rest
+    saveSettings()
+  }
+
+  let copied = $state(false)
+  async function copyDiagnostics() {
+    try {
+      await navigator.clipboard.writeText(await api.diagnostics())
+      copied = true
+      setTimeout(() => (copied = false), 2500)
+    } catch (e) {
+      notify(e)
+    }
+  }
 
   async function changeLanguage(code: string) {
     await setLanguage(code)
@@ -147,6 +171,16 @@
     </div>
     <div class="item">
       <div class="txt">
+        <div class="n">{t('Back up worlds automatically')}</div>
+        <div class="d">{t('Before playing and before changing mods, only for worlds that changed. Keeps the last 5 automatic backups of each world; the ones you make yourself are never deleted.')}</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" bind:checked={app.settings.autoBackup} onchange={saveSettings} aria-label={t('Back up worlds automatically')} />
+        <span class="track"></span>
+      </label>
+    </div>
+    <div class="item">
+      <div class="txt">
         <div class="n">{t('Check for updates')}</div>
         <div class="d">{t('Looks on GitHub for a new version when the launcher starts.')}</div>
       </div>
@@ -155,6 +189,31 @@
         <span class="track"></span>
       </label>
     </div>
+  </section>
+
+  <section class="group">
+    <h2>{t('Synced game settings')}</h2>
+    <div class="item">
+      <div class="txt">
+        <div class="n">{t('Share settings between instances')}</div>
+        <div class="d">{t('Change an option in one instance and the others get it the next time they start. New instances start with your settings instead of the defaults.')}</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" bind:checked={app.settings.syncOptions} onchange={saveSettings} aria-label={t('Share settings between instances')} />
+        <span class="track"></span>
+      </label>
+    </div>
+    {#if app.settings.syncOptions}
+      <div class="kinds">
+        {#each syncKinds as k}
+          <label class="opt kind">
+            <input type="checkbox" checked={app.settings.syncCategories.includes(k.key)} onchange={(e) => toggleSyncKind(k.key, e.currentTarget.checked)} />
+            <span class="txt"><span class="n">{k.label()}</span><span class="d">{k.hint()}</span></span>
+          </label>
+        {/each}
+        <p class="muted small">{t('Resource packs and per-instance choices are never touched. Versions before 1.13 share settings only among themselves.')}</p>
+      </div>
+    {/if}
   </section>
 
   <section class="group">
@@ -271,6 +330,24 @@
   </section>
 
   <section class="group">
+    <h2>{t('Troubleshooting')}</h2>
+    <div class="item">
+      <div class="txt">
+        <div class="n">{t('Copy diagnostics')}</div>
+        <div class="d">{t('Copies the launcher version, your system, your instances and the recent launcher log, ready to paste into a bug report. Account tokens are never included.')}</div>
+      </div>
+      <button onclick={copyDiagnostics}>{copied ? t('Copied') : t('Copy')}</button>
+    </div>
+    <div class="item">
+      <div class="txt">
+        <div class="n">{t('Launcher log')}</div>
+        <div class="d">{t('What the launcher did on each launch, with any errors.')}</div>
+      </div>
+      <button onclick={() => api.openLogs().catch(notify)}>{t('Open folder')}</button>
+    </div>
+  </section>
+
+  <section class="group">
     <h2>{t('About')}</h2>
     <div class="item">
       <div class="txt">
@@ -332,6 +409,10 @@
   .modal { position: fixed; z-index: 21; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; display: grid; gap: 16px; padding: 28px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 22px; box-shadow: 0 30px 90px rgba(0, 0, 0, 0.55); animation: pop 260ms var(--spring) both; }
   .modal h1 { font-size: 22px; }
   .opts { display: grid; gap: 10px; }
+  .kinds { display: grid; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+  .kind { align-items: flex-start; }
+  .kind .txt { display: grid; gap: 2px; }
+  .kind input { margin-top: 3px; }
   .opt { display: flex; flex-direction: row; align-items: center; gap: 12px; color: var(--text); font-size: 14px; }
   .sel { justify-self: start; padding-left: 0; }
   .warn { color: var(--text); background: var(--surface-2); border-radius: 12px; padding: 10px 14px; }

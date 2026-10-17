@@ -53,13 +53,14 @@ pub fn info() -> Storage {
 
     let known = [
         ("instances", paths::instances()),
+        ("backups", paths::backups()),
         ("versions", paths::versions()),
         ("libraries", paths::libraries()),
         ("assets", paths::assets()),
         ("skins", root.join("skins")),
     ];
     let mut items: Vec<Item> = known.iter().map(|(key, p)| Item { key, bytes: dir_size(p) }).collect();
-    items.insert(4, Item { key: "runtimes", bytes: runtimes_bytes });
+    items.insert(5, Item { key: "runtimes", bytes: runtimes_bytes });
     let other = std::fs::read_dir(&root)
         .into_iter()
         .flatten()
@@ -101,7 +102,7 @@ fn targets(scope: &str) -> Result<Vec<PathBuf>> {
         "accounts" => vec![paths::accounts_file(), paths::microsoft_file()],
         "settings" => vec![root.join("settings.json")],
         "stats" => vec![root.join("sessions.json")],
-        "instances" => vec![paths::instances(), root.join("natives")],
+        "instances" => vec![paths::instances(), root.join("natives"), paths::backups()],
         "gamefiles" => vec![paths::versions(), paths::libraries(), paths::assets(), root.join("natives"), paths::manifest_cache(), root.join("tmp")],
         "runtimes" => vec![paths::runtimes()],
         "skins" => vec![root.join("skins")],

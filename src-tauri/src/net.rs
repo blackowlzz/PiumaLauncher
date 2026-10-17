@@ -100,14 +100,14 @@ fn already_valid(job: &Job) -> bool {
 
 async fn download_once(client: &reqwest::Client, job: &Job, progress: Option<ByteProgress<'_>>) -> Result<()> {
     if let Some(parent) = job.path.parent() {
-        tokio::fs::create_dir_all(parent).await?;
+        tokio::fs::create_dir_all(parent).await.map_err(Error::at(parent))?;
     }
     let mut tmp_name = job.path.file_name().unwrap_or_default().to_os_string();
     tmp_name.push(".part");
     let tmp = job.path.with_file_name(tmp_name);
 
     let mut resp = client.get(&job.url).send().await?.error_for_status()?;
-    let mut file = BufWriter::with_capacity(WRITE_BUFFER, tokio::fs::File::create(&tmp).await?);
+    let mut file = BufWriter::with_capacity(WRITE_BUFFER, crate::fsx::retry_async(|| tokio::fs::File::create(&tmp)).await.map_err(Error::at(&tmp))?);
     let total = resp.content_length();
     let mut received = 0u64;
     let mut hasher = Hasher::new(&job.check);
@@ -126,7 +126,7 @@ async fn download_once(client: &reqwest::Client, job: &Job, progress: Option<Byt
         let _ = tokio::fs::remove_file(&tmp).await;
         return Err(Error::msg(format!("checksum mismatch for {} (expected {want}, got {got})", job.url)));
     }
-    tokio::fs::rename(&tmp, &job.path).await?;
+    crate::fsx::retry_async(|| tokio::fs::rename(&tmp, &job.path)).await.map_err(Error::at(&job.path))?;
     Ok(())
 }
 

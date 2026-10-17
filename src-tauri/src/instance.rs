@@ -135,5 +135,6 @@ pub fn delete(id: &str) -> Result<()> {
         std::fs::remove_dir_all(dir)?;
     }
     let _ = std::fs::remove_dir_all(paths::natives(id));
+    let _ = std::fs::remove_dir_all(paths::backups().join(id));
     Ok(())
 }

@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "PiumaLauncher",
-  "version": "0.6.4",
+  "version": "0.6.5",
   "identifier": "dev.piuma.launcher",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -48,6 +48,18 @@
         "mimeType": "application/x-modrinth-modpack+zip",
         "role": "Viewer"
       }
-    ]
+    ],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVCNURFMDcxRDczRjFBOTEKUldTUkdqL1hjZUJkNndJNUJMaVJGUGNKOGFTYVFNdmdjTGJsa1JPa1p1YmRlWkFySytnMHJVMkoK",
+      "endpoints": [
+        "https://github.com/blackowlzz/PiumaLauncher/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

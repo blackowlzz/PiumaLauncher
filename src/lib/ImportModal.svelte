@@ -6,7 +6,7 @@
   import { stageText, t } from './i18n.svelte'
   import Icon from './Icon.svelte'
 
-  let { onClose }: { onClose: () => void } = $props()
+  let { onClose, onMigrate }: { onClose: () => void; onMigrate: () => void } = $props()
 
   let code = $state('')
   let link = $state('')
@@ -75,6 +75,15 @@
     <Icon name="chevron" size={16} />
   </button>
   <input bind:this={picker} type="file" accept=".mrpack,.zip" hidden onchange={fromFile} />
+
+  <button class="file" onclick={onMigrate} disabled={busy}>
+    <span class="pk"><Icon name="layout" size={22} /></span>
+    <span class="grow">
+      <span class="fl">{t('Import from another launcher')}</span>
+      <span class="muted small">Prism, MultiMC, CurseForge, Modrinth App, ATLauncher, Minecraft Launcher</span>
+    </span>
+    <Icon name="chevron" size={16} />
+  </button>
 
   {#if stage}<p class="muted small st" aria-live="polite">{stage}{percent !== null ? ` · ${percent}%` : ''}</p>{/if}
 </div>

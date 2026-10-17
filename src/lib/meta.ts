@@ -4,11 +4,13 @@ import { locale, t } from './i18n.svelte'
 export const contentKindOf = (type: ProjectType): ContentKind => (type === 'mod' ? 'mods' : type === 'resourcepack' ? 'resourcepacks' : 'shaderpacks')
 
 export function isCompatible(hit: ProjectHit, type: ProjectType, inst: Instance, version?: PackVersion): boolean {
-  const games = version?.mcVersions ?? hit.gameVersions
+  const fitsVersion = !!version && version.mcVersions.includes(inst.mcVersion)
+  const pinned = fitsVersion ? version : undefined
+  const games = pinned?.mcVersions ?? hit.gameVersions
   if (games.length && !games.includes(inst.mcVersion)) return false
   if (type !== 'mod') return true
   const accepted = inst.loader === 'quilt' ? ['quilt', 'fabric'] : [inst.loader]
-  const known = (version?.loaders ?? hit.categories).filter((c) => ['fabric', 'quilt', 'forge', 'neoforge'].includes(c))
+  const known = (pinned?.loaders ?? hit.categories).filter((c) => ['fabric', 'quilt', 'forge', 'neoforge'].includes(c))
   return !known.length || known.some((l) => accepted.includes(l))
 }
 

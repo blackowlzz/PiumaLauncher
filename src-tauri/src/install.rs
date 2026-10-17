@@ -148,11 +148,17 @@ fn extract_natives(jars: Vec<(PathBuf, Vec<String>)>, dest: PathBuf) -> Result<(
         return Ok(());
     }
     if dest.exists() {
-        std::fs::remove_dir_all(&dest)?;
+        crate::fsx::retry(|| std::fs::remove_dir_all(&dest)).map_err(|e| match e.kind() {
+            std::io::ErrorKind::PermissionDenied => Error::msg(format!(
+                "Native libraries in {} are in use. Close any Minecraft still running for this instance (check Task Manager for javaw.exe) and try again",
+                dest.display()
+            )),
+            _ => Error::at(&dest)(e),
+        })?;
     }
-    std::fs::create_dir_all(&dest)?;
+    std::fs::create_dir_all(&dest).map_err(Error::at(&dest))?;
     for (jar, exclude) in jars {
-        let mut archive = zip::ZipArchive::new(std::fs::File::open(&jar)?)?;
+        let mut archive = zip::ZipArchive::new(std::fs::File::open(&jar).map_err(Error::at(&jar))?)?;
         for i in 0..archive.len() {
             let mut entry = archive.by_index(i)?;
             let Ok(name) = entry.name().map(|n| n.into_owned()) else { continue };
@@ -162,12 +168,13 @@ fn extract_natives(jars: Vec<(PathBuf, Vec<String>)>, dest: PathBuf) -> Result<(
             let Some(rel) = entry.enclosed_name() else { continue };
             let out = dest.join(rel);
             if let Some(parent) = out.parent() {
-                std::fs::create_dir_all(parent)?;
+                std::fs::create_dir_all(parent).map_err(Error::at(parent))?;
             }
-            std::io::copy(&mut entry, &mut std::fs::File::create(out)?)?;
+            let mut file = crate::fsx::retry(|| std::fs::File::create(&out)).map_err(Error::at(&out))?;
+            std::io::copy(&mut entry, &mut file).map_err(Error::at(&out))?;
         }
     }
-    std::fs::write(stamp_file, stamp)?;
+    std::fs::write(&stamp_file, stamp).map_err(Error::at(&stamp_file))?;
     Ok(())
 }
 
@@ -181,9 +188,9 @@ fn copy_virtual_assets(index: &AssetIndex, root: &std::path::Path, target: &std:
             continue;
         }
         if let Some(parent) = dst.parent() {
-            std::fs::create_dir_all(parent)?;
+            std::fs::create_dir_all(parent).map_err(Error::at(parent))?;
         }
-        std::fs::copy(root.join("objects").join(&obj.hash[..2]).join(&obj.hash), dst)?;
+        std::fs::copy(root.join("objects").join(&obj.hash[..2]).join(&obj.hash), &dst).map_err(Error::at(&dst))?;
     }
     Ok(())
 }

@@ -382,7 +382,7 @@ async fn load_version_json(client: &reqwest::Client, id: &str) -> Result<Version
     if let Some(dir) = path.parent() {
         tokio::fs::create_dir_all(dir).await?;
     }
-    tokio::fs::write(&path, text).await?;
+    tokio::fs::write(&path, text).await.map_err(Error::at(&path))?;
     Ok(parsed)
 }
 

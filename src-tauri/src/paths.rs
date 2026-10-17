@@ -39,6 +39,14 @@ pub fn game_dir(id: &str) -> PathBuf {
     instance_dir(id).join("game")
 }
 
+pub fn backups() -> PathBuf {
+    root().join("backups")
+}
+
+pub fn logs() -> PathBuf {
+    root().join("logs")
+}
+
 pub fn shim_dir() -> PathBuf {
     root().join("shim")
 }

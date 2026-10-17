@@ -1,10 +1,13 @@
 mod accounts;
+mod backup;
 mod cli;
 mod commands;
 mod console;
 mod crash;
+mod diag;
 mod error;
 mod flags;
+mod fsx;
 mod install;
 mod instance;
 mod java;
@@ -12,14 +15,17 @@ mod launch;
 mod library;
 mod loaders;
 mod microsoft;
+mod migrate;
 mod minecraft;
 mod modrinth;
 mod nbt;
 mod net;
 mod news;
 mod optimizer;
+mod options_sync;
 mod paths;
 mod presence;
+mod procs;
 mod runtime;
 mod servers;
 mod settings;
@@ -59,6 +65,7 @@ pub fn run() {
     }
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Running::default())
         .setup(|app| {
             if let Some(w) = app.get_webview_window("main") {
@@ -71,6 +78,7 @@ pub fn run() {
                     let _ = w.center();
                 }
             }
+            diag::started();
             presence::launcher();
             cli::serve(app.handle().clone(), request);
             Ok(())
@@ -153,6 +161,18 @@ pub fn run() {
             commands::import_mrpack_file,
             commands::import_mrpack_bytes,
             commands::reveal_file,
+            commands::leftover_processes,
+            commands::diagnostics,
+            commands::diag_log,
+            commands::open_logs,
+            commands::scan_launchers,
+            commands::import_from_launcher,
+            commands::install_update,
+            commands::list_backups,
+            commands::backup_world,
+            commands::restore_backup,
+            commands::delete_backup,
+            commands::open_backups,
         ])
         .run(tauri::generate_context!())
         .expect("error while starting PiumaLauncher");

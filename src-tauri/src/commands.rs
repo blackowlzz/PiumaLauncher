@@ -3,9 +3,11 @@ use tauri::{AppHandle, Emitter, State};
 use tokio::sync::oneshot;
 
 use crate::accounts::{self, Account, AccountStore};
+use crate::backup;
 use crate::console;
 use crate::cli;
 use crate::crash;
+use crate::diag;
 use crate::shortcut;
 use crate::share;
 use crate::servers::{self, QuickPlay};
@@ -14,6 +16,7 @@ use crate::instance::{self, Instance};
 use crate::java::{self, JavaInstall};
 use crate::runtime;
 use crate::microsoft;
+use crate::migrate;
 use crate::presence;
 use crate::minecraft::{self, VersionEntry};
 use crate::modrinth::{self, Content, ModFile, SearchResult};
@@ -27,7 +30,7 @@ use crate::update;
 use crate::stats::{self, Session};
 use crate::library;
 use crate::loaders::{self, Loader};
-use crate::{launch, net, Running};
+use crate::{launch, net, paths, procs, Running};
 
 #[tauri::command]
 pub async fn list_mc_versions() -> Result<Vec<VersionEntry>> {
@@ -154,7 +157,7 @@ pub async fn install_runtime(app: AppHandle, flavor: String, major: u32) -> Resu
 }
 
 #[tauri::command]
-pub fn launch_instance(app: AppHandle, running: State<'_, Running>, id: String, quick_play: Option<QuickPlay>) -> Result<()> {
+pub fn launch_instance(app: AppHandle, running: State<'_, Running>, id: String, quick_play: Option<QuickPlay>, close_leftovers: Option<bool>) -> Result<()> {
     let inst = instance::get(&id)?;
     if let Some(q) = &quick_play {
         q.validate(&id)?;
@@ -169,8 +172,43 @@ pub fn launch_instance(app: AppHandle, running: State<'_, Running>, id: String, 
         }
         map.insert(id, tx);
     }
-    tauri::async_runtime::spawn(launch::run(app, inst, account, quick_play, rx));
+    tauri::async_runtime::spawn(launch::run(app, inst, account, quick_play, close_leftovers.unwrap_or(false), rx));
     Ok(())
+}
+
+#[tauri::command(async)]
+pub fn leftover_processes(running: State<'_, Running>, instance_id: String) -> Result<usize> {
+    instance::check_id(&instance_id)?;
+    if running.0.lock().unwrap().contains_key(&instance_id) {
+        return Ok(0);
+    }
+    Ok(procs::leftovers(&instance_id).len())
+}
+
+#[tauri::command(async)]
+pub fn diagnostics(running: State<'_, Running>) -> String {
+    let ids: Vec<String> = running.0.lock().unwrap().keys().cloned().collect();
+    diag::report(&ids)
+}
+
+#[tauri::command]
+pub fn diag_log(line: String) {
+    diag::log(line.chars().take(2000).collect::<String>());
+}
+
+#[tauri::command(async)]
+pub fn open_logs() -> Result<()> {
+    library::open_path(&paths::logs())
+}
+
+#[tauri::command]
+pub async fn scan_launchers(folder: Option<String>) -> Vec<migrate::Found> {
+    migrate::scan(&net::client(), folder).await
+}
+
+#[tauri::command]
+pub async fn import_from_launcher(app: AppHandle, choice: migrate::Choice, folder: Option<String>) -> Result<Instance> {
+    migrate::import(&net::client(), choice, folder, &progress_emitter(&app)).await
 }
 
 #[tauri::command]
@@ -353,8 +391,9 @@ pub async fn install_modpack(app: AppHandle, project_id: String, version_id: Opt
 }
 
 #[tauri::command]
-pub async fn install_content(app: AppHandle, instance_id: String, project_id: String, kind: Content, version_id: Option<String>) -> Result<Vec<String>> {
+pub async fn install_content(app: AppHandle, running: State<'_, Running>, instance_id: String, project_id: String, kind: Content, version_id: Option<String>) -> Result<Vec<String>> {
     let inst = instance::get(&instance_id)?;
+    backup_before_change(&app, &running, &inst.id, kind).await;
     modrinth::install_content(&net::client(), &inst, &project_id, kind, version_id.as_deref(), &progress_emitter(&app)).await
 }
 
@@ -376,8 +415,9 @@ pub async fn installed_projects(instance_id: String, kind: Content, updates: boo
 }
 
 #[tauri::command]
-pub async fn update_content(instance_id: String, kind: Content, file_name: String) -> Result<String> {
+pub async fn update_content(app: AppHandle, running: State<'_, Running>, instance_id: String, kind: Content, file_name: String) -> Result<String> {
     let inst = instance::get(&instance_id)?;
+    backup_before_change(&app, &running, &inst.id, kind).await;
     modrinth::update_content(&net::client(), &inst, kind, &file_name).await
 }
 
@@ -392,8 +432,58 @@ pub fn import_content(instance_id: String, kind: Content, files: Vec<String>) ->
 }
 
 #[tauri::command(async)]
-pub fn remove_content(instance_id: String, kind: Content, file_name: String) -> Result<()> {
+pub fn remove_content(running: State<'_, Running>, instance_id: String, kind: Content, file_name: String) -> Result<()> {
+    if kind == Content::Mods && !running.0.lock().unwrap().contains_key(&instance_id) {
+        backup::auto(&instance_id, "update", &|_, _| {});
+    }
     modrinth::remove_content(&instance_id, kind, &file_name)
+}
+
+async fn backup_before_change(app: &AppHandle, running: &State<'_, Running>, instance_id: &str, kind: Content) {
+    if kind != Content::Mods || running.0.lock().unwrap().contains_key(instance_id) {
+        return;
+    }
+    let id = instance_id.to_string();
+    let app = app.clone();
+    let _ = tokio::task::spawn_blocking(move || {
+        let emit = progress_emitter(&app);
+        backup::auto(&id, "update", &|done, total| emit("Backing up worlds", done, total))
+    })
+    .await;
+}
+
+fn not_running(running: &State<'_, Running>, instance_id: &str) -> Result<()> {
+    if running.0.lock().unwrap().contains_key(instance_id) {
+        return Err(Error::msg("Close the game first"));
+    }
+    Ok(())
+}
+
+#[tauri::command(async)]
+pub fn list_backups(instance_id: String) -> Result<Vec<backup::Backup>> {
+    backup::list(&instance_id)
+}
+
+#[tauri::command(async)]
+pub fn backup_world(running: State<'_, Running>, instance_id: String, world: String) -> Result<backup::Backup> {
+    not_running(&running, &instance_id)?;
+    backup::create(&instance_id, &world, "manual")
+}
+
+#[tauri::command(async)]
+pub fn restore_backup(running: State<'_, Running>, instance_id: String, world: String, id: String, as_copy: bool) -> Result<String> {
+    not_running(&running, &instance_id)?;
+    backup::restore(&instance_id, &world, &id, as_copy)
+}
+
+#[tauri::command(async)]
+pub fn delete_backup(instance_id: String, world: String, id: String) -> Result<()> {
+    backup::delete(&instance_id, &world, &id)
+}
+
+#[tauri::command(async)]
+pub fn open_backups(instance_id: String) -> Result<()> {
+    library::open_path(&backup::folder(&instance_id)?)
 }
 
 #[tauri::command]
@@ -458,7 +548,14 @@ pub fn set_language(code: String) -> Result<()> {
 
 #[tauri::command]
 pub fn save_settings(settings: settings::Settings) -> Result<()> {
+    let turned_on = settings.sync_options && !settings::load().sync_options;
+    let last = settings.last_instance.clone();
     settings::save(settings)?;
+    if turned_on {
+        if let Some(inst) = last.and_then(|id| instance::get(&id).ok()) {
+            crate::options_sync::seed(&inst);
+        }
+    }
     presence::refresh();
     Ok(())
 }
@@ -497,11 +594,16 @@ pub async fn version_images() -> Result<std::collections::HashMap<String, String
 }
 
 #[tauri::command]
-pub async fn check_update() -> Option<update::UpdateInfo> {
+pub async fn check_update(app: AppHandle) -> Option<update::UpdateInfo> {
     if !settings::load().check_updates {
         return None;
     }
-    update::check(&net::client()).await
+    update::check_app(&app, &net::client()).await
+}
+
+#[tauri::command]
+pub async fn install_update(app: AppHandle) -> Result<()> {
+    update::install(&app).await
 }
 
 #[tauri::command]

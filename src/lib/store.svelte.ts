@@ -122,8 +122,15 @@ export async function init() {
   api.versionImages().then((m) => (app.versionImages = m)).catch(() => {})
   if (inTauri) await listenToBackend()
   await Promise.all([reloadInstances(), reloadAccounts()])
+  const remembered = app.settings.lastInstance
+  if (remembered && app.instances.some((i) => i.id === remembered)) app.selectedId = remembered
   app.loaded = true
-  reloadStats()
+  const initial = app.selectedId
+  reloadStats().then(() => {
+    if (remembered || app.selectedId !== initial) return
+    const recent = lastPlayed()
+    if (recent) app.selectedId = recent
+  })
   const checkUpdate = () =>
     api
       .checkUpdate()
@@ -150,6 +157,7 @@ async function listenToBackend() {
       app.stats[ev.instanceId] = []
     }
     if (ev.state === 'error') notify(ev.message ?? t('Launch failed'))
+    if (ev.state === 'running' && ev.message) notify(t(ev.message))
     if (ev.state === 'exited' || ev.state === 'running') reloadStats()
   })
   await listen<{ instanceId: string; rssMb: number }>('game-stats', (e) => {
@@ -174,8 +182,14 @@ export function openInstance(id: string) {
 
 export async function play(id: string, quickPlay?: QuickPlay) {
   app.selectedId = id
+  if (app.settings.lastInstance !== id) {
+    app.settings.lastInstance = id
+    saveSettings()
+  }
   try {
-    await api.launch(id, quickPlay)
+    const leftovers = await api.leftoverProcesses(id).catch(() => 0)
+    if (leftovers > 0 && !(await askConfirm(t('This instance is still open in the background, probably from a previous session that did not close properly. Close it and play?'), t('Close and play')))) return
+    await api.launch(id, quickPlay, leftovers > 0)
   } catch (e) {
     notify(e)
   }
@@ -334,6 +348,14 @@ export function playInfo(id: string) {
     last = Math.max(last, s.startMs)
   }
   return { secs, last }
+}
+
+function lastPlayed(): string | null {
+  let best: { id: string; at: number } | null = null
+  for (const s of app.sessions) {
+    if (app.instances.some((i) => i.id === s.instanceId) && (!best || s.startMs > best.at)) best = { id: s.instanceId, at: s.startMs }
+  }
+  return best?.id ?? null
 }
 
 export function weeklyPlaytime() {

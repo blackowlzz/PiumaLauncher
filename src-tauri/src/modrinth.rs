@@ -319,7 +319,10 @@ pub async fn install_content(
         }
         let is_root = project == project_id;
         let found = match version_id.filter(|_| is_root) {
-            Some(id) => Some(pinned_version(client, &project, id, &inst.mc_version, tags, kind).await?),
+            Some(id) => match pinned_version(client, &project, id, &inst.mc_version, tags, kind).await {
+                Ok(v) => Some(v),
+                Err(_) => best(versions_of(client, &project, Some(&inst.mc_version), tags).await?),
+            },
             None => best(versions_of(client, &project, Some(&inst.mc_version), tags).await?),
         };
         let Some(version) = found else {

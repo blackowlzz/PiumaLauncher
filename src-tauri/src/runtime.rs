@@ -188,15 +188,17 @@ async fn install(
     let staging = paths::runtimes().join(format!(".{}-{major}.tmp", flavor.slug()));
     let (src, dst, final_home) = (archive.clone(), staging.clone(), home.clone());
     tokio::task::spawn_blocking(move || -> Result<()> {
-        let _ = std::fs::remove_dir_all(&dst);
-        std::fs::create_dir_all(&dst)?;
+        let _ = crate::fsx::retry(|| std::fs::remove_dir_all(&dst));
+        std::fs::create_dir_all(&dst).map_err(Error::at(&dst))?;
         if src.extension().is_some_and(|e| e == "zip") {
             unzip_stripped(&src, &dst)?;
         } else {
             untar_stripped(&src, &dst)?;
         }
-        let _ = std::fs::remove_dir_all(&final_home);
-        std::fs::rename(&dst, &final_home)?;
+        if final_home.exists() {
+            crate::fsx::retry(|| std::fs::remove_dir_all(&final_home)).map_err(Error::at(&final_home))?;
+        }
+        crate::fsx::retry(|| std::fs::rename(&dst, &final_home)).map_err(Error::at(&final_home))?;
         let _ = std::fs::remove_file(&src);
         Ok(())
     })

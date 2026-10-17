@@ -25,6 +25,10 @@ pub struct Settings {
     pub tuning: Tuning,
     pub auto_optimize: bool,
     pub live_console: bool,
+    pub last_instance: Option<String>,
+    pub auto_backup: bool,
+    pub sync_options: bool,
+    pub sync_categories: Vec<String>,
 }
 
 impl Default for Settings {
@@ -47,6 +51,10 @@ impl Default for Settings {
             tuning: Tuning::default(),
             auto_optimize: false,
             live_console: false,
+            last_instance: None,
+            auto_backup: true,
+            sync_options: false,
+            sync_categories: vec!["controls".into(), "audio".into(), "interface".into()],
         }
     }
 }
@@ -82,6 +90,11 @@ impl Settings {
         if self.preferred_java.as_deref().is_some_and(|id| !crate::runtime::is_known_id(id)) {
             self.preferred_java = None;
         }
+        if self.last_instance.as_deref().is_some_and(|id| crate::instance::check_id(id).is_err()) {
+            self.last_instance = None;
+        }
+        let mut seen = std::collections::HashSet::new();
+        self.sync_categories.retain(|c| crate::options_sync::CATEGORIES.contains(&c.as_str()) && seen.insert(c.clone()));
         self.tuning = self.tuning.sanitized();
         self.default_extra_jvm_args = self.default_extra_jvm_args.replace(['\n', '\r'], " ").trim().chars().take(1000).collect();
         self.default_memory_max_mb = self.default_memory_max_mb.clamp(512, 65_536);

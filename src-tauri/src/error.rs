@@ -6,6 +6,8 @@ pub enum Error {
     Msg(String),
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
+    #[error("I/O error on {path}: {source}")]
+    IoAt { path: String, source: std::io::Error },
     #[error("network error: {0}")]
     Http(#[from] reqwest::Error),
     #[error("invalid JSON: {0}")]
@@ -17,6 +19,10 @@ pub enum Error {
 impl Error {
     pub fn msg(s: impl Into<String>) -> Self {
         Error::Msg(s.into())
+    }
+
+    pub fn at(path: &std::path::Path) -> impl FnOnce(std::io::Error) -> Error + '_ {
+        move |source| Error::IoAt { path: path.display().to_string(), source }
     }
 }
 
