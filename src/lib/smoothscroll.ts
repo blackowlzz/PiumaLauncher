@@ -1,6 +1,7 @@
 export function smoothScroll(node: HTMLElement, enabled = true) {
   let on = enabled
   let target = node.scrollTop
+  let pos = target
   let raf = 0
   let last = 0
 
@@ -16,17 +17,24 @@ export function smoothScroll(node: HTMLElement, enabled = true) {
     return false
   }
 
+  function stop() {
+    cancelAnimationFrame(raf)
+    raf = 0
+    last = 0
+  }
+
   function step(now: number) {
     const dt = Math.min(48, now - (last || now))
     last = now
-    const diff = target - node.scrollTop
-    if (Math.abs(diff) < 0.6) {
+    const diff = target - pos
+    if (Math.abs(diff) < 0.5) {
+      pos = target
       node.scrollTop = target
-      raf = 0
-      last = 0
+      stop()
       return
     }
-    node.scrollTop += diff * (1 - Math.exp(-dt / 95))
+    pos += diff * (1 - Math.exp(-dt / 95))
+    node.scrollTop = pos
     raf = requestAnimationFrame(step)
   }
 
@@ -34,7 +42,7 @@ export function smoothScroll(node: HTMLElement, enabled = true) {
     if (!on || e.ctrlKey || e.shiftKey || e.defaultPrevented || e.deltaY === 0) return
     if (innerCanScroll(e.target, e.deltaY)) return
     const dy = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaMode === 2 ? e.deltaY * node.clientHeight : e.deltaY
-    if (!raf) target = node.scrollTop
+    if (!raf) target = pos = node.scrollTop
     const next = Math.max(0, Math.min(max(), target + dy))
     if (next === target && node.scrollTop === target) return
     e.preventDefault()
@@ -43,7 +51,9 @@ export function smoothScroll(node: HTMLElement, enabled = true) {
   }
 
   const onScroll = () => {
-    if (!raf) target = node.scrollTop
+    if (raf && Math.abs(node.scrollTop - pos) <= 2) return
+    stop()
+    target = pos = node.scrollTop
   }
 
   node.addEventListener('wheel', onWheel, { passive: false })
@@ -51,7 +61,7 @@ export function smoothScroll(node: HTMLElement, enabled = true) {
   return {
     update: (v: boolean) => (on = v),
     destroy: () => {
-      cancelAnimationFrame(raf)
+      stop()
       node.removeEventListener('wheel', onWheel)
       node.removeEventListener('scroll', onScroll)
     },
