@@ -7,7 +7,7 @@ use serde_json::{json, Value};
 
 use crate::accounts::{self, Account};
 use crate::error::{Error, Result};
-use crate::{net, paths};
+use crate::{diag, net, paths};
 
 const CLIENT_ID: &str = "00000000441cc96b";
 const SCOPE: &str = "service::user.auth.xboxlive.com::MBI_SSL";
@@ -18,6 +18,7 @@ const XSTS_URL: &str = "https://xsts.auth.xboxlive.com/xsts/authorize";
 const MC_LOGIN_URL: &str = "https://api.minecraftservices.com/authentication/login_with_xbox";
 const MC_PROFILE_URL: &str = "https://api.minecraftservices.com/minecraft/profile";
 const EXPIRY_MARGIN_SECS: u64 = 120;
+const LAUNCH_MARGIN_SECS: u64 = 12 * 3600;
 
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -197,9 +198,13 @@ pub async fn finish() -> Result<Account> {
 }
 
 pub async fn session(account_id: &str) -> Result<Session> {
+    session_lasting(account_id, EXPIRY_MARGIN_SECS).await
+}
+
+async fn session_lasting(account_id: &str, margin: u64) -> Result<Session> {
     let mut map = load_tokens();
     let saved = map.get(account_id).cloned().ok_or_else(expired)?;
-    if saved.mc_expires_at > now() + EXPIRY_MARGIN_SECS {
+    if saved.mc_expires_at > now() + margin {
         return Ok(Session { token: saved.mc_token, offline: false });
     }
 
@@ -236,10 +241,12 @@ fn unreachable(e: &Error) -> bool {
 }
 
 pub async fn launch_session(account_id: &str) -> Result<Session> {
-    match session(account_id).await {
+    match session_lasting(account_id, LAUNCH_MARGIN_SECS).await {
         Err(e) if unreachable(&e) => {
             let saved = load_tokens().remove(account_id).ok_or_else(expired)?;
-            Ok(Session { token: saved.mc_token, offline: true })
+            let offline = saved.mc_expires_at <= now() + EXPIRY_MARGIN_SECS;
+            diag::log(format!("Microsoft refresh unreachable, using saved session ({})", if offline { "expired" } else { "still valid" }));
+            Ok(Session { token: saved.mc_token, offline })
         }
         other => other,
     }

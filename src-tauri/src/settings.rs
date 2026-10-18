@@ -84,7 +84,7 @@ impl Settings {
         if !matches!(self.theme.as_str(), "system" | "light" | "dark") {
             self.theme = "system".into();
         }
-        if !matches!(self.ui_scale.as_str(), "auto" | "100" | "125" | "150") {
+        if !matches!(self.ui_scale.as_str(), "auto" | "50" | "67" | "75" | "90" | "100" | "110" | "125" | "150" | "175" | "200") {
             self.ui_scale = "auto".into();
         }
         if self.preferred_java.as_deref().is_some_and(|id| !crate::runtime::is_known_id(id)) {

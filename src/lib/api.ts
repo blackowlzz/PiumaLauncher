@@ -486,10 +486,12 @@ export interface LauncherChoice {
   loaderVersion: string | null
 }
 
+export const uiScales = ['50', '67', '75', '90', '100', '110', '125', '150', '175', '200'] as const
+
 export interface Settings {
   language: string | null
   theme: 'system' | 'light' | 'dark'
-  uiScale: 'auto' | '100' | '125' | '150'
+  uiScale: 'auto' | (typeof uiScales)[number]
   minimizeOnLaunch: boolean
   defaultMemoryMaxMb: number
   defaultMemoryMinMb: number

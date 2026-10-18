@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { api, type RuntimeEntry, type StorageInfo } from './api'
+  import { api, uiScales, type RuntimeEntry, type StorageInfo } from './api'
   import { LANGUAGES, i18n, setLanguage, stageText, t } from './i18n.svelte'
   import Select from './Select.svelte'
   import { formatBytes } from './meta'
@@ -152,9 +152,7 @@
         onchange={saveSettings}
         options={[
           { value: 'auto', label: t('Automatic') },
-          { value: '100', label: '100%' },
-          { value: '125', label: '125%' },
-          { value: '150', label: '150%' },
+          ...uiScales.map((s) => ({ value: s, label: `${s}%` })),
         ]}
       />
     </div>

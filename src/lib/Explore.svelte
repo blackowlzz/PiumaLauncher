@@ -350,7 +350,7 @@
   .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .more { justify-self: center; }
 
-  .filters { position: sticky; top: 0; display: grid; gap: 20px; padding: 18px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); max-height: calc(100vh - 170px); overflow: auto; }
+  .filters { position: sticky; top: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; padding: 18px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); max-height: calc(100vh - 170px); overflow: auto; }
   .fhead { display: flex; align-items: center; justify-content: space-between; }
   .ft { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; }
   .fsec { display: grid; gap: 10px; }

@@ -98,7 +98,7 @@
   .sel { position: relative; display: inline-block; max-width: 100%; }
   .trigger { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 10px 14px 10px 18px; text-align: left; background: var(--surface); border-color: var(--line); color: var(--text); }
   .trigger:hover:not(:disabled) { background: var(--surface-2); border-color: var(--line-strong); }
-  .cur { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cur { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .chev { display: inline-grid; flex: none; color: var(--muted); transform: rotate(90deg); transition: transform 220ms var(--spring); }
   .chev.open { transform: rotate(-90deg); }
   .menu { position: absolute; left: 0; top: calc(100% + 8px); z-index: 60; min-width: 100%; width: max-content; max-width: min(420px, 90vw); max-height: 300px; overflow-y: auto; margin: 0; padding: 6px; list-style: none; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 18px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); animation: pop 180ms var(--spring) both; transform-origin: top left; }

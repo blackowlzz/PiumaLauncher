@@ -2,7 +2,7 @@
   import { onMount, tick } from 'svelte'
   import { fly } from 'svelte/transition'
   import { app, handleCli, init, installContentInto, installProject, notify, saveSettings, type Page } from './lib/store.svelte'
-  import { inTauri, type PackVersion } from './lib/api'
+  import { inTauri, uiScales, type PackVersion } from './lib/api'
   import { t } from './lib/i18n.svelte'
   import LanguageMenu from './lib/LanguageMenu.svelte'
   import Welcome from './lib/Welcome.svelte'
@@ -110,6 +110,20 @@
     void fitScale()
   })
 
+  function stepZoom(dir: number) {
+    if (dir === 0) {
+      app.settings.uiScale = 'auto'
+      notify(`Zoom: ${t('Automatic')}`)
+    } else {
+      const current = Math.round(zoom * 100)
+      const steps = dir > 0 ? uiScales.filter((s) => Number(s) > current) : uiScales.filter((s) => Number(s) < current).reverse()
+      if (!steps.length) return
+      app.settings.uiScale = steps[0]
+      notify(`Zoom: ${steps[0]}%`)
+    }
+    saveSettings()
+  }
+
   function nativeMenu(e: MouseEvent) {
     if (import.meta.env.DEV) return
     const el = e.target as HTMLElement | null
@@ -122,6 +136,11 @@
     const el = e.target as HTMLElement | null
     const typing = !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
     const mod = e.ctrlKey || e.metaKey
+    if (mod && !e.altKey && ['+', '=', '-', '0'].includes(e.key)) {
+      e.preventDefault()
+      stepZoom(e.key === '0' ? 0 : e.key === '-' ? -1 : 1)
+      return
+    }
     if (document.querySelector('[aria-modal="true"]')) return
     if ((mod && e.key.toLowerCase() === 'k') || (e.key === '/' && !typing && !mod)) {
       e.preventDefault()
