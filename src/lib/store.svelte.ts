@@ -1,8 +1,9 @@
 import { listen } from '@tauri-apps/api/event'
-import { loadLanguage, t } from './i18n.svelte'
+import { loadLanguage, t, translateError } from './i18n.svelte'
 import type { MenuItem } from './contextmenu'
 import { ping, serverKey } from './serverstatus.svelte'
-import { contentKindOf } from './meta'
+import { contentKindOf, formatDuration } from './meta'
+import { breakStep, secondsToday } from './playtime'
 import {
   api,
   inTauri,
@@ -11,6 +12,9 @@ import {
   type EffectiveLaunch,
   type NewsItem,
   defaultSettings,
+  type PackUpdate,
+  type StartupReport,
+  type SponsoredServer,
   type PackVersion,
   type ProjectHit,
   type Settings,
@@ -30,7 +34,7 @@ import {
   type VersionEntry,
 } from './api'
 
-export type Page = 'home' | 'library' | 'quickplay' | 'explore' | 'accounts' | 'instance' | 'settings' | 'themes' | 'performance' | 'wardrobe'
+export type Page = 'home' | 'library' | 'servers' | 'explore' | 'accounts' | 'instance' | 'settings' | 'themes' | 'performance' | 'wardrobe' | 'worlds' | 'stats'
 
 const MAX_STAT_SAMPLES = 90
 
@@ -44,7 +48,7 @@ export const app = $state({
   selectedId: null as string | null,
   games: {} as Record<string, GameStateEvent>,
   toast: null as string | null,
-  confirm: null as { message: string; confirmLabel: string; resolve: (ok: boolean) => void } | null,
+  confirm: null as { message: string; confirmLabel: string; danger: boolean; resolve: (ok: boolean) => void } | null,
   loaded: false,
   settings: defaultSettings() as Settings,
   versionImages: {} as Record<string, string>,
@@ -58,6 +62,12 @@ export const app = $state({
   installedVersions: [] as string[],
   news: [] as NewsItem[],
   installingId: null as string | null,
+  cancellable: false,
+  packUpdates: {} as Record<string, PackUpdate>,
+  gpu: null as { name: string } | null,
+  sponsored: null as SponsoredServer[] | null,
+  startup: {} as Record<string, StartupReport>,
+  cancelling: false,
   detail: null as { hit: ProjectHit; type: ProjectType } | null,
   picker: null as { hit: ProjectHit; type: ProjectType; version?: PackVersion } | null,
   contentRev: 0,
@@ -68,22 +78,24 @@ export const app = $state({
   joining: null as SavedServer | null,
   ctx: null as { x: number; y: number; items: MenuItem[] } | null,
   sharingId: null as string | null,
+  inviting: null as { instanceId: string; name: string; address: string } | null,
 })
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined
 
 export function notify(message: unknown) {
-  app.toast = String(message)
+  app.toast = translateError(message)
   clearTimeout(toastTimer)
   toastTimer = setTimeout(() => (app.toast = null), 6000)
 }
 
-export function askConfirm(message: string, confirmLabel = t('Delete')): Promise<boolean> {
+export function askConfirm(message: string, confirmLabel = t('Delete'), danger = true): Promise<boolean> {
   app.confirm?.resolve(false)
   return new Promise((resolve) => {
     app.confirm = {
       message,
       confirmLabel,
+      danger,
       resolve: (ok) => {
         app.confirm = null
         resolve(ok)
@@ -120,6 +132,7 @@ export async function init() {
   await loadLanguage(settings.language)
   app.settings = { ...defaultSettings(), ...settings }
   api.versionImages().then((m) => (app.versionImages = m)).catch(() => {})
+  api.gpuInfo().then((g) => (app.gpu = g)).catch(() => {})
   if (inTauri) await listenToBackend()
   await Promise.all([reloadInstances(), reloadAccounts()])
   const remembered = app.settings.lastInstance
@@ -140,6 +153,8 @@ export async function init() {
       })
       .catch(() => {})
   setTimeout(checkUpdate, 4000)
+  setTimeout(refreshPackUpdates, 2500)
+  setInterval(checkPlaytime, 30_000)
   setInterval(checkUpdate, 30 * 60 * 1000)
   stats.news().then((n) => (app.news = n)).catch(() => {})
   api.listVersions().then((v) => (app.versions = v)).catch((e) => notify(t('Version list unavailable: {error}', { error: e })))
@@ -150,6 +165,7 @@ export async function init() {
 }
 
 async function listenToBackend() {
+  await listen<{ instanceId: string }>('startup-measured', (e) => void refreshStartup(e.payload.instanceId))
   await listen<GameStateEvent>('game-state', (e) => {
     const ev = e.payload
     app.games[ev.instanceId] = ev
@@ -158,6 +174,11 @@ async function listenToBackend() {
     }
     if (ev.state === 'error') notify(ev.message ?? t('Launch failed'))
     if (ev.state === 'running' && ev.message) notify(t(ev.message))
+    if (ev.state === 'running') runningSince[ev.instanceId] ??= Date.now()
+    if (ev.state === 'exited' || ev.state === 'error') {
+      delete runningSince[ev.instanceId]
+      delete breaksShown[ev.instanceId]
+    }
     if (ev.state === 'exited' || ev.state === 'running') reloadStats()
   })
   await listen<{ instanceId: string; rssMb: number }>('game-stats', (e) => {
@@ -180,11 +201,52 @@ export function openInstance(id: string) {
   app.page = 'instance'
 }
 
+const runningSince: Record<string, number> = {}
+const breaksShown: Record<string, number> = {}
+let limitShownOn = ''
+
+export function playedTodaySecs(): number {
+  return secondsToday(app.sessions, Object.values(runningSince), Date.now())
+}
+
+async function osNotify(title: string, body: string) {
+  notify(`${title} ${body}`)
+  if (!inTauri) return
+  try {
+    const n = await import('@tauri-apps/plugin-notification')
+    if ((await n.isPermissionGranted()) || (await n.requestPermission()) === 'granted') n.sendNotification({ title, body })
+  } catch {}
+}
+
+function checkPlaytime() {
+  const { breakReminderMinutes: every, dailyLimitMinutes: limit } = app.settings
+  const now = Date.now()
+  if (every > 0) {
+    for (const [id, since] of Object.entries(runningSince)) {
+      const step = breakStep(since, now, every)
+      if (step >= 1 && step > (breaksShown[id] ?? 0)) {
+        breaksShown[id] = step
+        void osNotify(t('Time for a break?'), t('You have been playing for {time}.', { time: formatDuration(step * every * 60) }))
+      }
+    }
+  }
+  const today = new Date().toDateString()
+  if (limit > 0 && Object.keys(runningSince).length && limitShownOn !== today && playedTodaySecs() >= limit * 60) {
+    limitShownOn = today
+    void osNotify(t('Daily limit reached'), t('You have played {time} today, your limit is {limit}.', { time: formatDuration(playedTodaySecs()), limit: formatDuration(limit * 60) }))
+  }
+}
+
 export async function play(id: string, quickPlay?: QuickPlay) {
   app.selectedId = id
   if (app.settings.lastInstance !== id) {
     app.settings.lastInstance = id
     saveSettings()
+  }
+  const limit = app.settings.dailyLimitMinutes
+  if (limit > 0 && playedTodaySecs() >= limit * 60) {
+    const msg = t('You have played {time} today, your limit is {limit}. Play anyway?', { time: formatDuration(playedTodaySecs()), limit: formatDuration(limit * 60) })
+    if (!(await askConfirm(msg, t('Play anyway'), false))) return
   }
   try {
     const leftovers = await api.leftoverProcesses(id).catch(() => 0)
@@ -195,10 +257,35 @@ export async function play(id: string, quickPlay?: QuickPlay) {
   }
 }
 
+const wasCancelled = (e: unknown) => String(e) === 'Cancelled'
+
+function reportFailure(e: unknown) {
+  notify(wasCancelled(e) ? t('Cancelled') : e)
+}
+
+function beginInstall(id: string) {
+  app.installingId = id
+  app.install = null
+  app.cancellable = true
+  app.cancelling = false
+}
+
+function endInstall() {
+  app.installingId = null
+  app.install = null
+  app.cancellable = false
+  app.cancelling = false
+}
+
+export async function cancelInstall() {
+  if (!app.cancellable || app.cancelling) return
+  app.cancelling = true
+  if (!(await modrinth.cancelInstall().catch(() => false))) app.cancelling = false
+}
+
 export async function importPack(run: () => Promise<Imported>): Promise<boolean> {
   if (app.installingId) return false
-  app.installingId = 'import'
-  app.install = null
+  beginInstall('import')
   try {
     const r = await run()
     await reloadInstances()
@@ -208,14 +295,26 @@ export async function importPack(run: () => Promise<Imported>): Promise<boolean>
         ? t('"{name}" imported, {n} files are no longer available', { name: r.instance.name, n: r.skipped })
         : t('"{name}" imported', { name: r.instance.name }),
     )
+    if (r.server) void joinInvite(r.instance.id, r.server)
     return true
   } catch (e) {
-    notify(e)
+    reportFailure(e)
     return false
   } finally {
-    app.installingId = null
-    app.install = null
+    endInstall()
   }
+}
+
+async function joinInvite(instanceId: string, address: string) {
+  await api.addServer([instanceId], address, address).catch(() => {})
+  if (await askConfirm(t('Join {server} now?', { server: address }), t('Join'), false)) await play(instanceId, { kind: 'server', address })
+}
+
+export function invite(server: SavedServer, instanceId?: string) {
+  const id =
+    instanceId ??
+    [...server.instances].sort((a, b) => playInfo(b).last - playInfo(a).last).find((i) => app.instances.some((x) => x.id === i))
+  if (id) app.inviting = { instanceId: id, name: server.name, address: server.address }
 }
 
 export async function handleCli() {
@@ -263,7 +362,7 @@ export const stop = (id: string) => api.stop(id).catch(notify)
 
 export const isBusy = (id: string | null) => {
   const state = id ? app.games[id]?.state : undefined
-  return state === 'preparing' || state === 'running'
+  return state === 'preparing' || state === 'running' || (id !== null && app.installingId === id)
 }
 
 export function installProject(hit: ProjectHit, type: ProjectType, version?: PackVersion): Promise<boolean> {
@@ -274,47 +373,44 @@ export function installProject(hit: ProjectHit, type: ProjectType, version?: Pac
 
 export async function installContentInto(instanceIds: string[], hit: ProjectHit, type: ProjectType, versionId?: string): Promise<boolean> {
   if (app.installingId || !instanceIds.length) return false
-  app.installingId = hit.projectId
-  app.install = null
+  beginInstall(hit.projectId)
   const added: string[] = []
   let failed: unknown = null
   for (const id of instanceIds) {
+    if (app.cancelling) break
     try {
       added.push(...(await modrinth.installContent(id, hit.projectId, contentKindOf(type), versionId)))
     } catch (e) {
       failed ??= e
+      if (wasCancelled(e)) break
     }
   }
   app.contentRev++
-  app.installingId = null
-  app.install = null
+  endInstall()
   if (added.length) notify(t('Installed: {files}', { files: [...new Set(added)].join(', ') }))
-  if (failed) notify(failed)
+  if (failed) reportFailure(failed)
   return !failed
 }
 
 export async function updateInstalled(instanceId: string, type: ProjectType, fileName: string, projectId: string): Promise<boolean> {
   if (app.installingId) return false
-  app.installingId = projectId
-  app.install = null
+  beginInstall(projectId)
   try {
     const name = await modrinth.updateContent(instanceId, contentKindOf(type), fileName)
     app.contentRev++
     notify(t('Installed: {files}', { files: name }))
     return true
   } catch (e) {
-    notify(e)
+    reportFailure(e)
     return false
   } finally {
-    app.installingId = null
-    app.install = null
+    endInstall()
   }
 }
 
 export async function installModpack(projectId: string, versionId?: string, mcVersion?: string | null): Promise<boolean> {
   if (app.installingId) return false
-  app.installingId = projectId
-  app.install = null
+  beginInstall(projectId)
   try {
     const inst = await modrinth.installModpack(projectId, versionId, mcVersion ?? undefined)
     await reloadInstances()
@@ -322,11 +418,44 @@ export async function installModpack(projectId: string, versionId?: string, mcVe
     notify(t('"{name}" installed', { name: inst.name }))
     return true
   } catch (e) {
-    notify(e)
+    reportFailure(e)
     return false
   } finally {
-    app.installingId = null
-    app.install = null
+    endInstall()
+  }
+}
+
+export async function refreshStartup(id: string) {
+  const r = await api.startupReport(id).catch(() => null)
+  if (r) app.startup[id] = r
+}
+
+export const seconds = (ms: number) => `${Math.max(1, Math.round(ms / 1000))} s`
+
+export async function refreshPackUpdates() {
+  app.packUpdates = await modrinth.modpackUpdates().catch(() => app.packUpdates)
+}
+
+export async function refreshPackUpdate(id: string) {
+  const u = await modrinth.modpackUpdate(id).catch(() => undefined)
+  if (u) app.packUpdates[id] = u
+  else if (u === null) delete app.packUpdates[id]
+}
+
+export async function updateModpack(id: string, versionId?: string): Promise<boolean> {
+  if (app.installingId) return false
+  beginInstall(id)
+  try {
+    const inst = await modrinth.updateModpack(id, versionId)
+    delete app.packUpdates[id]
+    await reloadInstances()
+    notify(t('"{name}" updated to {version}', { name: inst.name, version: inst.pack?.versionNumber ?? '' }))
+    return true
+  } catch (e) {
+    reportFailure(e)
+    return false
+  } finally {
+    endInstall()
   }
 }
 

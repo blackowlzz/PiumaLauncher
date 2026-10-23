@@ -299,7 +299,7 @@ fn flatten(v: &Value, style: &str, out: &mut String) {
     }
 }
 
-fn strip_codes(s: &str) -> String {
+pub(crate) fn strip_codes(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut it = s.chars();
     while let Some(c) = it.next() {
@@ -499,7 +499,7 @@ pub fn level_info(dir: &Path) -> Option<(String, Option<i64>, bool)> {
     Some((name, data.int("GameType"), data.int("hardcore").unwrap_or(0) != 0))
 }
 
-fn icon(dir: &Path) -> Option<String> {
+pub(crate) fn world_icon(dir: &Path) -> Option<String> {
     let mut buf = vec![];
     std::fs::File::open(dir.join("icon.png")).ok()?.take(ICON_CAP).read_to_end(&mut buf).ok()?;
     buf.starts_with(b"\x89PNG").then(|| format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(buf)))
@@ -522,7 +522,7 @@ pub fn recent_worlds(limit: usize) -> Vec<RecentWorld> {
         .map(|(modified_ms, instance_id, dir)| {
             let folder = dir.file_name().map(|f| f.to_string_lossy().into_owned()).unwrap_or_default();
             let (name, mode, hardcore) = level_info(&dir).unwrap_or_else(|| (folder.clone(), None, false));
-            RecentWorld { icon: icon(&dir), instance_id, folder, name, modified_ms, mode, hardcore }
+            RecentWorld { icon: world_icon(&dir), instance_id, folder, name, modified_ms, mode, hardcore }
         })
         .collect()
 }

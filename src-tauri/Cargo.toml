@@ -1,6 +1,6 @@
 [package]
 name = "piuma-launcher"
-version = "0.6.7"
+version = "0.6.8"
 description = "Lightweight open source Minecraft launcher"
 edition = "2021"
 license = "GPL-3.0-or-later"
@@ -29,6 +29,7 @@ sha2 = "0.11.0"
 sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
 tar = "0.4.46"
 tauri = { version = "2", features = [] }
+tauri-plugin-notification = "2"
 tauri-plugin-updater = "2"
 thiserror = "2.0.21"
 tokio = { version = "1.53.2", features = ["rt-multi-thread", "macros", "fs", "process", "io-util", "time"] }

@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::SystemTime;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
 
 use crate::error::{Error, Result};
@@ -59,6 +59,51 @@ pub struct Report {
 }
 
 static LAST: LazyLock<Mutex<HashMap<String, Report>>> = LazyLock::new(Default::default);
+
+const HISTORY_KEEP: usize = 300;
+static HISTORY_LOCK: Mutex<()> = Mutex::new(());
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CrashEntry {
+    pub instance_id: String,
+    pub at_ms: u64,
+    pub cause: String,
+    pub subject: Option<String>,
+}
+
+fn history_file() -> PathBuf {
+    crate::paths::root().join("crashes.json")
+}
+
+pub fn history() -> Vec<CrashEntry> {
+    history_in(&history_file())
+}
+
+fn history_in(file: &Path) -> Vec<CrashEntry> {
+    std::fs::read_to_string(file).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default()
+}
+
+fn remember(report: &Report) {
+    remember_in(&history_file(), report);
+}
+
+fn remember_in(file: &Path, report: &Report) {
+    let _guard = HISTORY_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let mut list = history_in(file);
+    list.push(CrashEntry {
+        instance_id: report.instance_id.clone(),
+        at_ms: crate::stats::now_ms(),
+        cause: report.cause.to_string(),
+        subject: report.subject.clone(),
+    });
+    if list.len() > HISTORY_KEEP {
+        list.drain(..list.len() - HISTORY_KEEP);
+    }
+    if let Ok(text) = serde_json::to_string(&list) {
+        let _ = std::fs::write(file, text);
+    }
+}
 
 pub fn forget(id: &str) {
     LAST.lock().unwrap().remove(id);
@@ -545,6 +590,7 @@ pub async fn inspect(app: &AppHandle, inst: Instance, code: Option<i32>, since: 
         report.cause,
         report.subject.as_deref().map(|s| format!(" ({s})")).unwrap_or_default()
     ));
+    remember(&report);
     LAST.lock().unwrap().insert(report.instance_id.clone(), report.clone());
     let _ = app.emit("game-crash", report);
 }
@@ -597,6 +643,22 @@ pub fn open_report(id: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn crashes_are_remembered_newest_last_and_capped() {
+        let file = std::env::temp_dir().join(format!("piuma-crashes-{}.json", std::process::id()));
+        let _ = std::fs::remove_file(&file);
+        let report = |id: &str| Report { instance_id: id.into(), cause: "outOfMemory", subject: Some("x".into()), fix: None, excerpt: vec![], has_report: false, code: Some(1), file: None };
+        for n in 0..HISTORY_KEEP + 5 {
+            remember_in(&file, &report(&format!("i{n}")));
+        }
+        let list = history_in(&file);
+        assert_eq!(list.len(), HISTORY_KEEP);
+        assert_eq!(list.first().unwrap().instance_id, "i5");
+        let last = list.last().unwrap();
+        assert_eq!((last.instance_id.as_str(), last.cause.as_str(), last.subject.as_deref()), ("i304", "outOfMemory", Some("x")));
+        let _ = std::fs::remove_file(&file);
+    }
     use crate::flags::FlagProfile;
     use crate::loaders::Loader;
 
@@ -617,6 +679,8 @@ mod tests {
                 extra_jvm_args: args.into(),
                 icon_url: None,
                 banner_url: None,
+                pack: None,
+                launch: Default::default(),
             },
             effective_max: 4096,
             ceiling: 12288,

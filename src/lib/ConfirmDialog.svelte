@@ -27,7 +27,7 @@
     <p id="confirm-msg">{ask.message}</p>
     <div class="actions">
       <button bind:this={cancelBtn} class="ghost" onclick={() => ask.resolve(false)}>{t('Cancel')}</button>
-      <button class="primary danger" onclick={() => ask.resolve(true)}>{ask.confirmLabel}</button>
+      <button class="primary" class:danger={ask.danger} onclick={() => ask.resolve(true)}>{ask.confirmLabel}</button>
     </div>
   </div>
 {/if}

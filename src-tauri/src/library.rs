@@ -65,8 +65,10 @@ pub fn open_folder(instance_id: &str, which: &str) -> Result<()> {
         "game" => game,
         "mods" => game.join("mods"),
         "saves" => game.join("saves"),
+        "screenshots" => game.join("screenshots"),
         _ => return Err(Error::msg("invalid folder")),
     };
+    std::fs::create_dir_all(&dir)?;
     open_path(&dir)
 }
 
@@ -111,7 +113,7 @@ pub fn open_path(dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn copy_dir(src: &Path, dst: &Path) -> Result<()> {
+pub(crate) fn copy_dir(src: &Path, dst: &Path) -> Result<()> {
     std::fs::create_dir_all(dst)?;
     for entry in std::fs::read_dir(src)? {
         let entry = entry?;
@@ -127,10 +129,12 @@ fn copy_dir(src: &Path, dst: &Path) -> Result<()> {
     Ok(())
 }
 
-pub fn duplicate(instance_id: &str) -> Result<Instance> {
+pub fn duplicate(instance_id: &str, name: Option<&str>) -> Result<Instance> {
     let original = instance::get(instance_id)?;
+    let fallback = format!("{} (copy)", original.name);
+    let name = name.map(str::trim).filter(|n| !n.is_empty() && n.chars().count() <= 64).unwrap_or(&fallback);
     let mut copy = instance::create(
-        &format!("{} (copia)", original.name),
+        name,
         &original.mc_version,
         original.loader,
         original.loader_version.clone(),
@@ -144,6 +148,8 @@ pub fn duplicate(instance_id: &str) -> Result<Instance> {
     copy.extra_jvm_args = original.extra_jvm_args.clone();
     copy.icon_url = original.icon_url.clone();
     copy.banner_url = original.banner_url.clone();
+    copy.pack = original.pack.clone();
+    copy.launch = original.launch.clone();
     instance::save(&copy)?;
 
     let (from, to) = (paths::game_dir(&original.id), paths::game_dir(&copy.id));
@@ -151,5 +157,6 @@ pub fn duplicate(instance_id: &str) -> Result<Instance> {
         let _ = instance::delete(&copy.id);
         return Err(e);
     }
+    let _ = instance::save_pack_files(&copy.id, &instance::pack_files(&original.id));
     Ok(copy)
 }

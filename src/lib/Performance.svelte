@@ -124,6 +124,22 @@
     </div>
     {#if s.autoOptimize}<p class="warn small">{t('The optimizer is on: at each launch it can raise memory and picks the Java flags. The values below are the minimum it starts from.')}</p>{/if}
   </section>
+  {#if app.gpu}
+    <section class="group">
+      <h2>{t('Graphics card')}</h2>
+      <div class="item">
+        <div class="txt">
+          <div class="n">{t('Play on the {name} graphics card', { name: app.gpu.name })}</div>
+          <div class="d">{t('Your laptop has two graphics cards and games start on the integrated one, which is slower. Turn this on for more FPS; the battery drains faster.')}</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" bind:checked={s.dedicatedGpu} onchange={saveSettings} aria-label={t('Play on the {name} graphics card', { name: app.gpu.name })} />
+          <span class="track"></span>
+        </label>
+      </div>
+    </section>
+  {/if}
+
   <section class="group">
     <h2>{t('Default memory and profile')}</h2>
     <p class="muted small intro">
@@ -248,6 +264,45 @@
   </section>
 
   <section class="group">
+    <h2>{t('Default launch options')}</h2>
+    <p class="d intro">{t('Used by every instance that leaves these empty. An instance can also ignore them from its own settings.')}</p>
+    <div class="item">
+      <div class="txt">
+        <div class="n">{t('Start in fullscreen')}</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" bind:checked={s.defaultLaunch.fullscreen} onchange={saveSettings} aria-label={t('Start in fullscreen')} />
+        <span class="track"></span>
+      </label>
+    </div>
+    <div class="item">
+      <div class="txt">
+        <div class="n">{t('Window size')}</div>
+        <div class="d">{t('Leave empty to use the game default.')}</div>
+      </div>
+      <div class="val">
+        <input class="num" type="number" min="320" max="16384" step="1" placeholder="854" bind:value={s.defaultLaunch.width} onchange={saveSettings} disabled={s.defaultLaunch.fullscreen} aria-label={t('Window width')} />
+        <span class="muted">×</span>
+        <input class="num" type="number" min="320" max="16384" step="1" placeholder="480" bind:value={s.defaultLaunch.height} onchange={saveSettings} disabled={s.defaultLaunch.fullscreen} aria-label={t('Window height')} />
+      </div>
+    </div>
+    <div class="item col">
+      <div class="txt">
+        <div class="n">{t('Launch wrapper')}</div>
+        <div class="d">{t('A command that starts the game for you, such as gamemoderun, mangohud or prime-run. Leave it empty to start Java directly.')}</div>
+      </div>
+      <input class="wide" bind:value={s.defaultLaunch.wrapper} onchange={saveSettings} placeholder="gamemoderun mangohud" spellcheck="false" aria-label={t('Launch wrapper')} />
+    </div>
+    <div class="item col">
+      <div class="txt">
+        <div class="n">{t('Environment variables')}</div>
+        <div class="d">{t('One per line, as NAME=value.')}</div>
+      </div>
+      <textarea class="wide mono" rows="3" bind:value={s.defaultLaunch.env} onchange={saveSettings} placeholder="MESA_GL_VERSION_OVERRIDE=4.6" spellcheck="false" aria-label={t('Environment variables')}></textarea>
+    </div>
+  </section>
+
+  <section class="group">
     <h2>{t('Launcher')}</h2>
     <div class="item">
       <div class="txt">
@@ -288,6 +343,7 @@
   .d { margin-top: 2px; color: var(--muted); font-size: 13px; line-height: 1.45; max-width: 520px; }
   .num { width: 130px; }
   .wide { width: 100%; }
+  .mono { resize: vertical; font: 12.5px/1.5 ui-monospace, 'JetBrains Mono', monospace; letter-spacing: 0; }
   .presets { display: flex; flex-wrap: wrap; gap: 6px; }
   .presets .on { background: var(--inv-bg); color: var(--inv-text); border-color: var(--inv-bg); }
   .card { position: relative; overflow: hidden; margin: 12px 0 4px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); isolation: isolate; }

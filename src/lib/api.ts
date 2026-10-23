@@ -60,6 +60,78 @@ export interface Instance {
   extraJvmArgs: string
   iconUrl: string | null
   bannerUrl: string | null
+  pack: PackSource | null
+  launch: LaunchOptions
+}
+
+export interface LaunchOptions {
+  wrapper: string
+  env: string
+  width: number | null
+  height: number | null
+  fullscreen: boolean
+  skipDefaults: boolean
+}
+
+export const emptyLaunch = (): LaunchOptions => ({ wrapper: '', env: '', width: null, height: null, fullscreen: false, skipDefaults: false })
+
+export interface PackSource {
+  projectId: string
+  versionId: string
+  versionNumber: string
+}
+
+export interface SponsoredServer {
+  name: string
+  address: string
+  description: string
+  version: string | null
+}
+
+export interface WorldEntry {
+  instanceId: string
+  folder: string
+  name: string
+  size: number
+  modifiedMs: number
+  mode: number | null
+  hardcore: boolean
+  version: string | null
+  icon: string | null
+}
+
+export interface CrashEntry {
+  instanceId: string
+  atMs: number
+  cause: CrashCause
+  subject: string | null
+}
+
+export interface StartupReport {
+  history: number[]
+  lastMs: number | null
+  usualMs: number | null
+  slower: { beforeMs: number; nowMs: number; added: string[] } | null
+}
+
+export interface PackChange {
+  name: string
+  from: string | null
+  to: string | null
+}
+
+export interface PackDiff {
+  added: PackChange[]
+  removed: PackChange[]
+  updated: PackChange[]
+  mcFrom: string | null
+  mcTo: string | null
+}
+
+export interface PackUpdate {
+  versionId: string
+  versionNumber: string
+  mcVersion: string | null
 }
 
 export interface Account {
@@ -190,6 +262,7 @@ export interface ShareCode {
 export interface Imported {
   instance: Instance
   skipped: number
+  server?: string | null
 }
 
 export interface RecentWorld {
@@ -236,7 +309,7 @@ export const api = {
   takeCliRequest: () => call<CliRequest | null>('take_cli_request'),
   createShortcut: (instanceId: string) => call<void>('create_shortcut', { instanceId }),
   exportMrpack: (instanceId: string, options: ExportOptions) => call<Exported>('export_mrpack', { instanceId, options }),
-  shareCode: (instanceId: string) => call<ShareCode>('share_code', { instanceId }),
+  shareCode: (instanceId: string, server?: string) => call<ShareCode>('share_code', { instanceId, server }),
   importShareCode: (code: string) => call<Imported>('import_share_code', { code }),
   importModrinthLink: (link: string) => call<Imported>('import_modrinth_link', { link }),
   importMrpackFile: (path: string) => call<Imported>('import_mrpack_file', { path }),
@@ -272,10 +345,20 @@ export const api = {
   restoreBackup: (instanceId: string, world: string, id: string, asCopy: boolean) => call<string>('restore_backup', { instanceId, world, id, asCopy }),
   deleteBackup: (instanceId: string, world: string, id: string) => call<void>('delete_backup', { instanceId, world, id }),
   openBackups: (instanceId: string) => call<void>('open_backups', { instanceId }),
-  openFolder: (instanceId: string, which: 'game' | 'mods' | 'saves') =>
+  openFolder: (instanceId: string, which: 'game' | 'mods' | 'saves' | 'screenshots') =>
     call<void>('open_folder', { instanceId, which }),
   openUrl: (url: string) => call<void>('open_url', { url }),
-  duplicateInstance: (instanceId: string) => call<Instance>('duplicate_instance', { instanceId }),
+  duplicateInstance: (instanceId: string, name?: string) => call<Instance>('duplicate_instance', { instanceId, name }),
+  gpuInfo: () => call<{ name: string } | null>('gpu_info'),
+  startupReport: (instanceId: string) => call<StartupReport>('startup_report', { instanceId }),
+  allWorlds: () => call<WorldEntry[]>('all_worlds'),
+  transferWorld: (fromInstance: string, folder: string, toInstance: string, removeSource: boolean) =>
+    call<string>('transfer_world', { fromInstance, folder, toInstance, removeSource }),
+  exportWorld: (instanceId: string, folder: string) => call<string>('export_world', { instanceId, folder }),
+  importWorldBytes: (instanceId: string, bytes: Uint8Array) =>
+    inTauri ? invoke<string>('import_world_bytes', bytes, { headers: { 'x-instance': instanceId } }) : call<string>('import_world_bytes', { instanceId }),
+  crashHistory: () => call<CrashEntry[]>('crash_history'),
+  sponsoredServers: () => call<SponsoredServer[]>('sponsored_servers'),
 }
 
 export interface ProjectHit {
@@ -418,6 +501,11 @@ export const modrinth = {
   projectPage: (projectId: string) => call<ProjectPage>('project_page', { projectId }),
   installModpack: (projectId: string, versionId?: string, mcVersion?: string) =>
     call<Instance>('install_modpack', { projectId, versionId, mcVersion }),
+  modpackUpdate: (instanceId: string) => call<PackUpdate | null>('modpack_update', { instanceId }),
+  modpackUpdates: () => call<Record<string, PackUpdate>>('modpack_updates'),
+  modpackDiff: (instanceId: string, versionId: string) => call<PackDiff>('modpack_diff', { instanceId, versionId }),
+  updateModpack: (instanceId: string, versionId?: string) => call<Instance>('update_modpack', { instanceId, versionId }),
+  cancelInstall: () => call<boolean>('cancel_install'),
   installContent: (instanceId: string, projectId: string, kind: ContentKind, versionId?: string) =>
     call<string[]>('install_content', { instanceId, projectId, kind, versionId }),
   listContent: (instanceId: string, kind: ContentKind) =>
@@ -510,6 +598,10 @@ export interface Settings {
   autoBackup: boolean
   syncOptions: boolean
   syncCategories: string[]
+  defaultLaunch: LaunchOptions
+  dedicatedGpu: boolean
+  breakReminderMinutes: number
+  dailyLimitMinutes: number
 }
 
 export const defaultSettings = (): Settings => ({
@@ -534,6 +626,10 @@ export const defaultSettings = (): Settings => ({
   autoBackup: true,
   syncOptions: false,
   syncCategories: ['controls', 'audio', 'interface'],
+  defaultLaunch: emptyLaunch(),
+  dedicatedGpu: false,
+  breakReminderMinutes: 0,
+  dailyLimitMinutes: 0,
 })
 
 export interface RuntimeEntry {

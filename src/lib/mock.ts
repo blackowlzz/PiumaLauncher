@@ -10,11 +10,13 @@ const base: Omit<Instance, 'id' | 'name' | 'mcVersion' | 'loader' | 'loaderVersi
   extraJvmArgs: '',
   iconUrl: null,
   bannerUrl: null,
+  pack: null,
+  launch: { wrapper: '', env: '', width: null, height: null, fullscreen: false, skipDefaults: false },
 }
 
 const instances: Instance[] = [
   { ...base, id: 'survival-a1b2', name: 'Cobblemon', mcVersion: '1.21.1', loader: 'fabric', loaderVersion: '0.16.9', memoryMaxMb: 4096, iconUrl: 'https://cdn.modrinth.com/data/5FFgwNNP/e7f9ee2e9d361623847853fe2ddce42f519ee64f.png', bannerUrl: 'https://cdn.modrinth.com/data/5FFgwNNP/images/43765359395bb8216a238d18c02a045106d7bad4_350.webp' },
-  { ...base, id: 'fabulously-c3d4', name: 'Fabulously Optimized', mcVersion: '26.2', loader: 'fabric', loaderVersion: '0.19.5', flagProfile: 'balanced', memoryMaxMb: 3072, iconUrl: 'https://cdn.modrinth.com/data/1KVo5zza/d8152911f8fd5d7e9a8c499fe89045af81fe816e_96.webp', bannerUrl: 'https://cdn.modrinth.com/data/1KVo5zza/images/38f70f307f1a0b17d8ed4526d1636317e8c12d1d_350.webp' },
+  { ...base, id: 'fabulously-c3d4', name: 'Fabulously Optimized', mcVersion: '26.2', loader: 'fabric', loaderVersion: '0.19.5', flagProfile: 'balanced', memoryMaxMb: 3072, iconUrl: 'https://cdn.modrinth.com/data/1KVo5zza/d8152911f8fd5d7e9a8c499fe89045af81fe816e_96.webp', bannerUrl: 'https://cdn.modrinth.com/data/1KVo5zza/images/38f70f307f1a0b17d8ed4526d1636317e8c12d1d_350.webp', pack: { projectId: '1KVo5zza', versionId: 'old', versionNumber: '14.0.0' } },
   { ...base, id: 'vanilla-e5f6', name: 'Vanilla', mcVersion: '1.20.6', loader: 'vanilla', loaderVersion: null },
   { ...base, id: 'redstone-0789', name: 'Redstone Lab', mcVersion: '1.21.4', loader: 'quilt', loaderVersion: '0.27.1' },
 ]
@@ -316,7 +318,7 @@ export async function mock(cmd: string, args: Record<string, unknown>): Promise<
     case 'import_mrpack_file':
     case 'import_mrpack_bytes':
       await new Promise((r) => setTimeout(r, 1500))
-      return { instance: instances[0], skipped: 0 }
+      return { instance: instances[0], skipped: 0, server: String(args.code ?? '').includes('INVITE') ? 'mc.hypixel.net' : null }
     case 'reveal_file':
       return null
     case 'create_shortcut':
@@ -346,6 +348,66 @@ export async function mock(cmd: string, args: Record<string, unknown>): Promise<
       return { memoryMaxMb: 6144, memoryMinMb: 6144, flagProfile: 'performance' }
     case 'running_instances':
       return []
+    case 'modpack_update': {
+      const inst = instances.find((i) => i.id === args.instanceId)
+      return inst?.pack && inst.pack.versionId !== 'new' ? { versionId: 'new', versionNumber: '14.1.1', mcVersion: inst.mcVersion } : null
+    }
+    case 'modpack_diff':
+      await new Promise((r) => setTimeout(r, 600))
+      return {
+        added: [{ name: 'Zoomify', from: null, to: '2.14.1' }],
+        removed: [{ name: 'Old Mod', from: '1.0.0', to: null }],
+        updated: [
+          { name: 'Fabric API', from: '0.160.0+26.2', to: '0.161.0+26.2' },
+          { name: 'Sodium', from: '0.6.13', to: '0.6.14' },
+        ],
+        mcFrom: null,
+        mcTo: null,
+      }
+    case 'startup_report':
+      return args.instanceId === 'fabulously-c3d4'
+        ? { history: [18_000, 17_500, 19_000, 18_200, 60_000, 39_000, 41_000], lastMs: 41_000, usualMs: 39_000, slower: { beforeMs: 18_000, nowMs: 39_000, added: ['distanthorizons-2.3.0', 'bobby-5.2.4'] } }
+        : { history: [16_000, 14_800, 15_200, 14_200], lastMs: 14_200, usualMs: 15_000, slower: null }
+    case 'all_worlds': {
+      const hour = 3_600_000
+      return [
+        { instanceId: 'survival-a1b2', folder: 'Nuovo mondo', name: 'Nuovo mondo', size: 48_000_000, modifiedMs: Date.now() - hour, mode: 0, hardcore: false, version: '1.21.1', icon: null },
+        { instanceId: 'survival-a1b2', folder: 'Isola', name: 'Isola dei Pokémon', size: 212_000_000, modifiedMs: Date.now() - 30 * hour, mode: 0, hardcore: false, version: '1.21.1', icon: null },
+        { instanceId: 'redstone-0789', folder: 'Lab', name: 'Laboratorio', size: 9_500_000, modifiedMs: Date.now() - 90 * hour, mode: 1, hardcore: false, version: '1.21.4', icon: null },
+        { instanceId: 'vanilla-e5f6', folder: 'Hard', name: 'Una vita sola', size: 31_000_000, modifiedMs: Date.now() - 400 * hour, mode: 0, hardcore: true, version: '1.20.6', icon: null },
+      ]
+    }
+    case 'transfer_world':
+      await new Promise((r) => setTimeout(r, 900))
+      return String(args.folder)
+    case 'export_world':
+      await new Promise((r) => setTimeout(r, 900))
+      return `/home/steve/Scaricati/${String(args.folder)}.zip`
+    case 'import_world_bytes':
+      await new Promise((r) => setTimeout(r, 900))
+      return 'Mondo importato'
+    case 'crash_history': {
+      const day = 86_400_000
+      return [
+        { instanceId: 'survival-a1b2', atMs: Date.now() - 2 * day, cause: 'outOfMemory', subject: null },
+        { instanceId: 'fabulously-c3d4', atMs: Date.now() - 5 * day, cause: 'incompatibleMods', subject: 'sodium' },
+      ]
+    }
+    case 'sponsored_servers':
+      return [
+        { name: 'Hypixel', address: 'mc.hypixel.net', description: 'Il server di minigiochi più grande al mondo: Bed Wars, SkyBlock e molto altro.', version: '1.8–1.21' },
+        { name: 'Server di casa', address: '192.168.1.20', description: 'Sopravvivenza vanilla tranquilla per pochi amici.', version: '1.21.4' },
+      ]
+    case 'gpu_info':
+      return { name: 'NVIDIA' }
+    case 'modpack_updates':
+      return Object.fromEntries(instances.filter((i) => i.pack && i.pack.versionId !== 'new').map((i) => [i.id, { versionId: 'new', versionNumber: '14.1.1', mcVersion: i.mcVersion }]))
+    case 'update_modpack': {
+      await new Promise((r) => setTimeout(r, 2000))
+      const inst = instances.find((i) => i.id === args.instanceId)!
+      inst.pack = { projectId: inst.pack!.projectId, versionId: 'new', versionNumber: '14.1.1' }
+      return inst
+    }
     default:
       return null
   }

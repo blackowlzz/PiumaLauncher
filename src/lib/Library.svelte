@@ -95,6 +95,7 @@
             <div class="meta">
               <span class="tag">{loaderNames[inst.loader]}</span>
               <span class="tag">{inst.mcVersion}</span>
+              {#if app.packUpdates[inst.id]}<span class="tag upd"><Icon name="download" size={11} />{t('Update available')}</span>{/if}
               {#if secs}<span class="muted small">{formatDuration(secs)}</span>{/if}
             </div>
           </div>
@@ -111,6 +112,7 @@
         <button class="ghost rowopen grow" onclick={() => openInstance(inst.id)}>
           <span class="thumb"><Cover {inst} /></span>
           <span class="rt"><span class="n">{inst.name}</span><span class="muted small">{status(inst, last)}{secs ? ` · ${formatDuration(secs)}` : ''}</span></span>
+          {#if app.packUpdates[inst.id]}<span class="tag upd"><Icon name="download" size={11} />{t('Update available')}</span>{/if}
           <span class="tag">{loaderNames[inst.loader]}</span>
           <span class="tag">{inst.mcVersion}</span>
         </button>
@@ -150,6 +152,7 @@
   .body { padding: 12px 46px 14px 14px; display: grid; gap: 8px; }
   .title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .upd { display: inline-flex; align-items: center; gap: 4px; color: var(--inv-text); background: var(--inv-bg); border-color: var(--inv-bg); }
   .live { position: absolute; left: 10px; top: 10px; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; background: var(--bg); border-radius: 999px; padding: 3px 9px; }
   .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text); animation: pulse 1.4s infinite; }
   @keyframes pulse { 50% { opacity: 0.25; } }

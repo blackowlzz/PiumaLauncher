@@ -3,7 +3,7 @@
   import Icon from './Icon.svelte'
   import SkinViewer from './SkinViewer.svelte'
   import { api } from './api'
-  import { LANGUAGES, i18n, setLanguage, suggestedLanguage, t } from './i18n.svelte'
+  import { LANGUAGES, i18n, setLanguage, suggestedLanguage, t, translateError } from './i18n.svelte'
   import { makeSkin } from './skin'
   import { ensureSkin, skinOf } from './skins.svelte'
   import { app, reloadAccounts } from './store.svelte'
@@ -114,7 +114,7 @@
       await reloadAccounts()
       await finish()
     } catch (e) {
-      error = String(e)
+      error = translateError(e)
     } finally {
       busy = false
     }

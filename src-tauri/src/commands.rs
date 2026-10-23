@@ -55,7 +55,7 @@ pub async fn create_instance(app: AppHandle, name: String, mc_version: String, l
     let (loader_version, launch_version) = match loader {
         Loader::Vanilla => (None, None),
         _ => {
-            let installed = loaders::install(&net::client(), loader, &mc_version, None, &progress_emitter(&app)).await?;
+            let installed = net::cancellable(loaders::install(&net::client(), loader, &mc_version, None, &progress_emitter(&app))).await?;
             (Some(installed.loader_version), Some(installed.id))
         }
     };
@@ -63,8 +63,8 @@ pub async fn create_instance(app: AppHandle, name: String, mc_version: String, l
 }
 
 #[tauri::command]
-pub fn update_instance(instance: Instance) -> Result<()> {
-    instance::get(&instance.id)?;
+pub fn update_instance(mut instance: Instance) -> Result<()> {
+    instance.pack = instance::get(&instance.id)?.pack;
     instance::save(&instance)
 }
 
@@ -297,24 +297,24 @@ pub async fn export_mrpack(app: AppHandle, instance_id: String, options: share::
 }
 
 #[tauri::command]
-pub async fn share_code(app: AppHandle, instance_id: String) -> Result<share::ShareCode> {
+pub async fn share_code(app: AppHandle, instance_id: String, server: Option<String>) -> Result<share::ShareCode> {
     let inst = instance::get(&instance_id)?;
-    share::share_code(&net::client(), &inst, &progress_emitter(&app)).await
+    share::share_code(&net::client(), &inst, server.as_deref(), &progress_emitter(&app)).await
 }
 
 #[tauri::command]
 pub async fn import_share_code(app: AppHandle, code: String) -> Result<share::Imported> {
-    share::import_code(&net::client(), &code, &progress_emitter(&app)).await
+    net::cancellable(share::import_code(&net::client(), &code, &progress_emitter(&app))).await
 }
 
 #[tauri::command]
 pub async fn import_modrinth_link(app: AppHandle, link: String) -> Result<share::Imported> {
-    share::import_link(&net::client(), &link, &progress_emitter(&app)).await
+    net::cancellable(share::import_link(&net::client(), &link, &progress_emitter(&app))).await
 }
 
 #[tauri::command]
 pub async fn import_mrpack_file(app: AppHandle, path: String) -> Result<share::Imported> {
-    share::import_file(&net::client(), std::path::Path::new(&path), &progress_emitter(&app)).await
+    net::cancellable(share::import_file(&net::client(), std::path::Path::new(&path), &progress_emitter(&app))).await
 }
 
 #[tauri::command]
@@ -322,7 +322,7 @@ pub async fn import_mrpack_bytes(app: AppHandle, request: tauri::ipc::Request<'_
     let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
         return Err(Error::msg("Choose a .mrpack file"));
     };
-    share::import_bytes(&net::client(), bytes, &progress_emitter(&app)).await
+    net::cancellable(share::import_bytes(&net::client(), bytes, &progress_emitter(&app))).await
 }
 
 #[tauri::command(async)]
@@ -387,14 +387,113 @@ pub fn open_url(url: String) -> Result<()> {
 
 #[tauri::command]
 pub async fn install_modpack(app: AppHandle, project_id: String, version_id: Option<String>, mc_version: Option<String>) -> Result<Instance> {
-    modrinth::install_modpack(&net::client(), &project_id, version_id.as_deref(), mc_version.as_deref(), &progress_emitter(&app)).await
+    net::cancellable(modrinth::install_modpack(&net::client(), &project_id, version_id.as_deref(), mc_version.as_deref(), &progress_emitter(&app))).await
+}
+
+#[tauri::command(async)]
+pub fn all_worlds() -> Vec<crate::worlds::WorldEntry> {
+    crate::worlds::all()
+}
+
+fn closed_for_world(running: &Running, ids: &[&str]) -> Result<()> {
+    let map = running.0.lock().unwrap();
+    if ids.iter().any(|id| map.contains_key(*id)) {
+        return Err(Error::msg("Close the game first"));
+    }
+    Ok(())
+}
+
+#[tauri::command(async)]
+pub fn transfer_world(running: State<'_, Running>, from_instance: String, folder: String, to_instance: String, remove_source: bool) -> Result<String> {
+    closed_for_world(&running, &[&from_instance, &to_instance])?;
+    crate::worlds::transfer(&from_instance, &folder, &to_instance, remove_source)
+}
+
+#[tauri::command(async)]
+pub fn export_world(running: State<'_, Running>, instance_id: String, folder: String) -> Result<String> {
+    closed_for_world(&running, &[&instance_id])?;
+    crate::worlds::export(&instance_id, &folder).map(|p| p.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+pub async fn import_world_bytes(running: State<'_, Running>, request: tauri::ipc::Request<'_>) -> Result<String> {
+    let instance_id = request.headers().get("x-instance").and_then(|v| v.to_str().ok()).unwrap_or_default().to_string();
+    closed_for_world(&running, &[&instance_id])?;
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err(Error::msg("This file isn't a Minecraft world"));
+    };
+    let bytes = bytes.clone();
+    tokio::task::spawn_blocking(move || crate::worlds::import_bytes(&instance_id, &bytes))
+        .await
+        .map_err(|e| Error::msg(e.to_string()))?
+}
+
+#[tauri::command]
+pub async fn sponsored_servers() -> Vec<crate::sponsored::Sponsored> {
+    crate::sponsored::list(&net::client()).await
+}
+
+#[tauri::command(async)]
+pub fn crash_history() -> Vec<crate::crash::CrashEntry> {
+    crate::crash::history()
+}
+
+#[tauri::command(async)]
+pub fn startup_report(instance_id: String) -> crate::startup::StartupReport {
+    crate::startup::report(&instance_id)
+}
+
+#[tauri::command(async)]
+pub fn gpu_info() -> Option<crate::gpu::Dedicated> {
+    crate::gpu::dedicated()
+}
+
+#[tauri::command]
+pub fn cancel_install() -> bool {
+    net::cancel()
+}
+
+#[tauri::command]
+pub async fn modpack_update(instance_id: String) -> Result<Option<modrinth::PackUpdate>> {
+    let inst = instance::get(&instance_id)?;
+    modrinth::pack_update(&net::client(), &inst).await
+}
+
+#[tauri::command]
+pub async fn modpack_diff(instance_id: String, version_id: String) -> Result<modrinth::PackDiff> {
+    let inst = instance::get(&instance_id)?;
+    modrinth::pack_diff(&net::client(), &inst, &version_id).await
+}
+
+#[tauri::command]
+pub async fn modpack_updates() -> std::collections::HashMap<String, modrinth::PackUpdate> {
+    use futures_util::stream::{self, StreamExt};
+    let client = net::client();
+    let linked: Vec<Instance> = instance::list().into_iter().filter(|i| i.pack.is_some()).collect();
+    stream::iter(linked)
+        .map(|inst| {
+            let client = client.clone();
+            async move { modrinth::pack_update(&client, &inst).await.ok().flatten().map(|u| (inst.id, u)) }
+        })
+        .buffer_unordered(4)
+        .filter_map(|found| async move { found })
+        .collect()
+        .await
+}
+
+#[tauri::command]
+pub async fn update_modpack(app: AppHandle, running: State<'_, Running>, instance_id: String, version_id: Option<String>) -> Result<Instance> {
+    not_running(&running, &instance_id)?;
+    let inst = instance::get(&instance_id)?;
+    backup_before_change(&app, &running, &inst.id, Content::Mods).await;
+    net::cancellable(modrinth::update_modpack(&net::client(), &inst, version_id.as_deref(), &progress_emitter(&app))).await
 }
 
 #[tauri::command]
 pub async fn install_content(app: AppHandle, running: State<'_, Running>, instance_id: String, project_id: String, kind: Content, version_id: Option<String>) -> Result<Vec<String>> {
     let inst = instance::get(&instance_id)?;
     backup_before_change(&app, &running, &inst.id, kind).await;
-    modrinth::install_content(&net::client(), &inst, &project_id, kind, version_id.as_deref(), &progress_emitter(&app)).await
+    net::cancellable(modrinth::install_content(&net::client(), &inst, &project_id, kind, version_id.as_deref(), &progress_emitter(&app))).await
 }
 
 #[tauri::command(async)]
@@ -418,7 +517,7 @@ pub async fn installed_projects(instance_id: String, kind: Content, updates: boo
 pub async fn update_content(app: AppHandle, running: State<'_, Running>, instance_id: String, kind: Content, file_name: String) -> Result<String> {
     let inst = instance::get(&instance_id)?;
     backup_before_change(&app, &running, &inst.id, kind).await;
-    modrinth::update_content(&net::client(), &inst, kind, &file_name).await
+    net::cancellable(modrinth::update_content(&net::client(), &inst, kind, &file_name)).await
 }
 
 #[tauri::command(async)]
@@ -504,11 +603,11 @@ pub fn open_folder(instance_id: String, which: String) -> Result<()> {
 }
 
 #[tauri::command]
-pub async fn duplicate_instance(running: State<'_, Running>, instance_id: String) -> Result<Instance> {
+pub async fn duplicate_instance(running: State<'_, Running>, instance_id: String, name: Option<String>) -> Result<Instance> {
     if running.0.lock().unwrap().contains_key(&instance_id) {
         return Err(Error::msg("Close the game before duplicating the instance"));
     }
-    tokio::task::spawn_blocking(move || library::duplicate(&instance_id))
+    tokio::task::spawn_blocking(move || library::duplicate(&instance_id, name.as_deref()))
         .await
         .map_err(|e| Error::msg(e.to_string()))?
 }

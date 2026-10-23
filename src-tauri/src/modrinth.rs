@@ -1,11 +1,11 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
-use crate::instance::{self, Instance};
+use crate::instance::{self, Instance, PackSource};
 use crate::loaders::{self, Loader};
 use crate::net::{self, Check, Job};
 use crate::paths;
@@ -784,29 +784,173 @@ fn read_index(archive: &Path) -> Result<Index> {
     Ok(serde_json::from_str(&text)?)
 }
 
-fn extract_overrides(archive: &Path, game_dir: &Path) -> Result<()> {
+const OVERRIDE_PREFIXES: [&str; 2] = ["overrides/", "client-overrides/"];
+
+fn pack_key(rel: &Path) -> String {
+    rel.components().map(|c| c.as_os_str().to_string_lossy()).collect::<Vec<_>>().join("/")
+}
+
+struct Hashing<W> {
+    inner: W,
+    hasher: sha1::Sha1,
+}
+
+impl<W: std::io::Write> std::io::Write for Hashing<W> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let n = self.inner.write(buf)?;
+        sha1::Digest::update(&mut self.hasher, &buf[..n]);
+        Ok(n)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+fn same_hash(path: &Path, expected: &str) -> bool {
+    !expected.is_empty() && sha1_of(path).is_ok_and(|now| now.eq_ignore_ascii_case(expected))
+}
+
+fn user_owned(previous: &BTreeMap<String, String>, key: &str, game_dir: &Path) -> bool {
+    if let Some(rest) = key.strip_prefix("saves/") {
+        let world = rest.split('/').next().unwrap_or("");
+        if game_dir.join("saves").join(world).exists() {
+            return true;
+        }
+    }
+    let path = game_dir.join(key);
+    path.exists() && previous.get(key).is_none_or(|old| !same_hash(&path, old))
+}
+
+fn override_keys(archive: &Path) -> Result<HashSet<String>> {
+    let mut zip = zip::ZipArchive::new(std::fs::File::open(archive)?)?;
+    let mut keys = HashSet::new();
+    for i in 0..zip.len() {
+        let entry = zip.by_index(i)?;
+        if entry.is_dir() {
+            continue;
+        }
+        let Ok(name) = entry.name() else { continue };
+        let rest = OVERRIDE_PREFIXES.iter().find_map(|p| name.strip_prefix(p));
+        if let Some(rel) = rest.and_then(relative_safe) {
+            keys.insert(pack_key(&rel));
+        }
+    }
+    Ok(keys)
+}
+
+fn apply_overrides(archive: &Path, game_dir: &Path, previous: Option<&BTreeMap<String, String>>) -> Result<BTreeMap<String, String>> {
+    use sha1::{Digest, Sha1};
     let mut zip = zip::ZipArchive::new(std::fs::File::open(archive)?)?;
     let mut total = 0u64;
-    for prefix in ["overrides/", "client-overrides/"] {
+    let mut files = BTreeMap::new();
+    let mut keep: HashMap<String, bool> = HashMap::new();
+    for prefix in OVERRIDE_PREFIXES {
         for i in 0..zip.len() {
             let mut entry = zip.by_index(i)?;
             let Ok(name) = entry.name().map(|n| n.into_owned()) else { continue };
             let Some(rest) = name.strip_prefix(prefix) else { continue };
             let Some(rel) = relative_safe(rest) else { continue };
-            let out = game_dir.join(rel);
+            let out = game_dir.join(&rel);
             if entry.is_dir() {
                 std::fs::create_dir_all(&out)?;
                 continue;
             }
-            if let Some(parent) = out.parent() {
-                std::fs::create_dir_all(parent)?;
-            }
-            let written = std::io::copy(&mut (&mut entry).take(MAX_EXTRACT_BYTES - total), &mut std::fs::File::create(out)?)?;
+            let key = pack_key(&rel);
+            let skip = *keep.entry(key.clone()).or_insert_with(|| previous.is_some_and(|prev| user_owned(prev, &key, game_dir)));
+            let limit = MAX_EXTRACT_BYTES - total;
+            let (written, hasher) = if skip {
+                let mut sink = Hashing { inner: std::io::sink(), hasher: Sha1::new() };
+                (std::io::copy(&mut (&mut entry).take(limit), &mut sink)?, sink.hasher)
+            } else {
+                if let Some(parent) = out.parent() {
+                    std::fs::create_dir_all(parent)?;
+                }
+                let mut file = Hashing { inner: std::fs::File::create(&out)?, hasher: Sha1::new() };
+                (std::io::copy(&mut (&mut entry).take(limit), &mut file)?, file.hasher)
+            };
             total += written;
             if total >= MAX_EXTRACT_BYTES {
                 return Err(Error::msg("The modpack is too large to extract"));
             }
+            files.insert(key, hex::encode(hasher.finalize()));
         }
+    }
+    Ok(files)
+}
+
+struct PackItem {
+    key: String,
+    rel: PathBuf,
+    sha1: Option<String>,
+    url: String,
+    size: Option<u64>,
+}
+
+fn pack_items(index: &Index) -> Result<Vec<PackItem>> {
+    index
+        .files
+        .iter()
+        .filter(|f| f.env.as_ref().and_then(|e| e.client.as_deref()) != Some("unsupported"))
+        .map(|f| {
+            let rel = relative_safe(&f.path).ok_or_else(|| Error::msg(format!("invalid path in modpack: {}", f.path)))?;
+            let url = f
+                .downloads
+                .iter()
+                .find(|u| allowed_url(u).is_ok())
+                .ok_or_else(|| Error::msg(format!("no allowed download link for {}", f.path)))?;
+            Ok(PackItem {
+                key: pack_key(&rel),
+                rel,
+                sha1: f.hashes.sha1.as_ref().map(|h| h.to_ascii_lowercase()),
+                url: url.clone(),
+                size: f.file_size,
+            })
+        })
+        .collect()
+}
+
+fn pack_loader(index: &Index) -> Result<(String, Loader, String)> {
+    let mc = index
+        .dependencies
+        .get("minecraft")
+        .cloned()
+        .ok_or_else(|| Error::msg("The modpack doesn't specify a Minecraft version"))?;
+    let (loader, version) = if let Some(v) = index.dependencies.get("fabric-loader") {
+        (Loader::Fabric, v.clone())
+    } else if let Some(v) = index.dependencies.get("quilt-loader") {
+        (Loader::Quilt, v.clone())
+    } else if let Some(v) = index.dependencies.get("neoforge") {
+        (Loader::NeoForge, v.clone())
+    } else if let Some(v) = index.dependencies.get("forge") {
+        (Loader::Forge, v.clone())
+    } else {
+        (Loader::Vanilla, String::new())
+    };
+    Ok((mc, loader, version))
+}
+
+async fn install_pack_loader(
+    client: &reqwest::Client,
+    loader: Loader,
+    mc: &str,
+    version: String,
+    progress: Progress<'_>,
+) -> Result<(Option<String>, Option<String>)> {
+    if loader == Loader::Vanilla {
+        return Ok((None, None));
+    }
+    let installed = loaders::install(client, loader, mc, Some(version), progress).await?;
+    Ok((Some(installed.loader_version), Some(installed.id)))
+}
+
+fn move_file(from: &Path, to: &Path) -> Result<()> {
+    if let Some(parent) = to.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    if std::fs::rename(from, to).is_err() {
+        std::fs::copy(from, to)?;
+        let _ = std::fs::remove_file(from);
     }
     Ok(())
 }
@@ -867,7 +1011,21 @@ pub async fn install_modpack(
 
     let result = install_archive(client, &archive, project_images(client, project_id), progress).await;
     let _ = tokio::fs::remove_file(&archive).await;
-    result
+    let mut inst = result?;
+    inst.pack = Some(PackSource {
+        project_id: if version.project_id.is_empty() { project_id.to_string() } else { version.project_id.clone() },
+        version_id: version.id.clone(),
+        version_number: version.version_number.clone(),
+    });
+    let _ = instance::save(&inst);
+    Ok(inst)
+}
+
+pub(crate) async fn link_pack(client: &reqwest::Client, inst: &mut Instance, archive_sha1: &str) {
+    let Ok(found) = lookup_versions(client, &[archive_sha1.to_ascii_lowercase()]).await else { return };
+    let Some(v) = found.into_values().find(|v| v.files.iter().any(|f| f.filename.ends_with(".mrpack"))) else { return };
+    inst.pack = Some(PackSource { project_id: v.project_id, version_id: v.id, version_number: v.version_number });
+    let _ = instance::save(inst);
 }
 
 pub(crate) async fn install_archive(
@@ -881,34 +1039,9 @@ pub(crate) async fn install_archive(
         .await
         .map_err(|e| Error::msg(e.to_string()))??;
 
-    let mc = index
-        .dependencies
-        .get("minecraft")
-        .cloned()
-        .ok_or_else(|| Error::msg("The modpack doesn't specify a Minecraft version"))?;
-    let (loader, loader_version) = if let Some(v) = index.dependencies.get("fabric-loader") {
-        (Loader::Fabric, v.clone())
-    } else if let Some(v) = index.dependencies.get("quilt-loader") {
-        (Loader::Quilt, v.clone())
-    } else if let Some(v) = index.dependencies.get("neoforge") {
-        (Loader::NeoForge, v.clone())
-    } else if let Some(v) = index.dependencies.get("forge") {
-        (Loader::Forge, v.clone())
-    } else {
-        (Loader::Vanilla, String::new())
-    };
-
+    let (mc, loader, loader_version) = pack_loader(&index)?;
     progress("Installing the loader", 0, 0);
-    let install_loader = async {
-        match loader {
-            Loader::Vanilla => Ok((None, None)),
-            _ => {
-                let i = loaders::install(client, loader, &mc, Some(loader_version), progress).await?;
-                Ok::<_, Error>((Some(i.loader_version), Some(i.id)))
-            }
-        }
-    };
-    let (installed, images) = tokio::join!(install_loader, images);
+    let (installed, images) = tokio::join!(install_pack_loader(client, loader, &mc, loader_version, progress), images);
     let (loader_version, launch_version) = installed?;
 
     let mut inst = instance::create(&index.name, &mc, loader, loader_version, launch_version)?;
@@ -1076,6 +1209,62 @@ pub async fn modpack_details(client: &reqwest::Client, project_id: &str, version
 }
 
 
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PackChange {
+    pub name: String,
+    pub from: Option<String>,
+    pub to: Option<String>,
+}
+
+#[derive(Serialize, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct PackDiff {
+    pub added: Vec<PackChange>,
+    pub removed: Vec<PackChange>,
+    pub updated: Vec<PackChange>,
+    pub mc_from: Option<String>,
+    pub mc_to: Option<String>,
+}
+
+fn diff_packs(old: &PackDetails, new: &PackDetails) -> PackDiff {
+    let key = |f: &PackFile| f.project.as_ref().map_or_else(|| f.path.clone(), |p| p.id.clone());
+    let name = |f: &PackFile| f.project.as_ref().map_or_else(|| f.file_name.clone(), |p| p.title.clone());
+    let version = |f: &PackFile| f.version.as_ref().map_or_else(|| f.file_name.clone(), |v| v.number.clone());
+    let before: HashMap<String, &PackFile> = old.files.iter().map(|f| (key(f), f)).collect();
+    let after: HashMap<String, &PackFile> = new.files.iter().map(|f| (key(f), f)).collect();
+    let mut diff = PackDiff::default();
+    for (k, f) in &after {
+        match before.get(k) {
+            None => diff.added.push(PackChange { name: name(f), from: None, to: Some(version(f)) }),
+            Some(o) if version(o) != version(f) => diff.updated.push(PackChange { name: name(f), from: Some(version(o)), to: Some(version(f)) }),
+            Some(_) => {}
+        }
+    }
+    for (k, f) in &before {
+        if !after.contains_key(k) {
+            diff.removed.push(PackChange { name: name(f), from: Some(version(f)), to: None });
+        }
+    }
+    for list in [&mut diff.added, &mut diff.removed, &mut diff.updated] {
+        list.sort_by_key(|c| c.name.to_lowercase());
+    }
+    if old.mc_version != new.mc_version {
+        diff.mc_from = old.mc_version.clone();
+        diff.mc_to = new.mc_version.clone();
+    }
+    diff
+}
+
+pub async fn pack_diff(client: &reqwest::Client, inst: &Instance, version_id: &str) -> Result<PackDiff> {
+    let pack = inst.pack.as_ref().ok_or_else(|| Error::msg("This instance isn't linked to a Modrinth modpack"))?;
+    let (old, new) = tokio::try_join!(
+        modpack_details(client, &pack.project_id, Some(&pack.version_id)),
+        modpack_details(client, &pack.project_id, Some(version_id)),
+    )?;
+    Ok(diff_packs(&old, &new))
+}
+
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct PackVersion {
@@ -1174,30 +1363,158 @@ async fn fill_instance(
     progress: Progress<'_>,
 ) -> Result<()> {
     let game_dir = paths::game_dir(&inst.id);
-    let mut jobs = vec![];
-    for f in &index.files {
-        if f.env.as_ref().and_then(|e| e.client.as_deref()) == Some("unsupported") {
-            continue;
-        }
-        let rel = relative_safe(&f.path).ok_or_else(|| Error::msg(format!("invalid path in modpack: {}", f.path)))?;
-        let url = f.downloads.iter().find(|u| allowed_url(u).is_ok()).ok_or_else(|| {
-            Error::msg(format!("no allowed download link for {}", f.path))
-        })?;
-        jobs.push(Job {
-            url: url.clone(),
-            path: game_dir.join(rel),
-            check: Check::sha1(f.hashes.sha1.clone()),
-            size: f.file_size,
-        });
-    }
+    let items = pack_items(index)?;
+    let jobs = items
+        .iter()
+        .map(|i| Job { url: i.url.clone(), path: game_dir.join(&i.rel), check: Check::sha1(i.sha1.clone()), size: i.size })
+        .collect();
     net::download_all(client, jobs, &|d, t| progress("Downloading mods", d, t)).await?;
 
     progress("Applying configuration", 0, 0);
     let (archive, dir) = (archive.to_path_buf(), game_dir);
-    tokio::task::spawn_blocking(move || extract_overrides(&archive, &dir))
+    let overrides = tokio::task::spawn_blocking(move || apply_overrides(&archive, &dir, None))
         .await
         .map_err(|e| Error::msg(e.to_string()))??;
+    let mut files: BTreeMap<String, String> = items.into_iter().map(|i| (i.key, i.sha1.unwrap_or_default())).collect();
+    files.extend(overrides);
+    let _ = instance::save_pack_files(&inst.id, &files);
     Ok(())
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PackUpdate {
+    pub version_id: String,
+    pub version_number: String,
+    pub mc_version: Option<String>,
+}
+
+pub async fn pack_update(client: &reqwest::Client, inst: &Instance) -> Result<Option<PackUpdate>> {
+    let Some(pack) = &inst.pack else { return Ok(None) };
+    let versions = versions_of(client, &pack.project_id, None, &[]).await?;
+    let installed = versions.iter().find(|v| v.id == pack.version_id).map(|v| v.date_published.clone());
+    let latest = pick_version(versions, None, Some(&inst.mc_version))?;
+    if latest.id == pack.version_id || installed.is_some_and(|d| latest.date_published <= d) {
+        return Ok(None);
+    }
+    let mc_version = latest.game_versions.iter().find(|g| **g == inst.mc_version).or(latest.game_versions.first()).cloned();
+    Ok(Some(PackUpdate { version_id: latest.id, version_number: latest.version_number, mc_version }))
+}
+
+pub async fn update_modpack(client: &reqwest::Client, inst: &Instance, version_id: Option<&str>, progress: Progress<'_>) -> Result<Instance> {
+    let pack = inst.pack.clone().ok_or_else(|| Error::msg("This instance isn't linked to a Modrinth modpack"))?;
+    progress("Finding the latest version", 0, 0);
+    let version = pick_version(versions_of(client, &pack.project_id, None, &[]).await?, version_id, Some(&inst.mc_version))?;
+    let file = version
+        .files
+        .iter()
+        .find(|f| f.filename.ends_with(".mrpack"))
+        .ok_or_else(|| Error::msg("The version doesn't contain a .mrpack file"))?;
+    allowed_url(&file.url)?;
+
+    let tmp = paths::root().join("tmp");
+    let archive = tmp.join(format!("update-{}.mrpack", inst.id));
+    let staging = tmp.join(format!("update-{}", inst.id));
+    let _ = tokio::fs::remove_file(&archive).await;
+    let _ = tokio::fs::remove_dir_all(&staging).await;
+    progress("Downloading the modpack", 0, 0);
+    net::download(
+        client,
+        &Job { url: file.url.clone(), path: archive.clone(), check: Check::sha1(file.hashes.sha1.clone()), size: None },
+    )
+    .await?;
+
+    let result = apply_update(client, inst, &archive, &staging, progress).await;
+    let _ = tokio::fs::remove_file(&archive).await;
+    let _ = tokio::fs::remove_dir_all(&staging).await;
+    let mut updated = result?;
+    updated.pack = Some(PackSource { project_id: pack.project_id, version_id: version.id.clone(), version_number: version.version_number.clone() });
+    instance::save(&updated)?;
+    Ok(updated)
+}
+
+async fn apply_update(client: &reqwest::Client, inst: &Instance, archive: &Path, staging: &Path, progress: Progress<'_>) -> Result<Instance> {
+    let path = archive.to_path_buf();
+    let (index, overridden) = tokio::task::spawn_blocking(move || Ok::<_, Error>((read_index(&path)?, override_keys(&path)?)))
+        .await
+        .map_err(|e| Error::msg(e.to_string()))??;
+    let (mc, loader, loader_version) = pack_loader(&index)?;
+    let items = pack_items(&index)?;
+
+    progress("Installing the loader", 0, 0);
+    let (loader_version, launch_version) = install_pack_loader(client, loader, &mc, loader_version, progress).await?;
+
+    let game_dir = paths::game_dir(&inst.id);
+    let previous = instance::pack_files(&inst.id);
+    let wanted: BTreeMap<String, String> = items.iter().map(|i| (i.key.clone(), i.sha1.clone().unwrap_or_default())).collect();
+    let disabled = disabled_mods(client, &game_dir, &previous, &wanted).await;
+
+    let (dir, stage) = (game_dir.clone(), staging.to_path_buf());
+    let (jobs, moves) = tokio::task::spawn_blocking(move || {
+        let mut jobs = vec![];
+        let mut moves = vec![];
+        for item in items {
+            let target = if disabled.contains(&item.key) { dir.join(format!("{}.disabled", item.key)) } else { dir.join(&item.rel) };
+            if item.sha1.as_deref().is_some_and(|h| same_hash(&target, h)) {
+                continue;
+            }
+            let staged = stage.join(&item.rel);
+            jobs.push(Job { url: item.url, path: staged.clone(), check: Check::sha1(item.sha1), size: item.size });
+            moves.push((staged, target));
+        }
+        (jobs, moves)
+    })
+    .await
+    .map_err(|e| Error::msg(e.to_string()))?;
+    net::download_all(client, jobs, &|d, t| progress("Downloading mods", d, t)).await?;
+
+    net::check_cancelled()?;
+    progress("Applying configuration", 0, 0);
+    let (archive, id) = (archive.to_path_buf(), inst.id.clone());
+    tokio::task::spawn_blocking(move || {
+        for (key, old) in previous.iter().filter(|(k, _)| !wanted.contains_key(*k) && !overridden.contains(*k)) {
+            for path in [game_dir.join(key), game_dir.join(format!("{key}.disabled"))] {
+                if same_hash(&path, old) {
+                    let _ = std::fs::remove_file(&path);
+                }
+            }
+        }
+        for (staged, target) in &moves {
+            move_file(staged, target)?;
+        }
+        let mut files = wanted;
+        files.extend(apply_overrides(&archive, &game_dir, Some(&previous))?);
+        instance::save_pack_files(&id, &files)
+    })
+    .await
+    .map_err(|e| Error::msg(e.to_string()))??;
+
+    let mut updated = inst.clone();
+    updated.mc_version = mc;
+    updated.loader = loader;
+    updated.loader_version = loader_version;
+    updated.launch_version = launch_version;
+    Ok(updated)
+}
+
+async fn disabled_mods(client: &reqwest::Client, game_dir: &Path, previous: &BTreeMap<String, String>, wanted: &BTreeMap<String, String>) -> HashSet<String> {
+    let is_off = |key: &str| key.starts_with("mods/") && !game_dir.join(key).exists() && game_dir.join(format!("{key}.disabled")).exists();
+    let mut out: HashSet<String> = wanted.keys().filter(|k| is_off(k)).cloned().collect();
+    let old_off: Vec<&String> = previous.iter().filter(|(k, h)| is_off(k) && !h.is_empty()).map(|(_, h)| h).collect();
+    if old_off.is_empty() {
+        return out;
+    }
+    let new_mods: Vec<(&String, &String)> = wanted.iter().filter(|(k, h)| k.starts_with("mods/") && !h.is_empty()).collect();
+    let hashes: Vec<String> = old_off.iter().map(|h| h.to_string()).chain(new_mods.iter().map(|(_, h)| h.to_string())).collect::<HashSet<_>>().into_iter().collect();
+    let Ok(found) = lookup_versions(client, &hashes).await else { return out };
+    let off_projects: HashSet<&str> = old_off.iter().filter_map(|h| found.get(h.as_str())).map(|v| v.project_id.as_str()).collect();
+    out.extend(
+        new_mods
+            .iter()
+            .filter(|(_, h)| found.get(h.as_str()).is_some_and(|v| off_projects.contains(v.project_id.as_str())))
+            .map(|(k, _)| (*k).clone()),
+    );
+    out
 }
 
 #[cfg(test)]
@@ -1240,6 +1557,228 @@ mod tests {
         assert!(remove_content(&id, Content::Resourcepacks, "a.jar").is_err());
         remove_content(&id, Content::Mods, "a.jar").unwrap();
         let _ = std::fs::remove_dir_all(paths::instance_dir(&id));
+    }
+
+    fn sha1_hex(data: &[u8]) -> String {
+        use sha1::{Digest, Sha1};
+        hex::encode(Sha1::digest(data))
+    }
+
+    #[test]
+    fn pack_overrides_never_clobber_user_files() {
+        use std::io::Write;
+        let base = std::env::temp_dir().join(format!("piuma-overrides-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let game = base.join("game");
+        let archive = base.join("pack.mrpack");
+        std::fs::create_dir_all(game.join("config")).unwrap();
+        std::fs::create_dir_all(game.join("saves/World")).unwrap();
+
+        let mut zip = zip::ZipWriter::new(std::fs::File::create(&archive).unwrap());
+        let opts = zip::write::SimpleFileOptions::default();
+        for (name, data) in [
+            ("overrides/config/edited.toml", "pack v2"),
+            ("overrides/config/untouched.toml", "pack v2"),
+            ("overrides/config/new.toml", "pack v2"),
+            ("overrides/saves/World/level.dat", "pack world"),
+            ("overrides/saves/Fresh/level.dat", "pack world"),
+            ("client-overrides/config/client.toml", "client v2"),
+            ("overrides/config/client.toml", "common v2"),
+        ] {
+            zip.start_file(name, opts).unwrap();
+            zip.write_all(data.as_bytes()).unwrap();
+        }
+        zip.finish().unwrap();
+
+        std::fs::write(game.join("config/edited.toml"), "mine").unwrap();
+        std::fs::write(game.join("config/untouched.toml"), "pack v1").unwrap();
+        std::fs::write(game.join("config/client.toml"), "client v1").unwrap();
+        std::fs::write(game.join("saves/World/level.dat"), "my progress").unwrap();
+        let previous: BTreeMap<String, String> = [
+            ("config/edited.toml", "pack v1"),
+            ("config/untouched.toml", "pack v1"),
+            ("config/client.toml", "client v1"),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), sha1_hex(v.as_bytes())))
+        .collect();
+
+        let files = apply_overrides(&archive, &game, Some(&previous)).unwrap();
+        let read = |p: &str| std::fs::read_to_string(game.join(p)).unwrap();
+        assert_eq!(read("config/edited.toml"), "mine");
+        assert_eq!(read("config/untouched.toml"), "pack v2");
+        assert_eq!(read("config/new.toml"), "pack v2");
+        assert_eq!(read("config/client.toml"), "client v2");
+        assert_eq!(read("saves/World/level.dat"), "my progress");
+        assert_eq!(read("saves/Fresh/level.dat"), "pack world");
+        assert_eq!(files["config/edited.toml"], sha1_hex(b"pack v2"));
+        assert_eq!(files["config/client.toml"], sha1_hex(b"client v2"));
+        assert!(override_keys(&archive).unwrap().contains("config/new.toml"));
+
+        let fresh = base.join("fresh");
+        apply_overrides(&archive, &fresh, None).unwrap();
+        assert_eq!(std::fs::read_to_string(fresh.join("config/client.toml")).unwrap(), "client v2");
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn pack_diff_e2e() {
+        let client = net::client();
+        let versions = versions_of(&client, "1KVo5zza", None, &[]).await.unwrap();
+        let latest = best(versions.clone()).unwrap();
+        let mc = latest.game_versions[0].clone();
+        let older: Vec<&Version> = versions.iter().filter(|v| v.id != latest.id && v.version_type == "release" && v.game_versions.contains(&mc)).collect();
+        let old = older[older.len().min(3) - 1];
+        let inst = Instance {
+            pack: Some(PackSource { project_id: "1KVo5zza".into(), version_id: old.id.clone(), version_number: old.version_number.clone() }),
+            ..instance::tests_instance("diff-e2e")
+        };
+        let d = pack_diff(&client, &inst, &latest.id).await.unwrap();
+        eprintln!("{} -> {}: +{} -{} ~{}", old.version_number, latest.version_number, d.added.len(), d.removed.len(), d.updated.len());
+        for c in d.added.iter().chain(&d.removed).chain(&d.updated).take(12) {
+            eprintln!("  {} {:?} -> {:?}", c.name, c.from, c.to);
+        }
+        assert!(!(d.added.is_empty() && d.removed.is_empty() && d.updated.is_empty()));
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn cancelled_install_leaves_nothing_behind() {
+        let client = net::client();
+        let before: HashSet<String> = instance::list().into_iter().map(|i| i.id).collect();
+        let progress = |stage: &str, done: u32, _total: u32| {
+            if stage == "Downloading mods" && done >= 5 {
+                net::cancel();
+            }
+        };
+        let result = net::cancellable(install_modpack(&client, "1KVo5zza", None, None, &progress)).await;
+        assert_eq!(result.unwrap_err().to_string(), net::CANCELLED);
+        let after: HashSet<String> = instance::list().into_iter().map(|i| i.id).collect();
+        assert_eq!(before, after);
+        let leftovers: Vec<_> = std::fs::read_dir(paths::instances())
+            .into_iter()
+            .flatten()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .filter(|n| !before.contains(n))
+            .collect();
+        assert!(leftovers.is_empty(), "{leftovers:?}");
+        let parts: Vec<_> = std::fs::read_dir(paths::root().join("tmp"))
+            .into_iter()
+            .flatten()
+            .flatten()
+            .filter(|e| e.file_name().to_string_lossy().ends_with(".part"))
+            .collect();
+        assert!(parts.is_empty());
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn modpack_update_e2e() {
+        let client = net::client();
+        let project = "1KVo5zza";
+        let versions = versions_of(&client, project, None, &[]).await.unwrap();
+        let latest = best(versions.clone()).unwrap();
+        let mc = latest.game_versions[0].clone();
+        let older: Vec<&Version> = versions.iter().filter(|v| v.id != latest.id && v.version_type == "release" && v.game_versions.contains(&mc)).collect();
+        let old = older[older.len().min(3) - 1];
+        eprintln!("installo {} (mc {mc}), poi aggiorno a {}", old.version_number, latest.version_number);
+
+        let progress = |s: &str, d: u32, t: u32| {
+            if t == 0 || d == t {
+                eprintln!("{s} {d}/{t}");
+            }
+        };
+        let inst = install_modpack(&client, project, Some(&old.id), None, &progress).await.unwrap();
+        assert_eq!(inst.pack.as_ref().unwrap().version_id, old.id);
+        let game = paths::game_dir(&inst.id);
+        let before = instance::pack_files(&inst.id);
+        assert!(!before.is_empty());
+
+        let config = before.keys().find(|k| k.starts_with("config/") && game.join(k).is_file()).cloned();
+        if let Some(c) = &config {
+            std::fs::write(game.join(c), "user edit").unwrap();
+        }
+        let disabled = before.keys().find(|k| k.starts_with("mods/") && k.contains("sodium")).cloned().or_else(|| before.keys().find(|k| k.starts_with("mods/")).cloned()).unwrap();
+        let disabled_name = disabled.trim_start_matches("mods/").to_string();
+        set_mod_enabled(&inst.id, &disabled_name, false).unwrap();
+        std::fs::write(game.join("mods/my-own-mod.jar"), b"mine").unwrap();
+        std::fs::create_dir_all(game.join("saves/My World")).unwrap();
+        std::fs::write(game.join("saves/My World/level.dat"), b"progress").unwrap();
+
+        let found = pack_update(&client, &inst).await.unwrap().expect("aggiornamento atteso");
+        assert_eq!(found.version_id, latest.id);
+
+        let updated = update_modpack(&client, &inst, None, &progress).await.unwrap();
+        assert_eq!(updated.pack.as_ref().unwrap().version_id, latest.id);
+        assert_eq!(instance::get(&inst.id).unwrap().pack, updated.pack);
+        assert!(pack_update(&client, &updated).await.unwrap().is_none());
+
+        let after = instance::pack_files(&inst.id);
+        assert_eq!(std::fs::read(game.join("mods/my-own-mod.jar")).unwrap(), b"mine");
+        assert_eq!(std::fs::read(game.join("saves/My World/level.dat")).unwrap(), b"progress");
+        if let Some(c) = &config {
+            assert_eq!(std::fs::read_to_string(game.join(c)).unwrap(), "user edit");
+        }
+        let mods = list_content(&inst.id, Content::Mods).unwrap();
+        let off: Vec<&str> = mods.iter().filter(|m| !m.enabled).map(|m| m.file_name.as_str()).collect();
+        eprintln!("mod disattivate dopo l'aggiornamento: {off:?}");
+        assert!(!off.is_empty(), "la mod disattivata è tornata attiva");
+        for key in after.keys().filter(|k| k.starts_with("mods/")) {
+            assert!(game.join(key).exists() || game.join(format!("{key}.disabled")).exists(), "manca {key}");
+        }
+        for key in before.keys().filter(|k| k.starts_with("mods/") && !after.contains_key(*k)) {
+            assert!(!game.join(key).exists() && !game.join(format!("{key}.disabled")).exists(), "vecchia mod rimasta: {key}");
+        }
+        let jars = mods.iter().filter(|m| m.file_name != "my-own-mod.jar").count();
+        assert_eq!(jars, after.keys().filter(|k| k.starts_with("mods/")).count());
+        eprintln!("{} mod prima, {} dopo", before.keys().filter(|k| k.starts_with("mods/")).count(), jars);
+        let _ = instance::delete(&inst.id);
+    }
+
+    #[test]
+    fn pack_diff_groups_changes_by_project() {
+        let file = |path: &str, project: Option<(&str, &str)>, version: Option<&str>| PackFile {
+            path: path.into(),
+            file_name: path.rsplit('/').next().unwrap().into(),
+            kind: "mod".into(),
+            size: 0,
+            optional: false,
+            project: project.map(|(id, title)| ProjectMeta { id: id.into(), slug: id.into(), title: title.into(), description: String::new(), icon_url: None }),
+            version: version.map(|n| VersionMeta { id: format!("v-{n}"), number: n.into() }),
+        };
+        let old = PackDetails {
+            version: "1".into(),
+            mc_version: Some("1.21.1".into()),
+            loader: Some("fabric".into()),
+            files: vec![
+                file("mods/sodium-0.5.jar", Some(("AANobbMI", "Sodium")), Some("0.5")),
+                file("mods/iris-1.7.jar", Some(("YL57xq9U", "Iris")), Some("1.7")),
+                file("mods/old.jar", Some(("oldold00", "Old Mod")), Some("1.0")),
+                file("mods/custom.jar", None, None),
+            ],
+            overrides: 0,
+        };
+        let new = PackDetails {
+            version: "2".into(),
+            mc_version: Some("1.21.4".into()),
+            loader: Some("fabric".into()),
+            files: vec![
+                file("mods/sodium-0.6.jar", Some(("AANobbMI", "Sodium")), Some("0.6")),
+                file("mods/iris-1.7.jar", Some(("YL57xq9U", "Iris")), Some("1.7")),
+                file("mods/zoomify.jar", Some(("w7ThoJFB", "Zoomify")), Some("2.0")),
+                file("mods/custom.jar", None, None),
+            ],
+            overrides: 0,
+        };
+        let d = diff_packs(&old, &new);
+        assert_eq!(d.updated, [PackChange { name: "Sodium".into(), from: Some("0.5".into()), to: Some("0.6".into()) }]);
+        assert_eq!(d.added, [PackChange { name: "Zoomify".into(), from: None, to: Some("2.0".into()) }]);
+        assert_eq!(d.removed, [PackChange { name: "Old Mod".into(), from: Some("1.0".into()), to: None }]);
+        assert_eq!((d.mc_from.as_deref(), d.mc_to.as_deref()), (Some("1.21.1"), Some("1.21.4")));
+        let same = diff_packs(&old, &old);
+        assert!(same.added.is_empty() && same.removed.is_empty() && same.updated.is_empty() && same.mc_to.is_none());
     }
 
     #[test]
@@ -1328,6 +1867,8 @@ mod tests {
             extra_jvm_args: String::new(),
             icon_url: None,
             banner_url: None,
+            pack: None,
+            launch: Default::default(),
         };
         let mut versions = versions_of(&client, "AANobbMI", Some("1.21.1"), &["fabric"]).await.unwrap();
         let old = versions.pop().expect("Sodium versions");

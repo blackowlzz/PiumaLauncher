@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
 use crate::flags::{FlagProfile, Tuning};
+use crate::instance::LaunchOptions;
 use crate::paths;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -29,6 +30,10 @@ pub struct Settings {
     pub auto_backup: bool,
     pub sync_options: bool,
     pub sync_categories: Vec<String>,
+    pub default_launch: LaunchOptions,
+    pub dedicated_gpu: bool,
+    pub break_reminder_minutes: u32,
+    pub daily_limit_minutes: u32,
 }
 
 impl Default for Settings {
@@ -55,6 +60,10 @@ impl Default for Settings {
             auto_backup: true,
             sync_options: false,
             sync_categories: vec!["controls".into(), "audio".into(), "interface".into()],
+            default_launch: LaunchOptions::default(),
+            dedicated_gpu: false,
+            break_reminder_minutes: 0,
+            daily_limit_minutes: 0,
         }
     }
 }

@@ -1,6 +1,8 @@
 
 use std::collections::HashSet;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use futures_util::stream::{self, StreamExt};
@@ -16,6 +18,43 @@ const WRITE_BUFFER: usize = 256 * 1024;
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(80);
 
 static CLIENT: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();
+
+pub const CANCELLED: &str = "Cancelled";
+
+tokio::task_local! {
+    static CANCEL: Arc<AtomicBool>;
+}
+
+static CURRENT: Mutex<Option<Arc<AtomicBool>>> = Mutex::new(None);
+
+pub async fn cancellable<F: std::future::Future>(fut: F) -> F::Output {
+    let flag = Arc::new(AtomicBool::new(false));
+    *CURRENT.lock().unwrap() = Some(flag.clone());
+    let out = CANCEL.scope(flag.clone(), fut).await;
+    let mut current = CURRENT.lock().unwrap();
+    if current.as_ref().is_some_and(|c| Arc::ptr_eq(c, &flag)) {
+        *current = None;
+    }
+    out
+}
+
+pub fn cancel() -> bool {
+    match CURRENT.lock().unwrap().as_ref() {
+        Some(flag) => {
+            flag.store(true, Ordering::Relaxed);
+            true
+        }
+        None => false,
+    }
+}
+
+pub fn cancelled() -> bool {
+    CANCEL.try_with(|c| c.load(Ordering::Relaxed)).unwrap_or(false)
+}
+
+pub fn check_cancelled() -> Result<()> {
+    if cancelled() { Err(Error::msg(CANCELLED)) } else { Ok(()) }
+}
 
 pub fn client() -> reqwest::Client {
     CLIENT
@@ -112,6 +151,11 @@ async fn download_once(client: &reqwest::Client, job: &Job, progress: Option<Byt
     let mut received = 0u64;
     let mut hasher = Hasher::new(&job.check);
     while let Some(chunk) = resp.chunk().await? {
+        if cancelled() {
+            drop(file);
+            let _ = tokio::fs::remove_file(&tmp).await;
+            return Err(Error::msg(CANCELLED));
+        }
         hasher.update(&chunk);
         file.write_all(&chunk).await?;
         received += chunk.len() as u64;
@@ -140,6 +184,7 @@ pub async fn download_with_progress(client: &reqwest::Client, job: &Job, progres
     }
     let mut last_err = None;
     for attempt in 0..ATTEMPTS {
+        check_cancelled()?;
         match download_once(client, job, progress).await {
             Ok(()) => return Ok(()),
             Err(e) => {
@@ -172,7 +217,12 @@ pub async fn download_all(
         .buffer_unordered(PARALLEL_DOWNLOADS);
 
     let mut last = Instant::now();
+    let mut stopped = false;
     while let Some(r) = results.next().await {
+        if cancelled() {
+            stopped = true;
+            continue;
+        }
         r?;
         done += 1;
         if done == total || last.elapsed() >= PROGRESS_INTERVAL {
@@ -180,5 +230,25 @@ pub async fn download_all(
             progress(done, total);
         }
     }
-    Ok(())
+    if stopped { Err(Error::msg(CANCELLED)) } else { Ok(()) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn cancelling_stops_only_the_running_job() {
+        assert!(!cancelled());
+        let first = cancellable(async {
+            assert!(check_cancelled().is_ok());
+            assert!(cancel());
+            check_cancelled()
+        })
+        .await;
+        assert_eq!(first.unwrap_err().to_string(), CANCELLED);
+        assert!(!cancelled());
+        assert!(!cancel());
+        assert!(cancellable(async { check_cancelled() }).await.is_ok());
+    }
 }

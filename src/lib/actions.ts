@@ -50,3 +50,19 @@ export function portal(node: HTMLElement) {
   document.body.appendChild(node)
   return { destroy: () => node.remove() }
 }
+
+export function inview(node: HTMLElement, onSeen?: () => void) {
+  let done = false
+  const io = new IntersectionObserver(
+    (entries) => {
+      if (done || !entries.some((e) => e.isIntersecting)) return
+      done = true
+      node.classList.add('seen')
+      onSeen?.()
+      io.disconnect()
+    },
+    { threshold: 0.15 },
+  )
+  io.observe(node)
+  return { destroy: () => io.disconnect() }
+}

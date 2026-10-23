@@ -12,7 +12,7 @@ use tokio::sync::oneshot;
 
 use crate::accounts::{self, Account, AccountKind};
 use crate::error::{Error, Result};
-use crate::{backup, console, crash, diag, flags, options_sync, procs};
+use crate::{backup, console, crash, diag, flags, options_sync, procs, startup};
 use crate::install::{self, Prepared};
 use crate::instance::Instance;
 use crate::java::{self, JavaInstall};
@@ -200,7 +200,22 @@ pub fn build_args(prep: &Prepared, inst: &Instance, acc: &Account, session: Opti
     if let Some(q) = quick {
         args.extend(quick_play_args(prep, q)?);
     }
+    args.extend(inst.effective_launch().game_args());
     Ok(args)
+}
+
+fn game_command(launch: &crate::instance::LaunchOptions, java: &str, args: Vec<String>, game_dir: &std::path::Path) -> Command {
+    let wrapper = launch.wrapper_command();
+    let mut cmd = match wrapper.split_first() {
+        Some((program, rest)) => {
+            let mut c = Command::new(program);
+            c.args(rest).arg(java);
+            c
+        }
+        None => Command::new(java),
+    };
+    cmd.args(args).envs(launch.env_vars()).current_dir(game_dir);
+    cmd
 }
 
 async fn start(app: &AppHandle, inst: &Instance, acc: &Account, quick: Option<&QuickPlay>, close_leftovers: bool) -> Result<(Child, Option<String>, bool)> {
@@ -286,15 +301,19 @@ async fn start(app: &AppHandle, inst: &Instance, acc: &Account, quick: Option<&Q
     }
     options_sync::apply(inst);
     let args = build_args(&prep, inst, acc, session.as_ref(), &java, quick)?;
-    let mut cmd = Command::new(&java.path);
-    cmd.args(args)
-        .current_dir(&game_dir)
-        .stdin(if session.is_some() { Stdio::piped() } else { Stdio::null() })
+    let launch = inst.effective_launch();
+    let wrapper = launch.wrapper_command();
+    if !wrapper.is_empty() {
+        diag::log(format!("{}: launching through {}", inst.id, wrapper.join(" ")));
+    }
+    let mut cmd = game_command(&launch, &java.path, args, &game_dir);
+    cmd.stdin(if session.is_some() { Stdio::piped() } else { Stdio::null() })
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     #[cfg(windows)]
     cmd.creation_flags(0x0800_0000);
     let mut child = cmd.spawn().map_err(|e| match e.kind() {
+        _ if !wrapper.is_empty() => Error::msg(format!("The launch wrapper \"{}\" couldn't be started: {e}", wrapper[0])),
         std::io::ErrorKind::PermissionDenied => Error::msg(format!(
             "Windows refused to start Java ({}). Your antivirus may be blocking it, or pick another Java in the instance settings",
             java.path
@@ -319,11 +338,14 @@ async fn start(app: &AppHandle, inst: &Instance, acc: &Account, quick: Option<&Q
     Ok((child, session.map(|s| s.token), offline))
 }
 
-fn forward_lines<R: AsyncRead + Unpin + Send + 'static>(app: AppHandle, id: String, reader: R, secret: Option<String>, console: bool, tail: crash::Tail) -> tauri::async_runtime::JoinHandle<()> {
+fn forward_lines<R: AsyncRead + Unpin + Send + 'static>(app: AppHandle, id: String, reader: R, secret: Option<String>, console: bool, tail: crash::Tail, probe: Arc<startup::Probe>) -> tauri::async_runtime::JoinHandle<()> {
     tauri::async_runtime::spawn(async move {
         let mut lines = BufReader::new(reader).lines();
         while let Ok(Some(line)) = lines.next_line().await {
             presence::observe(&id, &line);
+            if let Some(message) = presence::log_message(&line) {
+                probe.observe(message);
+            }
             let line = match &secret {
                 Some(s) if line.contains(s.as_str()) => line.replace(s.as_str(), "***"),
                 _ => line,
@@ -349,6 +371,7 @@ pub async fn run(app: AppHandle, inst: Instance, acc: Account, quick: Option<Qui
         inst.loader,
         inst.loader_version.as_deref().unwrap_or("")
     ));
+    let wrapped = !inst.effective_launch().wrapper_command().is_empty();
     match start(&app, &inst, &acc, quick.as_ref(), close_leftovers).await {
         Err(e) => {
             diag::log(format!("Launch of {id} failed: {e}"));
@@ -374,21 +397,26 @@ pub async fn run(app: AppHandle, inst: Instance, acc: Account, quick: Option<Qui
             let started_ms = stats::now_ms();
             let since = std::time::SystemTime::now() - std::time::Duration::from_secs(2);
             let tail = crash::Tail::default();
+            let probe = startup::Probe::new(app.clone(), &id);
             let mut readers = vec![];
             let done = Arc::new(AtomicBool::new(false));
             if let Some(pid) = child.id() {
                 sample_memory(app.clone(), id.clone(), pid, done.clone());
             }
             if let Some(out) = child.stdout.take() {
-                readers.push(forward_lines(app.clone(), id.clone(), out, secret.clone(), console, tail.clone()));
+                readers.push(forward_lines(app.clone(), id.clone(), out, secret.clone(), console, tail.clone(), probe.clone()));
             }
             if let Some(err) = child.stderr.take() {
-                readers.push(forward_lines(app.clone(), id.clone(), err, secret.clone(), console, tail.clone()));
+                readers.push(forward_lines(app.clone(), id.clone(), err, secret.clone(), console, tail.clone(), probe.clone()));
             }
             let (code, stopped) = tokio::select! {
                 status = child.wait() => (status.ok().and_then(|s| s.code()), false),
                 Ok(()) = &mut kill_rx => {
                     let _ = child.kill().await;
+                    if wrapped {
+                        let id = id.clone();
+                        let _ = tokio::task::spawn_blocking(move || procs::close_leftovers(&id)).await;
+                    }
                     (None, true)
                 }
             };
@@ -458,8 +486,8 @@ pub(crate) mod tests {
         eprintln!("java: {java:?}");
         let args = build_args(&prep, inst, &acc, None, &java, None).unwrap();
 
-        let mut cmd = Command::new(&java.path);
-        cmd.args(args).current_dir(&game_dir).stdout(Stdio::piped()).stderr(Stdio::piped()).kill_on_drop(true);
+        let mut cmd = game_command(&inst.effective_launch(), &java.path, args, &game_dir);
+        cmd.stdout(Stdio::piped()).stderr(Stdio::piped()).kill_on_drop(true);
         let mut child = cmd.spawn().unwrap();
         let mut lines = BufReader::new(child.stdout.take().unwrap()).lines();
         let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(secs);
@@ -518,6 +546,15 @@ pub(crate) mod tests {
             extra_jvm_args: String::new(),
             icon_url: None,
             banner_url: None,
+            pack: None,
+            launch: crate::instance::LaunchOptions {
+                wrapper: std::env::var("SMOKE_WRAPPER").unwrap_or_default(),
+                env: std::env::var("SMOKE_ENV").unwrap_or_default(),
+                width: std::env::var("SMOKE_WIDTH").ok().and_then(|w| w.parse().ok()),
+                height: std::env::var("SMOKE_HEIGHT").ok().and_then(|h| h.parse().ok()),
+                fullscreen: false,
+                skip_defaults: false,
+            },
         };
         let log = run_and_capture(&client, &inst, 25).await;
         for l in log.iter().take(400) {

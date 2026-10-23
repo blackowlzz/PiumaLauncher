@@ -15,7 +15,7 @@
   import PlayBar from './lib/PlayBar.svelte'
   import Accounts from './lib/Accounts.svelte'
   import Explore from './lib/Explore.svelte'
-  import QuickPlay from './lib/QuickPlay.svelte'
+  import Servers from './lib/Servers.svelte'
   import Settings from './lib/Settings.svelte'
   import Performance from './lib/Performance.svelte'
   import Intro from './lib/Intro.svelte'
@@ -27,17 +27,21 @@
   import ShareModal from './lib/ShareModal.svelte'
   import Themes from './lib/Themes.svelte'
   import Wardrobe from './lib/Wardrobe.svelte'
+  import Worlds from './lib/Worlds.svelte'
+  import Stats from './lib/Stats.svelte'
   import { applyTheme, isCustomized, resetTheme } from './lib/palette.svelte'
   import UpdateBanner from './lib/UpdateBanner.svelte'
   import TitleBar from './lib/TitleBar.svelte'
   import { maybeBench } from './lib/bench'
   import { smoothScroll } from './lib/smoothscroll'
 
-  const tabs: { id: Page; label: string; icon: 'home' | 'grid' | 'feather' | 'server' | 'compass' | 'user' | 'settings' | 'palette' | 'cpu' }[] = [
+  const tabs: { id: Page; label: string; icon: 'home' | 'grid' | 'feather' | 'server' | 'compass' | 'user' | 'settings' | 'palette' | 'cpu' | 'map' | 'chart' }[] = [
     { id: 'home', label: 'Home', icon: 'home' },
-    { id: 'quickplay', label: 'Quick Play', icon: 'server' },
+    { id: 'servers', label: 'Servers', icon: 'server' },
     { id: 'library', label: 'Library', icon: 'grid' },
+    { id: 'worlds', label: 'Worlds', icon: 'map' },
     { id: 'explore', label: 'Explore', icon: 'compass' },
+    { id: 'stats', label: 'Statistics', icon: 'chart' },
     { id: 'accounts', label: 'Account', icon: 'user' },
     { id: 'wardrobe', label: 'Wardrobe', icon: 'feather' },
     { id: 'themes', label: 'Themes', icon: 'palette' },
@@ -131,7 +135,7 @@
     if (!editable && !window.getSelection()?.toString()) e.preventDefault()
   }
 
-  const order: Page[] = ['home', 'quickplay', 'library', 'explore', 'accounts', 'wardrobe', 'themes', 'performance', 'settings']
+  const order: Page[] = ['home', 'servers', 'library', 'worlds', 'explore', 'stats', 'accounts', 'wardrobe', 'themes']
   async function shortcuts(e: KeyboardEvent) {
     const el = e.target as HTMLElement | null
     const typing = !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
@@ -193,6 +197,10 @@
   {@const shared = app.instances.find((i) => i.id === app.sharingId)}
   {#if shared}<ShareModal inst={shared} onClose={() => (app.sharingId = null)} />{/if}
 {/if}
+{#if app.inviting}
+  {@const invited = app.instances.find((i) => i.id === app.inviting?.instanceId)}
+  {#if invited}<ShareModal inst={invited} server={{ name: app.inviting.name, address: app.inviting.address }} onClose={() => (app.inviting = null)} />{/if}
+{/if}
 
 <div class="shell">
   <TitleBar />
@@ -232,8 +240,8 @@
             <Library />
           {:else if app.page === 'instance'}
             <InstanceDetail />
-          {:else if app.page === 'quickplay'}
-            <QuickPlay />
+          {:else if app.page === 'servers'}
+            <Servers />
           {:else if app.page === 'accounts'}
             <Accounts />
           {:else if app.page === 'wardrobe'}
@@ -244,6 +252,10 @@
             <Performance />
           {:else if app.page === 'settings'}
             <Settings />
+          {:else if app.page === 'worlds'}
+            <Worlds />
+          {:else if app.page === 'stats'}
+            <Stats />
           {:else}
             <Explore />
           {/if}
@@ -287,7 +299,7 @@
   nav { grid-row: 1; }
   .content { grid-row: 1; }
   .body > :global(.bar) { grid-column: 1 / -1; grid-row: 2; }
-  nav { display: flex; flex-direction: column; gap: 4px; padding: 22px 12px 14px; border-right: 1px solid var(--line); }
+  nav { display: flex; flex-direction: column; gap: 4px; padding: 22px 12px 14px; border-right: 1px solid var(--line); min-height: 0; overflow-y: auto; scrollbar-width: none; }
   .tabs { position: relative; display: grid; grid-auto-rows: 42px; gap: 2px; flex: 1; align-content: start; }
   .ind { position: absolute; left: 0; right: 0; top: 0; height: 42px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line); transform: translateY(calc(var(--i) * 44px)); transition: transform 420ms cubic-bezier(0.3, 0.8, 0.2, 1); }
   .tab { position: relative; display: flex; gap: 12px; align-items: center; text-align: left; border-color: transparent; color: var(--muted); padding: 0 16px; height: 42px; width: 100%; }

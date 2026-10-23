@@ -2,7 +2,7 @@
   import Cover from './Cover.svelte'
   import AccountMenu from './AccountMenu.svelte'
   import InstancePicker from './InstancePicker.svelte'
-  import { activeAccount, app, isBusy, openInstance, play, selectedInstance, stop } from './store.svelte'
+  import { activeAccount, app, cancelInstall, isBusy, openInstance, play, selectedInstance, stop } from './store.svelte'
   import { stageText, t } from './i18n.svelte'
   import { loaderNames } from './meta'
 
@@ -49,6 +49,9 @@
     {:else}
       <span class="muted">{status || t('No instance')}</span>
     {/if}
+    {#if installing && app.cancellable}
+      <button class="ghost cancel" onclick={cancelInstall} disabled={app.cancelling}>{app.cancelling ? t('Cancelling…') : t('Cancel')}</button>
+    {/if}
   </div>
 
   {#if inst && game?.state === 'running'}
@@ -68,6 +71,7 @@
   .top { position: absolute; top: -1px; left: 0; right: 0; border-radius: 0; }
   .side { display: flex; align-items: center; gap: 12px; min-width: 0; }
   .right { justify-content: flex-end; }
+  .cancel { flex: none; padding: 6px 14px; font-size: 13px; animation: swapin 260ms var(--spring) backwards; }
   .thumb { position: relative; width: 48px; height: 48px; padding: 0; border-radius: 14px; overflow: hidden; flex: none; display: grid; place-items: center; animation: gopop 320ms var(--spring) backwards; }
   .pick { display: grid; justify-items: start; min-width: 0; }
   .pick :global(.picker) { margin-left: -10px; }

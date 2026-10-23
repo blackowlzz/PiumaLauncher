@@ -251,6 +251,8 @@ mod tests {
             extra_jvm_args: String::new(),
             icon_url: None,
             banner_url: None,
+            pack: None,
+            launch: Default::default(),
         };
         assert!(!modern(&inst));
         inst.mc_version = "1.12.2".into();

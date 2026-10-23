@@ -8,6 +8,7 @@ mod diag;
 mod error;
 mod flags;
 mod fsx;
+mod gpu;
 mod install;
 mod instance;
 mod java;
@@ -32,7 +33,10 @@ mod settings;
 mod share;
 mod shortcut;
 mod skin;
+mod sponsored;
+mod startup;
 mod wardrobe;
+mod worlds;
 mod stats;
 mod storage;
 mod thumb;
@@ -55,7 +59,7 @@ pub fn run() {
     }
 
     #[cfg(target_os = "linux")]
-    if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+    if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() && gpu::primary_is_nvidia() {
         std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
     }
 
@@ -65,6 +69,7 @@ pub fn run() {
     }
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Running::default())
         .setup(|app| {
@@ -107,6 +112,19 @@ pub fn run() {
             commands::running_instances,
             commands::modrinth_search,
             commands::install_modpack,
+            commands::modpack_update,
+            commands::modpack_updates,
+            commands::modpack_diff,
+            commands::gpu_info,
+            commands::startup_report,
+            commands::all_worlds,
+            commands::transfer_world,
+            commands::export_world,
+            commands::import_world_bytes,
+            commands::crash_history,
+            commands::sponsored_servers,
+            commands::cancel_install,
+            commands::update_modpack,
             commands::modpack_details,
             commands::project_page,
             commands::open_url,

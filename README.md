@@ -21,16 +21,30 @@ PiumaLauncher is a fast, lightweight and open source Minecraft launcher for Wind
 **Instances**
 - Vanilla, Fabric and Quilt, on any Minecraft version
 - Per-instance memory, JVM profile (low usage, balanced or performance) and extra JVM arguments
-- Mods on/off, world list, duplicate and delete from the instance page
+- Launch options: window size or fullscreen, a launch wrapper such as `gamemoderun`, `mangohud` or `prime-run`, and environment variables, set once as defaults in Performance or per instance
+- On laptops with Intel or AMD graphics plus an NVIDIA card (Linux), one switch in Performance makes the game run on the NVIDIA card
+- Mods on/off, world list, screenshots folder, duplicate and delete from the instance page
 - Live memory usage while the game runs
+- Startup time: the launcher measures how long the game takes to reach the main menu and tells you when it gets slower, with the mods added since then
+- Invite friends from the server list: one code gives them the same mods and joins the server right away
+- Break reminders and an optional daily limit, with notifications; the game is never closed for you
 - Share an instance with friends: export a `.mrpack` (works in other launchers too) or copy a short share code; import by pasting the code, choosing the file or dragging it onto the window
 - Desktop shortcuts and command line options to start an instance, a world or a server directly
-- Quick Play: jump straight into a recent world, or into a saved server after choosing which instance to use, with live status, players and ping
+- Servers: your saved servers and the sponsored ones as cards with live status, players and ping; join after choosing which instance to use
 - Crash analysis: when the game crashes, the launcher explains why (missing or incompatible mods, memory, Java, graphics drivers) and offers a one-click fix
+
+**Worlds**
+- Every singleplayer world from all your instances on one page, with icon, mode, version, size and last played
+- Play straight into a world, back it up and restore it, copy or move it to another instance (a backup is made first), export it as `.zip` or import one
+
+**Statistics**
+- Total playtime, the last 7 and 30 days, sessions and day streaks, with an animated 30-day line chart, days of the week and time of day
+- Per-instance playtime, startup time lines and crash count, plus the latest crashes with their cause
 
 **Modrinth**
 - Search modpacks, mods, resource packs and shaders with filters for version, loader and category
-- One-click modpack install (`.mrpack`), with a details page showing contents, gallery and versions
+- One-click modpack install (`.mrpack`), with a details page showing contents, gallery and versions; installs and downloads can be cancelled
+- Modpack updates: when a new version is out, the instance page offers it with the list of mods that change, and your worlds, the settings you changed and the mods you added are kept
 - Mods install with their dependencies, and you get update, enable and disable actions per file
 
 **Java**
@@ -69,7 +83,8 @@ You don't need to install Java. PiumaLauncher downloads Minecraft, its libraries
 | Keys | Action |
 |---|---|
 | `Ctrl+K` or `/` | Search in Explore |
-| `Ctrl+1` to `Ctrl+8` | Home, Quick Play, Library, Explore, Account, Themes, Performance, Settings |
+| `Ctrl+1` to `Ctrl+9` | Home, Servers, Library, Worlds, Explore, Statistics, Account, Wardrobe, Themes |
+| `Ctrl` `+` / `Ctrl` `-` / `Ctrl+0` | Zoom the interface in, out, or back to automatic |
 | `Esc` | Close the open panel |
 
 ## Command line and shortcuts
@@ -92,6 +107,16 @@ PiumaLauncher --server mc.hypixel.net
 Passing a `.mrpack` file (`PiumaLauncher pack.mrpack`, or "Open with" on the file) imports it as a new instance.
 
 If PiumaLauncher is already open, the request goes to the open window instead of starting a second copy. To get a ready-made shortcut, open an instance's menu and choose **Create shortcut**: on Linux it appears in the applications menu and on the desktop, on Windows on the desktop.
+
+## Sponsored servers
+
+The Servers page shows a "Sponsored servers" section read from [`sponsored-servers.json`](sponsored-servers.json) on the `main` branch. Edit that file to add or remove servers; launchers pick up the change the next time the page is opened, and keep the last list they saw when offline. Each entry is validated (name up to 48 characters, a valid address, description up to 200 characters, at most 24 servers):
+
+```json
+{ "servers": [
+  { "name": "Example", "address": "play.example.net", "description": "Short description", "version": "1.21.x" }
+] }
+```
 
 ## Privacy and security
 

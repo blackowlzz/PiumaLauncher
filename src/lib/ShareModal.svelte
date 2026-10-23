@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import { fade, slide } from 'svelte/transition'
   import { api, type Exported, type ExportOptions, type Instance, type ShareCode } from './api'
   import { app, notify } from './store.svelte'
@@ -6,10 +7,10 @@
   import Cover from './Cover.svelte'
   import Icon from './Icon.svelte'
 
-  let { inst, onClose }: { inst: Instance; onClose: () => void } = $props()
+  let { inst, server = null, onClose }: { inst: Instance; server?: { name: string; address: string } | null; onClose: () => void } = $props()
 
   type Tab = 'file' | 'code'
-  let tab = $state<Tab>('file')
+  let tab = $state<Tab>(untrack(() => (server ? 'code' : 'file')))
   let opts = $state<ExportOptions>({ resourcepacks: true, shaderpacks: true, config: true, options: false, servers: false })
   let working = $state(false)
   let exported = $state<Exported | null>(null)
@@ -46,7 +47,7 @@
   }
 
   async function makeCode() {
-    shared = await run(() => api.shareCode(inst.id))
+    shared = await run(() => api.shareCode(inst.id, server?.address))
   }
 
   async function copy() {
@@ -74,17 +75,19 @@
   <div class="head">
     <span class="thumb"><Cover {inst} /></span>
     <div class="grow">
-      <h1 id="sh-title">{t('Share {name}', { name: inst.name })}</h1>
-      <p class="muted small">Minecraft {inst.mcVersion}</p>
+      <h1 id="sh-title">{server ? t('Invite friends to {server}', { server: server.name }) : t('Share {name}', { name: inst.name })}</h1>
+      <p class="muted small">{server ? `${inst.name} · ` : ''}Minecraft {inst.mcVersion}</p>
     </div>
     <button class="ghost iconbtn" onclick={close} disabled={working} aria-label={t('Close')}><Icon name="x" size={16} /></button>
   </div>
 
+  {#if !server}
   <div class="seg tabs" role="tablist" style:--i={tab === 'file' ? 0 : 1}>
     <span class="pill" aria-hidden="true"></span>
     <button role="tab" aria-selected={tab === 'file'} onclick={() => (tab = 'file')} disabled={working}><Icon name="package" size={15} />{t('.mrpack file')}</button>
     <button role="tab" aria-selected={tab === 'code'} onclick={() => (tab = 'code')} disabled={working}><Icon name="share" size={15} />{t('Share code')}</button>
   </div>
+  {/if}
 
   {#key tab}
     <div class="pane">
@@ -110,7 +113,11 @@
           </div>
         {/if}
       {:else}
-        <p class="muted lead">{t('A short text to paste in a chat. Your friend pastes it in PiumaLauncher and gets the same mods. Only content from Modrinth is included.')}</p>
+        {#if server}
+          <p class="muted lead">{t('Send this code to a friend. In PiumaLauncher they choose Import and paste it: they get "{name}" with the same mods and join {server} right away.', { name: inst.name, server: server.address })}</p>
+        {:else}
+          <p class="muted lead">{t('A short text to paste in a chat. Your friend pastes it in PiumaLauncher and gets the same mods. Only content from Modrinth is included.')}</p>
+        {/if}
         {#if shared}
           <div class="codewrap" in:slide={{ duration: 260 }}>
             <textarea class="codebox" readonly rows="4" value={shared.code} onfocus={(e) => e.currentTarget.select()}></textarea>
@@ -138,7 +145,7 @@
     {#if tab === 'file' && !exported}
       <button class="primary" onclick={exportFile} disabled={working}><Icon name="download" size={15} />{working ? t('Exporting…') : t('Export .mrpack')}</button>
     {:else if tab === 'code' && !shared}
-      <button class="primary" onclick={makeCode} disabled={working}><Icon name="share" size={15} />{working ? t('Creating…') : t('Create code')}</button>
+      <button class="primary" onclick={makeCode} disabled={working}><Icon name="share" size={15} />{working ? t('Creating…') : server ? t('Create invite') : t('Create code')}</button>
     {:else}
       <button class="ghost" onclick={close}>{t('Close')}</button>
     {/if}

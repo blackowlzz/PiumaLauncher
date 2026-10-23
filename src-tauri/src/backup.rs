@@ -25,7 +25,7 @@ fn now_ms() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis() as u64)
 }
 
-fn check_world(folder: &str) -> Result<()> {
+pub(crate) fn check_world(folder: &str) -> Result<()> {
     let ok = !folder.trim().is_empty() && !folder.starts_with('.') && !folder.contains(['/', '\\', '\0']);
     if ok { Ok(()) } else { Err(Error::msg("invalid world")) }
 }
@@ -79,12 +79,12 @@ pub fn list(instance_id: &str) -> Result<Vec<Backup>> {
     Ok(out)
 }
 
-fn add_dir<W: Write + std::io::Seek>(zip: &mut zip::ZipWriter<W>, root: &Path, rel: &str) -> Result<()> {
+pub(crate) fn add_dir<W: Write + std::io::Seek>(zip: &mut zip::ZipWriter<W>, root: &Path, rel: &str) -> Result<()> {
     let dir = if rel.is_empty() { root.to_path_buf() } else { root.join(rel) };
     for entry in std::fs::read_dir(&dir).map_err(Error::at(&dir))? {
         let entry = entry.map_err(Error::at(&dir))?;
         let name = entry.file_name().to_string_lossy().into_owned();
-        if rel.is_empty() && name == "session.lock" {
+        if !rel.contains('/') && name == "session.lock" {
             continue;
         }
         let child = if rel.is_empty() { name } else { format!("{rel}/{name}") };

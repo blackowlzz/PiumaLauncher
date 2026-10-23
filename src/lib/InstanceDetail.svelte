@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { api, type Backup, type Instance, type JavaInstall, type World } from './api'
-  import { locale, t } from './i18n.svelte'
-  import { app, askConfirm, createShortcut, installedJavas, isBusy, notify, play, refreshEffective, reloadInstances, stop } from './store.svelte'
+  import { api, modrinth, type Backup, type Instance, type JavaInstall, type PackDiff, type World } from './api'
+  import { locale, stageText, t } from './i18n.svelte'
+  import { app, askConfirm, cancelInstall, createShortcut, installedJavas, isBusy, notify, play, refreshEffective, refreshPackUpdate, refreshStartup, reloadInstances, seconds, stop, updateModpack } from './store.svelte'
   import { formatBytes, loaderNames, profileName, profiles } from './meta'
   import Cover from './Cover.svelte'
   import ContentTable from './ContentTable.svelte'
@@ -61,12 +61,70 @@
   const running = $derived(game?.state === 'running')
   const busy = $derived(isBusy(inst?.id ?? null))
   const samples = $derived(inst ? (app.stats[inst.id] ?? []) : [])
+  const startup = $derived(inst ? app.startup[inst.id] : undefined)
+  $effect(() => {
+    if (inst?.id) refreshStartup(inst.id)
+  })
   const current = $derived(running && samples.length ? samples[samples.length - 1] : null)
   const peak = $derived(samples.length ? Math.max(...samples) : null)
 
   $effect(() => {
-    draft = inst ? { ...inst } : null
+    draft = inst ? { ...inst, launch: { ...inst.launch } } : null
   })
+
+  const defaults = $derived(app.settings.defaultLaunch)
+  const hasDefaults = $derived(!!(defaults?.wrapper.trim() || defaults?.env.trim() || defaults?.fullscreen || (defaults?.width && defaults?.height)))
+  const inherited = $derived.by(() => {
+    const d = draft as Instance | null
+    return hasDefaults && d && !d.launch.skipDefaults ? defaults : null
+  })
+  const packUpdate = $derived(inst ? (app.packUpdates[inst.id] ?? null) : null)
+  const updating = $derived(!!inst && app.installingId === inst.id)
+  const updateStatus = $derived.by(() => {
+    const p = app.install
+    if (!p) return t('Updating…')
+    return p.total > 0 ? `${stageText(p.stage)} · ${Math.round((p.done / p.total) * 100)}%` : stageText(p.stage)
+  })
+  const packKey = $derived(inst?.pack ? `${inst.id}\n${inst.pack.versionId}` : null)
+  $effect(() => {
+    if (packKey) refreshPackUpdate(packKey.split('\n')[0])
+  })
+
+  let diff: PackDiff | null = $state(null)
+  let showDiff = $state(false)
+  const diffKey = $derived(inst && packUpdate ? `${inst.id}\n${packUpdate.versionId}` : null)
+  $effect(() => {
+    const key = diffKey
+    diff = null
+    showDiff = false
+    if (!key) return
+    const [id, version] = key.split('\n')
+    let alive = true
+    modrinth
+      .modpackDiff(id, version)
+      .then((d) => alive && (diff = d))
+      .catch(() => {})
+    return () => (alive = false)
+  })
+  const diffSummary = $derived.by(() => {
+    const d = diff as PackDiff | null
+    if (!d) return ''
+    return [
+      d.updated.length ? t('{n} updated', { n: d.updated.length }) : '',
+      d.added.length ? t('{n} added', { n: d.added.length }) : '',
+      d.removed.length ? t('{n} removed', { n: d.removed.length }) : '',
+    ]
+      .filter(Boolean)
+      .join(' · ')
+  })
+
+  async function runUpdate() {
+    const u = packUpdate
+    if (!inst || !u) return
+    const mc = u.mcVersion && u.mcVersion !== inst.mcVersion ? u.mcVersion : null
+    if (mc && !(await askConfirm(t('Update "{name}" to {version}? It also moves to Minecraft {mc}: worlds opened on the new version may not work on the old one anymore.', { name: inst.name, version: u.versionNumber, mc }), t('Update')))) return
+    await updateModpack(inst.id, u.versionId)
+  }
 
   async function loadWorlds() {
     if (!inst) return
@@ -144,7 +202,7 @@
 
   const duplicate = () =>
     attempt(async () => {
-      const copy = await api.duplicateInstance(inst!.id)
+      const copy = await api.duplicateInstance(inst!.id, t('{name} (copy)', { name: inst!.name }))
       await reloadInstances()
       app.detailId = copy.id
       app.selectedId = copy.id
@@ -199,6 +257,7 @@
         <div class="chips">
           <span class="tag">Minecraft {inst.mcVersion}</span>
           {#if inst.loader !== 'vanilla'}<span class="tag">{loaderNames[inst.loader]} {inst.loaderVersion ?? ''}</span>{/if}
+          {#if inst.pack}<span class="tag">{t('Modpack {version}', { version: inst.pack.versionNumber })}</span>{/if}
           <span class="tag">{profileName(inst.flagProfile)}</span>
           {#if running}<span class="tag live">{t('Running')}</span>{/if}
         </div>
@@ -222,6 +281,46 @@
 
   {#if sharing}<ShareModal {inst} onClose={() => (sharing = false)} />{/if}
 
+  {#if packUpdate || updating}
+    <section class="upd" aria-live="polite">
+      <span class="uic"><Icon name="download" size={18} /></span>
+      <div class="grow">
+        <div class="ut">{t('Update available')}{#if packUpdate}<span class="muted">{` · ${inst.pack?.versionNumber} → ${packUpdate.versionNumber}`}</span>{/if}</div>
+        <div class="muted small">
+          {#if updating}{updateStatus}{:else if packUpdate?.mcVersion && packUpdate.mcVersion !== inst.mcVersion}{t('This version moves to Minecraft {mc}.', { mc: packUpdate.mcVersion })}{:else}{t('Your worlds, the settings you changed and the mods you added stay as they are.')}{/if}
+        </div>
+      </div>
+      {#if diffSummary && !updating}
+        <button class="ghost difft" onclick={() => (showDiff = !showDiff)} aria-expanded={showDiff}>{diffSummary} · {showDiff ? t('Hide changes') : t('Show changes')}</button>
+      {/if}
+      {#if updating}
+        <button onclick={cancelInstall} disabled={app.cancelling}>{app.cancelling ? t('Cancelling…') : t('Cancel')}</button>
+      {:else}
+        <button class="primary" onclick={runUpdate} disabled={running || app.installingId !== null}>{t('Update')}</button>
+      {/if}
+    </section>
+    {#if showDiff && diff && !updating}
+      <div class="diff">
+        {#if diff.mcTo}<div class="dmc"><Icon name="box" size={15} />Minecraft {diff.mcFrom} → {diff.mcTo}</div>{/if}
+        {#each [{ kind: 'updated', label: t('Updated'), list: diff.updated, mark: '↑' }, { kind: 'added', label: t('Added'), list: diff.added, mark: '+' }, { kind: 'removed', label: t('Removed'), list: diff.removed, mark: '−' }] as group}
+          {#if group.list.length}
+            <section class="dgroup {group.kind}">
+              <header><span class="dbadge" aria-hidden="true">{group.mark}</span>{group.label}<span class="dcount">{group.list.length}</span></header>
+              <ul>
+                {#each group.list as c}
+                  <li title={c.name}>
+                    <span class="dname">{c.name}</span>
+                    <span class="dver">{#if c.from && c.to}<span class="dold">{c.from}</span> → {c.to}{:else}{c.to ?? c.from}{/if}</span>
+                  </li>
+                {/each}
+              </ul>
+            </section>
+          {/if}
+        {/each}
+      </div>
+    {/if}
+  {/if}
+
   {#key tab}
   <div class="swap">
   {#if tab === 'overview'}
@@ -242,7 +341,26 @@
         <div class="eyebrow">{t('Profile')}</div>
         <div class="num sm">{profileName(eff?.flagProfile ?? inst.flagProfile)}</div>
       </div>
+      <div>
+        <div class="eyebrow">{t('Startup')}</div>
+        <div class="num">{startup?.lastMs ? seconds(startup.lastMs) : '—'}</div>
+        {#if startup?.usualMs && startup.lastMs && Math.abs(startup.usualMs - startup.lastMs) >= 2000}<div class="muted small">{t('usually {time}', { time: seconds(startup.usualMs) })}</div>{/if}
+      </div>
     </section>
+    {#if startup?.slower}
+      <div class="slow">
+        <Icon name="clock" size={18} />
+        <div class="grow">
+          <div class="st">{t('It now takes {now} to start, it used to take {before}.', { now: seconds(startup.slower.nowMs), before: seconds(startup.slower.beforeMs) })}</div>
+          <div class="muted small">
+            {#if startup.slower.added.length}{t('Added since then: {mods}', { mods: startup.slower.added.join(', ') })}{:else}{t('No mods were added in the meantime, so the cause is something else (an update, resource packs or the system).')}{/if}
+          </div>
+        </div>
+        <button class="ghost" onclick={() => (tab = 'mods')}>{t('Content')}</button>
+      </div>
+    {:else if !startup?.lastMs}
+      <p class="muted small">{t('The launcher measures how long the game takes to reach the main menu, and tells you if it gets slower.')}</p>
+    {/if}
     <div class="chart">
       <Sparkline values={samples} limit={eff?.memoryMaxMb ?? inst.memoryMaxMb} />
       {#if !samples.length}<p class="muted small hint">{t('The chart fills in while the game is running.')}</p>{/if}
@@ -336,6 +454,50 @@
         />
       </label>
       <label>{t('Extra JVM arguments')}<input bind:value={draft.extraJvmArgs} placeholder="-Dprop=value" /></label>
+      <details class="adv" open={!!(draft.launch.wrapper || draft.launch.env || draft.launch.width || draft.launch.fullscreen || draft.launch.skipDefaults)}>
+        <summary>{t('Launch options')}</summary>
+        <div class="advbody">
+          {#if hasDefaults || draft.launch.skipDefaults}
+            <label class="own">
+              <span>
+                <strong>{t('Use the default launch options')}</strong>
+                <span class="muted">{t('Fields you leave empty here take the values from {page}.', { page: t('Performance') })}</span>
+              </span>
+              <span class="switch">
+                <input type="checkbox" checked={!draft.launch.skipDefaults} onchange={(e) => (draft!.launch.skipDefaults = !e.currentTarget.checked)} aria-label={t('Use the default launch options')} />
+                <span class="track"></span>
+              </span>
+            </label>
+          {/if}
+          <label class="own">
+            <span>
+              <strong>{t('Start in fullscreen')}</strong>
+              {#if inherited?.fullscreen && !draft.launch.fullscreen && !(draft.launch.width && draft.launch.height)}<span class="inh">{t('Default: {value}', { value: t('Start in fullscreen') })}</span>{/if}
+              <span class="muted">{t('Otherwise the game window opens at the size below, or at the default size if you leave it empty.')}</span>
+            </span>
+            <span class="switch">
+              <input type="checkbox" bind:checked={draft.launch.fullscreen} aria-label={t('Start in fullscreen')} />
+              <span class="track"></span>
+            </span>
+          </label>
+          <div class="row">
+            <label class="grow">{t('Window width')}<input type="number" min="320" max="16384" step="1" placeholder={String(inherited?.width ?? 854)} bind:value={draft.launch.width} disabled={draft.launch.fullscreen} /></label>
+            <label class="grow">{t('Window height')}<input type="number" min="320" max="16384" step="1" placeholder={String(inherited?.height ?? 480)} bind:value={draft.launch.height} disabled={draft.launch.fullscreen} /></label>
+          </div>
+          <label>
+            {t('Launch wrapper')}
+            <input bind:value={draft.launch.wrapper} placeholder="gamemoderun mangohud" spellcheck="false" />
+            <span class="muted">{t('A command that starts the game for you, such as gamemoderun, mangohud or prime-run. Leave it empty to start Java directly.')}</span>
+            {#if inherited?.wrapper.trim() && !draft.launch.wrapper.trim()}<span class="inh">{t('Default: {value}', { value: inherited.wrapper })}</span>{/if}
+          </label>
+          <label>
+            {t('Environment variables')}
+            <textarea bind:value={draft.launch.env} rows="3" placeholder="MESA_GL_VERSION_OVERRIDE=4.6" spellcheck="false"></textarea>
+            <span class="muted">{t('One per line, as NAME=value.')}</span>
+            {#if inherited?.env.trim()}<span class="inh">{t('The default variables come first; yours replace them when the name is the same.')}</span>{/if}
+          </label>
+        </div>
+      </details>
       <div class="row">
         <button class="primary" type="submit" disabled={busyAction}>{t('Save')}</button>
       </div>
@@ -344,6 +506,7 @@
         <div class="eyebrow">{t('More')}</div>
         <div class="row wrap">
           <button type="button" onclick={() => api.openFolder(inst.id, 'game').catch(notify)}>{t('Open instance folder')}</button>
+          <button type="button" onclick={() => api.openFolder(inst.id, 'screenshots').catch(notify)}>{t('Screenshots')}</button>
           <button type="button" class="linkbtn" class:done={linked === 'done'} onclick={shortcut} disabled={linked === 'working'} aria-live="polite">
             {#key linked}
               <span class="lk">
@@ -375,6 +538,23 @@
   .stopbtn { position: relative; }
   .acts { position: relative; display: flex; gap: 8px; }
   .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+  .upd { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--surface); animation: swapin 320ms var(--spring) backwards; }
+  .uic { display: grid; place-items: center; width: 38px; height: 38px; flex: none; border-radius: 50%; background: var(--inv-bg); color: var(--inv-text); }
+  .ut { font-weight: 600; margin-bottom: 2px; }
+  .difft { flex: none; font-size: 13px; padding: 7px 12px; }
+  .diff { display: grid; gap: 18px; margin-top: -8px; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); max-height: 420px; overflow-y: auto; animation: swapin 260ms var(--spring) backwards; }
+  .dmc { display: inline-flex; align-items: center; gap: 8px; justify-self: start; padding: 6px 12px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line-strong); font-size: 13px; font-weight: 600; }
+  .dgroup header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 13px; font-weight: 600; }
+  .dbadge { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 6px; background: var(--surface-2); color: var(--text); font-size: 13px; line-height: 1; }
+  .added .dbadge { background: rgba(62, 207, 110, 0.16); color: #3ecf6e; }
+  .removed .dbadge { background: rgba(229, 72, 77, 0.16); color: #e5484d; }
+  .dcount { color: var(--muted); font-weight: 500; }
+  .dgroup ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+  .dgroup li { display: grid; gap: 3px; min-width: 0; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line); }
+  .dname { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .removed .dname { color: var(--muted); }
+  .dver { font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dold, .removed .dver, .added .dver { color: var(--muted); }
   .swap { display: flex; flex-direction: column; gap: 22px; animation: swap 300ms var(--spring) both; }
   .swap > * { flex-shrink: 0; }
   @keyframes swap { from { opacity: 0; transform: translateY(8px); } }
@@ -383,6 +563,8 @@
   .tabs button::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: 0; height: 2px; background: var(--text); transform: scaleX(0); transition: transform 320ms var(--spring); }
   .tabs button.on { color: var(--text); }
   .tabs button.on::after { transform: none; }
+  .slow { display: flex; align-items: center; gap: 14px; padding: 12px 16px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--surface-2); }
+  .slow .st { font-weight: 600; }
   .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 24px; }
   .num { font-size: 26px; font-weight: 600; letter-spacing: -0.03em; margin-top: 4px; }
   .num.sm { font-size: 18px; line-height: 1.65; }
@@ -423,5 +605,10 @@
 
   .perf { display: grid; gap: 14px; }
   .own { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .adv { border: 1px solid var(--line); border-radius: 14px; padding: 4px 14px; }
+  .adv summary { cursor: pointer; padding: 10px 0; color: var(--text); font-weight: 600; }
+  .advbody { display: grid; gap: 14px; padding: 4px 0 14px; }
+  .inh { color: var(--text); font-size: 12px; font-weight: 500; }
+  .adv textarea { resize: vertical; font: 12.5px/1.5 ui-monospace, 'JetBrains Mono', monospace; letter-spacing: 0; }
   .own > span:first-child { display: grid; gap: 2px; }
 </style>

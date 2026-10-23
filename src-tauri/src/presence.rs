@@ -111,6 +111,10 @@ pub fn stop(id: &str) {
     }
 }
 
+pub(crate) fn log_message(line: &str) -> Option<&str> {
+    message(line).map(|(m, _)| m)
+}
+
 fn message(line: &str) -> Option<(&str, bool)> {
     if let Some(i) = line.find("<![CDATA[") {
         let rest = &line[i + 9..];

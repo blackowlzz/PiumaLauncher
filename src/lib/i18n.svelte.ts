@@ -1,4 +1,5 @@
 import { api } from './api'
+import { errorKey } from './errors'
 
 export const LANGUAGES = [
   { code: 'en', name: 'English' },
@@ -40,6 +41,13 @@ export const locale = () => i18n.lang
 export function t(text: string, params?: Record<string, string | number>): string {
   const raw = dicts[i18n.lang]?.[text] ?? text
   return params ? raw.replace(/\{(\w+)\}/g, (_, k) => String(params[k] ?? `{${k}}`)) : raw
+}
+
+export function translateError(message: unknown): string {
+  const text = String(message)
+  if (dicts[i18n.lang]?.[text]) return t(text)
+  const { key, params } = errorKey(text)
+  return t(key, params)
 }
 
 export function stageText(stage: string): string {

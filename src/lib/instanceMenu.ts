@@ -10,7 +10,7 @@ export function instanceItems(inst: Instance, withPlay = true): MenuItem[] {
 
   const duplicate = async () => {
     try {
-      const copy = await api.duplicateInstance(inst.id)
+      const copy = await api.duplicateInstance(inst.id, t('{name} (copy)', { name: inst.name }))
       await reloadInstances()
       notify(t('Created "{name}"', { name: copy.name }))
     } catch (e) {
@@ -45,6 +45,7 @@ export function instanceItems(inst: Instance, withPlay = true): MenuItem[] {
     ...head,
     { label: t('Details'), icon: 'settings', onclick: () => openInstance(inst.id) },
     { label: t('Open instance folder'), icon: 'folder', onclick: () => void api.openFolder(inst.id, 'game').catch(notify) },
+    { label: t('Screenshots'), icon: 'folder', onclick: () => void api.openFolder(inst.id, 'screenshots').catch(notify) },
     { label: t('Share'), icon: 'share', onclick: () => (app.sharingId = inst.id) },
     { label: t('Create shortcut'), icon: 'shortcut', onclick: shortcut },
     { label: t('Duplicate'), icon: 'file', onclick: duplicate, disabled: locked },

@@ -11,8 +11,8 @@
   import Strip from './Strip.svelte'
   import { reveal, spotlight } from './actions'
   import { locale, t } from './i18n.svelte'
-  import { onMount } from 'svelte'
-  import { activeAccount, app, installModpack, isBusy, openInstance, openProject, play, refreshEffective, selectedInstance, stop, weeklyPlaytime } from './store.svelte'
+  import { onMount, tick } from 'svelte'
+  import { activeAccount, app, installModpack, isBusy, openInstance, openProject, play, playedTodaySecs, refreshEffective, refreshStartup, seconds, selectedInstance, stop, weeklyPlaytime } from './store.svelte'
   import { formatDuration, loaderNames, profileName, relativeTime } from './meta'
 
   const inst = $derived(selectedInstance())
@@ -26,6 +26,23 @@
     if (!inst) return
     void [inst.customPerformance, inst.memoryMaxMb, inst.flagProfile, app.settings.autoOptimize, app.settings.defaultMemoryMaxMb, app.settings.defaultFlagProfile, running]
     refreshEffective(inst.id)
+  })
+  const startup = $derived(inst ? app.startup[inst.id] : undefined)
+  $effect(() => {
+    if (inst?.id) refreshStartup(inst.id)
+  })
+  async function openLimits() {
+    app.page = 'settings'
+    await tick()
+    document.getElementById('playtime')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+  let today = $state(0)
+  $effect(() => {
+    void app.sessions
+    void app.games
+    today = playedTodaySecs()
+    const id = setInterval(() => (today = playedTodaySecs()), 30_000)
+    return () => clearInterval(id)
   })
   const shownInstances = $derived(app.instances.slice(0, 8))
   const account = $derived(activeAccount())
@@ -88,7 +105,9 @@
         <li><Icon name="box" size={16} />Minecraft {inst.mcVersion}</li>
         {#if inst.loader !== 'vanilla'}<li><Icon name="wrench" size={16} />{loaderNames[inst.loader]}</li>{/if}
         <li><Icon name="cpu" size={16} />{eff?.memoryMaxMb ?? inst.memoryMaxMb} MB · {profileName(eff?.flagProfile ?? inst.flagProfile)}</li>
+        {#if startup?.usualMs ?? startup?.lastMs}<li><Icon name="clock" size={16} />{t('Starts in about {time}', { time: seconds((startup?.usualMs ?? startup?.lastMs)!) })}</li>{/if}
         {#if ram !== null}<li class="live"><span class="dot"></span>{t('RAM in use: {ram} MB', { ram })}</li>{/if}
+        {#if app.packUpdates[inst.id]}<li><button class="updlink" onclick={() => openInstance(inst.id)}><Icon name="download" size={14} />{t('Update available')}: {app.packUpdates[inst.id].versionNumber}</button></li>{/if}
       </ul>
       <div class="cta" use:reveal={4}>
         {#if running}
@@ -148,6 +167,7 @@
               <div class="mt">
                 <span class="mn">{i.name}</span>
                 <span class="muted small">{i.mcVersion}{i.loader !== 'vanilla' ? ` · ${loaderNames[i.loader]}` : ''}</span>
+                {#if app.packUpdates[i.id]}<span class="small updmini"><Icon name="download" size={11} />{t('Update available')}</span>{/if}
                 {#if g?.state === 'running'}
                   <button class="sm stopb" onclick={() => stop(i.id)}>{t('Stop')}</button>
                 {:else}
@@ -176,6 +196,14 @@
         {/each}
       </div>
       {#if !weekTotal}<p class="muted small">{t('The chart fills in after your first game.')}</p>{/if}
+      <div class="today">
+        {#if app.settings.dailyLimitMinutes > 0}
+          <div class="row tl"><span class="grow">{t('Today')}</span><span class="muted small">{formatDuration(today)} / {formatDuration(app.settings.dailyLimitMinutes * 60)}</span></div>
+          <div class="line"><div style:width="{Math.min(100, (today / (app.settings.dailyLimitMinutes * 60)) * 100)}%"></div></div>
+        {:else}
+          <div class="row tl"><span class="grow">{t('Today')}: {formatDuration(today)}</span><button class="ghost lim" onclick={openLimits}>{t('Breaks and limits')}</button></div>
+        {/if}
+      </div>
     </section>
 
     {#if headlines.length}
@@ -224,6 +252,8 @@
   @keyframes up { to { transform: none; } }
   .facts { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 22px; color: var(--muted); font-size: 14px; }
   .facts li { display: inline-flex; align-items: center; gap: 8px; }
+  .updlink { display: inline-flex; align-items: center; gap: 7px; padding: 3px 12px; font-size: 13px; color: #fff; background: rgba(255, 255, 255, 0.14); border-color: rgba(255, 255, 255, 0.35); }
+  .updmini { display: inline-flex; align-items: center; gap: 4px; color: var(--text); }
   .live { display: inline-flex; align-items: center; gap: 8px; color: var(--text); }
   .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text); animation: pulse 1.4s infinite; }
   @keyframes pulse { 50% { opacity: 0.25; } }
@@ -262,6 +292,9 @@
   .bar.today .fill { background: var(--inv-bg); }
   .lab { font-size: 11px; color: var(--muted); text-transform: capitalize; }
   .bar.today .lab { color: var(--text); }
+  .today { display: grid; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13px; }
+  .tl { gap: 8px; }
+  .lim { padding: 3px 10px; font-size: 12px; }
   .news { list-style: none; padding: 0; margin: 0; display: grid; }
   .news li { display: flex; gap: 14px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
   .news li:first-child { border-top: 0; padding-top: 2px; }

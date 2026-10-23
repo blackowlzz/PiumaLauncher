@@ -1,5 +1,5 @@
 <script lang="ts">
-  type Name = 'play' | 'grid' | 'compass' | 'user' | 'sun' | 'moon' | 'feather' | 'search' | 'chevron' | 'home' | 'download' | 'list' | 'layout' | 'filter' | 'x' | 'clock' | 'check' | 'globe' | 'settings' | 'minimize' | 'maximize' | 'restore' | 'refresh' | 'trash' | 'file' | 'folder' | 'palette' | 'dots' | 'box' | 'flame' | 'news' | 'cpu' | 'wrench' | 'discord' | 'kofi' | 'server' | 'plus' | 'shortcut' | 'share' | 'package' | 'copy'
+  type Name = 'play' | 'grid' | 'compass' | 'user' | 'sun' | 'moon' | 'feather' | 'search' | 'chevron' | 'home' | 'download' | 'list' | 'layout' | 'filter' | 'x' | 'clock' | 'check' | 'globe' | 'settings' | 'minimize' | 'maximize' | 'restore' | 'refresh' | 'trash' | 'file' | 'folder' | 'palette' | 'dots' | 'box' | 'flame' | 'news' | 'cpu' | 'wrench' | 'discord' | 'kofi' | 'server' | 'plus' | 'shortcut' | 'share' | 'package' | 'copy' | 'map' | 'chart'
   let { name, size = 18 }: { name: Name; size?: number } = $props()
 </script>
 
@@ -7,6 +7,10 @@
   stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
   {#if name === 'play'}
     <polygon points="7 4 20 12 7 20 7 4" />
+  {:else if name === 'map'}
+    <path d="M9 4 3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5z" /><path d="M9 4v13.5M15 6.5V20" />
+  {:else if name === 'chart'}
+    <path d="M3 20h18" /><path d="M6.5 16v-4M11 16V6.5M15.5 16v-6.5M20 16V9" />
   {:else if name === 'grid'}
     <rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" />
     <rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" />

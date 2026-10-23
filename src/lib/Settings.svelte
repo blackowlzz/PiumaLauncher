@@ -3,8 +3,11 @@
   import { api, uiScales, type RuntimeEntry, type StorageInfo } from './api'
   import { LANGUAGES, i18n, setLanguage, stageText, t } from './i18n.svelte'
   import Select from './Select.svelte'
-  import { formatBytes } from './meta'
+  import { formatBytes, formatDuration } from './meta'
   import { app, askConfirm, installRuntime, notify, reloadRuntimes, saveSettings } from './store.svelte'
+
+  const minutes = (steps: number[], current: number) =>
+    [0, ...new Set([...steps, current].filter((m) => m > 0))].sort((a, b) => a - b).map((m) => ({ value: m, label: m ? formatDuration(m * 60) : t('Off') }))
 
   let storage = $state<StorageInfo | null>(null)
   const loadStorage = async () => (storage = await api.storageInfo().catch(() => null))
@@ -186,6 +189,36 @@
         <input type="checkbox" bind:checked={app.settings.checkUpdates} onchange={saveSettings} aria-label={t('Check for updates')} />
         <span class="track"></span>
       </label>
+    </div>
+  </section>
+
+  <section class="group" id="playtime">
+    <h2>{t('Playtime')}</h2>
+    <div class="item">
+      <div class="txt">
+        <div class="n">{t('Break reminder')}</div>
+        <div class="d">{t('A notification when you have been playing for this long without closing the game.')}</div>
+      </div>
+      <Select
+        bind:value={app.settings.breakReminderMinutes}
+        width="190px"
+        label={t('Break reminder')}
+        onchange={saveSettings}
+        options={minutes([30, 45, 60, 90, 120], app.settings.breakReminderMinutes)}
+      />
+    </div>
+    <div class="item">
+      <div class="txt">
+        <div class="n">{t('Daily limit')}</div>
+        <div class="d">{t('When you reach it you get a notification, and Play asks before starting again. The game is never closed for you.')}</div>
+      </div>
+      <Select
+        bind:value={app.settings.dailyLimitMinutes}
+        width="190px"
+        label={t('Daily limit')}
+        onchange={saveSettings}
+        options={minutes([60, 90, 120, 180, 240, 360], app.settings.dailyLimitMinutes)}
+      />
     </div>
   </section>
 

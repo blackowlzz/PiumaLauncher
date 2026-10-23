@@ -51,6 +51,7 @@ pub struct ShareCode {
 pub struct Imported {
     instance: Instance,
     skipped: u32,
+    server: Option<String>,
 }
 
 struct Local {
@@ -261,7 +262,7 @@ async fn export_to(client: &reqwest::Client, inst: &Instance, opts: ExportOption
     Ok(Exported { path: out.to_string_lossy().into_owned(), linked, bundled })
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 struct Payload {
     n: String,
     m: String,
@@ -270,6 +271,8 @@ struct Payload {
     #[serde(default, skip_serializing_if = "String::is_empty")]
     v: String,
     f: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    s: Option<String>,
 }
 
 fn encode(p: &Payload) -> Result<String> {
@@ -306,7 +309,8 @@ fn parse_entries(f: &str) -> Result<Vec<(Content, String)>> {
     Ok(out)
 }
 
-pub async fn share_code(client: &reqwest::Client, inst: &Instance, progress: Progress<'_>) -> Result<ShareCode> {
+pub async fn share_code(client: &reqwest::Client, inst: &Instance, server: Option<&str>, progress: Progress<'_>) -> Result<ShareCode> {
+    let server = server.map(crate::servers::check_address).transpose()?.map(String::from);
     let files = collect(inst, &[Content::Mods, Content::Resourcepacks, Content::Shaderpacks], progress).await?;
     let found = identify(client, &files, progress).await?;
     let mut items = vec![];
@@ -317,7 +321,7 @@ pub async fn share_code(client: &reqwest::Client, inst: &Instance, progress: Pro
             None => excluded.push(f.file_name.clone()),
         }
     }
-    if items.is_empty() {
+    if items.is_empty() && server.is_none() {
         return Err(Error::msg("None of the files in this instance come from Modrinth"));
     }
     let payload = Payload {
@@ -326,6 +330,7 @@ pub async fn share_code(client: &reqwest::Client, inst: &Instance, progress: Pro
         l: loader_key(inst.loader).unwrap_or_default().to_string(),
         v: inst.loader_version.clone().unwrap_or_default(),
         f: items.join(","),
+        s: server,
     };
     Ok(ShareCode { code: encode(&payload)?, included: items.len() as u32, excluded })
 }
@@ -355,15 +360,21 @@ fn temp_pack() -> Result<PathBuf> {
 }
 
 async fn install_temp(client: &reqwest::Client, archive: &Path, progress: Progress<'_>) -> Result<Instance> {
+    let hash = modrinth::sha1_of(archive).ok();
     let result = modrinth::install_archive(client, archive, async { None }, progress).await;
     let _ = tokio::fs::remove_file(archive).await;
-    result
+    let mut inst = result?;
+    if let Some(hash) = hash {
+        modrinth::link_pack(client, &mut inst, &hash).await;
+    }
+    Ok(inst)
 }
 
 pub async fn import_code(client: &reqwest::Client, code: &str, progress: Progress<'_>) -> Result<Imported> {
     let payload = decode(code)?;
     let entries = parse_entries(&payload.f)?;
-    if entries.is_empty() || payload.m.trim().is_empty() {
+    let server = payload.s.as_deref().and_then(|a| crate::servers::check_address(a).ok()).map(String::from);
+    if (entries.is_empty() && server.is_none()) || payload.m.trim().is_empty() {
         return Err(Error::msg("This share code isn't valid"));
     }
     progress("Looking up Modrinth", 0, 0);
@@ -401,7 +412,7 @@ pub async fn import_code(client: &reqwest::Client, code: &str, progress: Progres
     let archive = temp_pack()?;
     write_index_pack(&archive, &index)?;
     let instance = install_temp(client, &archive, progress).await?;
-    Ok(Imported { instance, skipped })
+    Ok(Imported { instance, skipped, server })
 }
 
 fn parse_link(link: &str) -> Option<(String, Option<String>)> {
@@ -429,7 +440,7 @@ pub async fn import_link(client: &reqwest::Client, link: &str, progress: Progres
     progress("Finding the latest version", 0, 0);
     let (project, version) = modrinth::resolve_modpack(client, &slug, version.as_deref()).await?;
     let instance = modrinth::install_modpack(client, &project, version.as_deref(), None, progress).await?;
-    Ok(Imported { instance, skipped: 0 })
+    Ok(Imported { instance, skipped: 0, server: None })
 }
 
 pub async fn import_file(client: &reqwest::Client, path: &Path, progress: Progress<'_>) -> Result<Imported> {
@@ -439,7 +450,7 @@ pub async fn import_file(client: &reqwest::Client, path: &Path, progress: Progre
     }
     let archive = temp_pack()?;
     std::fs::copy(path, &archive)?;
-    Ok(Imported { instance: install_temp(client, &archive, progress).await?, skipped: 0 })
+    Ok(Imported { instance: install_temp(client, &archive, progress).await?, skipped: 0, server: None })
 }
 
 pub async fn import_bytes(client: &reqwest::Client, bytes: &[u8], progress: Progress<'_>) -> Result<Imported> {
@@ -448,7 +459,7 @@ pub async fn import_bytes(client: &reqwest::Client, bytes: &[u8], progress: Prog
     }
     let archive = temp_pack()?;
     tokio::fs::write(&archive, bytes).await?;
-    Ok(Imported { instance: install_temp(client, &archive, progress).await?, skipped: 0 })
+    Ok(Imported { instance: install_temp(client, &archive, progress).await?, skipped: 0, server: None })
 }
 
 #[cfg(test)]
@@ -458,12 +469,43 @@ mod tests {
     #[test]
     fn codes_round_trip_and_stay_short() {
         let ids: Vec<String> = (0..120).map(|i| format!("m{:08}", i * 7919)).collect();
-        let p = Payload { n: "Cobblemon".into(), m: "1.21.1".into(), l: "fabric-loader".into(), v: "0.16.9".into(), f: ids.join(",") };
+        let p = Payload { n: "Cobblemon".into(), m: "1.21.1".into(), l: "fabric-loader".into(), v: "0.16.9".into(), f: ids.join(","), s: None };
         let code = encode(&p).unwrap();
         assert!(code.starts_with(CODE_PREFIX));
         assert!(code.len() < 1400, "{}", code.len());
         assert_eq!(decode(&format!("  Look: {}\n", code)).unwrap(), p);
         assert_eq!(parse_entries(&p.f).unwrap().len(), 120);
+    }
+
+    #[test]
+    fn invites_carry_the_server_and_old_codes_still_work() {
+        let invite = Payload { n: "Vanilla".into(), m: "1.21.4".into(), l: String::new(), v: String::new(), f: String::new(), s: Some("mc.example.net".into()) };
+        let back = decode(&encode(&invite).unwrap()).unwrap();
+        assert_eq!(back.s.as_deref(), Some("mc.example.net"));
+        assert!(parse_entries(&back.f).unwrap().is_empty());
+        let old = Payload { s: None, ..invite.clone() };
+        let code = encode(&old).unwrap();
+        assert!(decode(&code).unwrap().s.is_none());
+        let text = {
+            let compact = code.trim_start_matches(CODE_PREFIX);
+            let raw = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(compact).unwrap();
+            let mut t = String::new();
+            flate2::read::DeflateDecoder::new(raw.as_slice()).read_to_string(&mut t).unwrap();
+            t
+        };
+        assert!(!text.contains("\"s\""));
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn vanilla_invite_imports_for_real() {
+        let client = crate::net::client();
+        let invite = Payload { n: "Invite test".into(), m: "1.21.4".into(), l: String::new(), v: String::new(), f: String::new(), s: Some("mc.example.net".into()) };
+        let imported = import_code(&client, &encode(&invite).unwrap(), &|_, _, _| {}).await.unwrap();
+        assert_eq!(imported.server.as_deref(), Some("mc.example.net"));
+        assert_eq!(imported.instance.mc_version, "1.21.4");
+        eprintln!("istanza {} creata, server {:?}", imported.instance.id, imported.server);
+        let _ = crate::instance::delete(&imported.instance.id);
     }
 
     #[test]
@@ -529,7 +571,7 @@ mod tests {
         assert_eq!(idx["dependencies"]["fabric-loader"], "0.16.9");
         assert!(idx["files"][0]["downloads"][0].as_str().unwrap().starts_with("https://cdn.modrinth.com/"));
 
-        let code = share_code(&client, &inst, &quiet).await.unwrap();
+        let code = share_code(&client, &inst, None, &quiet).await.unwrap();
         eprintln!("code {} included={} excluded={:?}", code.code, code.included, code.excluded);
         assert_eq!(code.excluded, vec!["homemade.jar".to_string()]);
 
