@@ -51,6 +51,10 @@ pub fn shim_dir() -> PathBuf {
     root().join("shim")
 }
 
+pub fn shim_jar() -> PathBuf {
+    shim_dir().join("piuma-shim.jar")
+}
+
 pub fn accounts_file() -> PathBuf {
     root().join("accounts.json")
 }

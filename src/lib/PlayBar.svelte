@@ -67,7 +67,7 @@
 
 <style>
   .bar { position: relative; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; padding: 0 24px; height: 84px; background: var(--bg); flex: none; }
-  .bar::before { content: ''; position: absolute; left: 216px; right: 0; bottom: 100%; height: 72px; background: linear-gradient(to top, var(--bg) 0%, color-mix(in srgb, var(--bg) 85%, transparent) 30%, color-mix(in srgb, var(--bg) 45%, transparent) 65%, transparent 100%); pointer-events: none; z-index: 2; }
+  .bar::before { content: ''; position: absolute; left: 216px; right: 0; bottom: 100%; height: 28px; background: linear-gradient(to top, var(--bg), transparent); pointer-events: none; z-index: 2; }
   .top { position: absolute; top: -1px; left: 0; right: 0; border-radius: 0; }
   .side { display: flex; align-items: center; gap: 12px; min-width: 0; }
   .right { justify-content: flex-end; }

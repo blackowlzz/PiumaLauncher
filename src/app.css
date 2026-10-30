@@ -93,6 +93,8 @@ button.big { padding: 14px 34px; font-size: 15px; }
 .switch input:checked + .track { background: var(--text); }
 .switch input:checked + .track::after { transform: translateX(16px); }
 .switch input:focus-visible + .track { outline: 2px solid var(--text); outline-offset: 2px; }
+.switch input:disabled { cursor: default; }
+.switch input:disabled + .track { opacity: 0.4; }
 
 label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; }
 input, select, textarea {
@@ -150,7 +152,7 @@ input[type='checkbox'] { width: 16px; height: 16px; accent-color: var(--inv-bg);
 
 * { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
 
-:root[data-idle] *, :root[data-idle] *::before, :root[data-idle] *::after { animation-play-state: paused !important; }
+:root[data-idle]:not([data-intro]) *, :root[data-idle]:not([data-intro]) *::before, :root[data-idle]:not([data-intro]) *::after { animation-play-state: paused !important; }
 
 :root[data-reduce] *, :root[data-reduce] *::before, :root[data-reduce] *::after { transition: none !important; animation: none !important; }
 :root[data-reduce] .rv { opacity: 1; transform: none; }

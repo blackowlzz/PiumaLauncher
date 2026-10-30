@@ -1,10 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { api, uiScales, type RuntimeEntry, type StorageInfo } from './api'
-  import { LANGUAGES, i18n, setLanguage, stageText, t } from './i18n.svelte'
+  import { api, uiScales, type StorageInfo } from './api'
+  import { LANGUAGES, i18n, setLanguage, t } from './i18n.svelte'
   import Select from './Select.svelte'
   import { formatBytes, formatDuration } from './meta'
-  import { app, askConfirm, installRuntime, notify, reloadRuntimes, saveSettings } from './store.svelte'
+  import { app, askConfirm, notify, reloadRuntimes, saveSettings } from './store.svelte'
+  import JavaRuntimes from './JavaRuntimes.svelte'
+  import SectionCards, { type SectionCard } from './SectionCards.svelte'
+  import SectionHead from './SectionHead.svelte'
 
   const minutes = (steps: number[], current: number) =>
     [0, ...new Set([...steps, current].filter((m) => m > 0))].sort((a, b) => a - b).map((m) => ({ value: m, label: m ? formatDuration(m * 60) : t('Off') }))
@@ -14,36 +17,6 @@
   onMount(loadStorage)
 
   onMount(reloadRuntimes)
-
-  const javaNote = (r: RuntimeEntry) =>
-    r.flavor === 'graalvm'
-      ? t('Fast peak performance, ideal for modern versions.')
-      : r.major <= 8
-        ? t('For Minecraft 1.16 and older.')
-        : t('Lightweight and very stable.')
-
-  async function installJava(r: RuntimeEntry) {
-    if (await installRuntime(r)) await loadStorage()
-  }
-
-  async function removeJava(r: RuntimeEntry) {
-    if (!(await askConfirm(t('Delete {name}?', { name: `${r.label} ${r.major}` })))) return
-    try {
-      await api.deleteRuntime(r.id)
-      if (app.settings.preferredJava === r.id) {
-        app.settings.preferredJava = null
-        await saveSettings()
-      }
-      await Promise.all([reloadRuntimes(), loadStorage()])
-    } catch (e) {
-      notify(e)
-    }
-  }
-
-  async function setPreferred(r: RuntimeEntry) {
-    app.settings.preferredJava = app.settings.preferredJava === r.id ? null : r.id
-    await saveSettings()
-  }
 
   const total = $derived(storage ? storage.items.reduce((n, i) => n + i.bytes, 0) : 0)
   const label = (key: string) =>
@@ -103,6 +76,28 @@
     { key: 'runtimes', label: () => t('Downloaded Java') },
     { key: 'skins', label: () => t('Skin cache') },
   ]
+  type Section = 'general' | 'playtime' | 'sync' | 'java' | 'privacy' | 'storage' | 'help' | 'about' | 'reset'
+  let open = $state<Section | null>((app.section as Section | null) ?? null)
+  app.section = null
+
+  function show(id: Section | null) {
+    open = id
+    document.querySelector('main')?.scrollTo({ top: 0 })
+  }
+
+  const cards = $derived<(SectionCard & { id: Section })[]>([
+    { id: 'general', icon: 'settings', title: t('General'), sub: [t('Language'), t('Theme'), t('Interface size'), t('Back up worlds automatically'), t('Check for updates')].join(' · ') },
+    { id: 'playtime', icon: 'clock', title: t('Playtime'), sub: [t('Break reminder'), t('Daily limit')].join(' · ') },
+    { id: 'sync', icon: 'refresh', title: t('Synced game settings'), sub: [t('Share settings between instances'), t('Controls'), t('Audio'), t('Video')].join(' · ') },
+    { id: 'java', icon: 'package', title: t('Java'), sub: app.runtimes.filter((r) => r.installed).map((r) => `${r.label} ${r.major}`).join(' · ') || t('No Java downloaded yet.') },
+    { id: 'privacy', icon: 'globe', title: t('Privacy'), sub: [t('Discord Rich Presence'), t('Look up skins on Mojang')].join(' · ') },
+    { id: 'storage', icon: 'folder', title: t('Storage'), sub: storage ? `${t('Total')}: ${formatBytes(total)} · ${t('Data folder')}` : t('Data folder') },
+    { id: 'help', icon: 'wrench', title: t('Troubleshooting'), sub: [t('Copy diagnostics'), t('Launcher log'), t('Live console')].join(' · ') },
+    { id: 'about', icon: 'feather', title: t('About'), sub: `PiumaLauncher · ${t('Version {v}', { v: __APP_VERSION__ })}` },
+    { id: 'reset', icon: 'trash', title: t('Reset launcher'), sub: t('Delete launcher data. After a restart, the launcher starts as if it were new.'), danger: true },
+  ])
+  const current = $derived(cards.find((c) => c.id === open) ?? null)
+
   let showReset = $state(false)
   let resetting = $state(false)
   let chosen: Record<string, boolean> = $state(Object.fromEntries(options.map((o) => [o.key, true])))
@@ -123,14 +118,19 @@
 
 <svelte:window onkeydown={(e) => e.key === 'Escape' && !resetting && (showReset = false)} />
 
-<header class="head">
-  <h1>{t('Settings')}</h1>
-  <p class="muted">{t('Make the launcher yours.')}</p>
-</header>
+{#if current === null}
+  <header class="head">
+    <h1>{t('Settings')}</h1>
+    <p class="muted">{t('Make the launcher yours.')}</p>
+  </header>
+
+  <SectionCards {cards} onselect={(id) => show(id as Section)} />
+{:else}
+  <SectionHead title={current.title} back={t('Settings')} onback={() => show(null)} />
 
 <div class="groups">
+  {#if open === 'general'}
   <section class="group">
-    <h2>{t('General')}</h2>
 
     <div class="item">
       <div class="txt"><div class="n">{t('Language')}</div></div>
@@ -191,9 +191,10 @@
       </label>
     </div>
   </section>
+  {/if}
 
-  <section class="group" id="playtime">
-    <h2>{t('Playtime')}</h2>
+  {#if open === 'playtime'}
+  <section class="group">
     <div class="item">
       <div class="txt">
         <div class="n">{t('Break reminder')}</div>
@@ -221,9 +222,10 @@
       />
     </div>
   </section>
+  {/if}
 
+  {#if open === 'sync'}
   <section class="group">
-    <h2>{t('Synced game settings')}</h2>
     <div class="item">
       <div class="txt">
         <div class="n">{t('Share settings between instances')}</div>
@@ -246,58 +248,18 @@
       </div>
     {/if}
   </section>
+  {/if}
 
+  {#if open === 'java'}
   <section class="group">
-    <h2>{t('Java')}</h2>
     <p class="muted small intro">{t('Install the Java you prefer. The default one is used whenever the game version allows it, otherwise the launcher picks a compatible one on its own.')}</p>
 
-    {#each app.runtimes as r (r.id)}
-      <div class="item">
-        <div class="txt">
-          <div class="n">
-            {r.label} {r.major}
-            {#if app.settings.preferredJava === r.id}<span class="tag def">{t('Default')}</span>{/if}
-          </div>
-          <div class="d">
-            {#if app.javaBusy === r.id}
-              {app.install ? `${stageText(app.install.stage)}${app.install.total > 0 ? ` · ${Math.round((app.install.done / app.install.total) * 100)}%` : ''}` : t('Installing…')}
-            {:else if r.installed}
-              {r.version} · {javaNote(r)}
-            {:else}
-              {javaNote(r)}
-            {/if}
-          </div>
-        </div>
-        <div class="acts">
-          {#if r.installed}
-            <button class:primary={app.settings.preferredJava !== r.id} onclick={() => setPreferred(r)}>
-              {app.settings.preferredJava === r.id ? t('Remove default') : t('Set as default')}
-            </button>
-            <button class="ghost" onclick={() => removeJava(r)}>{t('Delete')}</button>
-          {:else}
-            <button onclick={() => installJava(r)} disabled={app.javaBusy !== null}>{app.javaBusy === r.id ? t('Installing…') : t('Install')}</button>
-          {/if}
-        </div>
-      </div>
-    {/each}
+    <JavaRuntimes onchange={loadStorage} />
   </section>
+  {/if}
 
+  {#if open === 'privacy'}
   <section class="group">
-    <h2>{t('Developer')}</h2>
-    <div class="item">
-      <div class="txt">
-        <div class="n">{t('Live console')}</div>
-        <div class="d">{t('Opens a separate window with the live game log every time you play. Turned off, nothing runs and nothing is stored. Takes effect from the next launch.')}</div>
-      </div>
-      <label class="switch">
-        <input type="checkbox" bind:checked={app.settings.liveConsole} onchange={saveSettings} aria-label={t('Live console')} />
-        <span class="track"></span>
-      </label>
-    </div>
-  </section>
-
-  <section class="group">
-    <h2>{t('Privacy')}</h2>
     <div class="item">
       <div class="txt">
         <div class="n">{t('Discord Rich Presence')}</div>
@@ -319,9 +281,10 @@
       </label>
     </div>
   </section>
+  {/if}
 
+  {#if open === 'storage'}
   <section class="group">
-    <h2>{t('Storage')}</h2>
     <div class="item">
       <div class="txt">
         <div class="n">{t('Data folder')}</div>
@@ -351,17 +314,10 @@
       </div>
     {/if}
   </section>
+  {/if}
 
-  <section class="group danger">
-    <h2>{t('Reset launcher')}</h2>
-    <div class="item">
-      <div class="txt"><div class="d">{t('Delete launcher data. After a restart, the launcher starts as if it were new.')}</div></div>
-      <button class="danger-btn" onclick={() => (showReset = true)}>{t('Reset…')}</button>
-    </div>
-  </section>
-
+  {#if open === 'help'}
   <section class="group">
-    <h2>{t('Troubleshooting')}</h2>
     <div class="item">
       <div class="txt">
         <div class="n">{t('Copy diagnostics')}</div>
@@ -376,10 +332,21 @@
       </div>
       <button onclick={() => api.openLogs().catch(notify)}>{t('Open folder')}</button>
     </div>
+    <div class="item">
+      <div class="txt">
+        <div class="n">{t('Live console')}</div>
+        <div class="d">{t('Opens a separate window with the live game log every time you play. Turned off, nothing runs and nothing is stored. Takes effect from the next launch.')}</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" bind:checked={app.settings.liveConsole} onchange={saveSettings} aria-label={t('Live console')} />
+        <span class="track"></span>
+      </label>
+    </div>
   </section>
+  {/if}
 
+  {#if open === 'about'}
   <section class="group">
-    <h2>{t('About')}</h2>
     <div class="item">
       <div class="txt">
         <div class="n">PiumaLauncher</div>
@@ -387,7 +354,18 @@
       </div>
     </div>
   </section>
+  {/if}
+
+  {#if open === 'reset'}
+  <section class="group danger">
+    <div class="item">
+      <div class="txt"><div class="d">{t('Delete launcher data. After a restart, the launcher starts as if it were new.')}</div></div>
+      <button class="danger-btn" onclick={() => (showReset = true)}>{t('Reset…')}</button>
+    </div>
+  </section>
+  {/if}
 </div>
+{/if}
 
 {#if showReset}
   <div class="backdrop" role="presentation" onclick={() => !resetting && (showReset = false)}></div>
@@ -413,7 +391,6 @@
 <style>
   .head { display: grid; gap: 6px; }
   .groups { display: grid; gap: 34px; max-width: 820px; }
-  .group h2 { margin: 0 0 4px; color: var(--text); font-size: 16px; font-weight: 600; letter-spacing: -0.02em; }
   .intro { margin-bottom: 4px; }
   .item { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 16px 0; border-bottom: 1px solid var(--line); }
   .item.slim { padding: 10px 0; }
@@ -421,14 +398,10 @@
   .n { font-weight: 500; }
   .d { margin-top: 2px; color: var(--muted); font-size: 13px; line-height: 1.45; max-width: 520px; }
   .path { font-family: inherit; font-size: 12px; word-break: break-all; }
-  .num { width: 130px; }
   .usage { display: grid; gap: 2px; padding: 14px 0; border-bottom: 1px solid var(--line); }
   .u { display: flex; justify-content: space-between; font-size: 14px; padding: 3px 0; }
   .u.tot { margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--line); font-weight: 600; }
   .rt { padding-top: 16px; }
-  .acts { display: flex; gap: 8px; align-items: center; flex: none; }
-  .def { margin-left: 8px; color: var(--text); }
-  .danger h2 { color: var(--text); }
   .danger-btn { color: #e5484d; border-color: rgba(229, 72, 77, 0.55); }
   .danger-btn:hover:not(:disabled) { background: rgba(229, 72, 77, 0.12); border-color: #e5484d; }
   .danger-btn.solid { background: #e5484d; border-color: #e5484d; color: #fff; font-weight: 600; }

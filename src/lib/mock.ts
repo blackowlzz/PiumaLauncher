@@ -400,6 +400,8 @@ export async function mock(cmd: string, args: Record<string, unknown>): Promise<
       ]
     case 'gpu_info':
       return { name: 'NVIDIA' }
+    case 'power_info':
+      return { active: 'power-saver' }
     case 'modpack_updates':
       return Object.fromEntries(instances.filter((i) => i.pack && i.pack.versionId !== 'new').map((i) => [i.id, { versionId: 'new', versionNumber: '14.1.1', mcVersion: i.mcVersion }]))
     case 'update_modpack': {

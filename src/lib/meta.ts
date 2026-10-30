@@ -16,7 +16,7 @@ export function isCompatible(hit: ProjectHit, type: ProjectType, inst: Instance,
 
 export const profiles = (): { id: FlagProfile; label: string; hint: string }[] => [
   { id: 'low', label: t('Low usage'), hint: t('Least RAM possible; gives memory back to the system while the game is idle.') },
-  { id: 'balanced', label: t('Balanced'), hint: t("G1 with Aikar's flags: smooth and stable.") },
+  { id: 'balanced', label: t('Balanced'), hint: t('G1 tuned for playing: smooth and stable.') },
   { id: 'performance', label: t('Performance'), hint: t('Low-pause ZGC; uses more RAM (Java 17+).') },
   { id: 'none', label: t('None'), hint: t('No extra flags.') },
 ]
@@ -24,6 +24,11 @@ export const profiles = (): { id: FlagProfile; label: string; hint: string }[] =
 export const loaderNames: Record<Loader, string> = { vanilla: 'Vanilla', fabric: 'Fabric', quilt: 'Quilt', forge: 'Forge', neoforge: 'NeoForge' }
 
 export const profileName = (id: FlagProfile) => profiles().find((p) => p.id === id)?.label ?? id
+
+export const categoryName = (slug: string) => {
+  const words = slug.replace(/-/g, ' ')
+  return t(words.charAt(0).toUpperCase() + words.slice(1))
+}
 
 export function formatBytes(n: number): string {
   if (n >= 1 << 30) return `${(n / (1 << 30)).toFixed(1)} GB`

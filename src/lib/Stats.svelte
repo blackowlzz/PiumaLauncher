@@ -88,8 +88,6 @@
       <div class="heyebrow">{t('Total playtime')}</div>
       <div class="hbig"><Count value={sum.all} format={formatDuration} /></div>
       <div class="hchips">
-        <span class="hchip"><Icon name="play" size={12} />{t('{n} sessions', { n: sum.count })}</span>
-        {#if streak.current}<span class="hchip"><Icon name="flame" size={13} />{t('Day streak')}: {days_(streak.current)}</span>{/if}
         {#if week.change !== null}
           <span class="hchip trend" class:up={week.change > 0} class:down={week.change < 0}>{week.change > 0 ? '↑' : week.change < 0 ? '↓' : '='} {Math.abs(week.change)}% {t('vs the previous week')}</span>
         {/if}
@@ -111,14 +109,13 @@
 
   <section class="panel" use:reveal>
     <div class="phead"><h2><Icon name="chart" size={18} />{t('Last 30 days')}</h2><span class="muted small">{formatDuration(sum.month)}</span></div>
-    <LineChart
-      area
-      height={190}
-      label={t('Playtime over the last 30 days')}
-      series={[{ label: t('Playtime'), color: 'var(--text)', values: days.map((d) => d.secs) }]}
-      labels={days.map((d) => dayLabel(d.day, { weekday: 'long', day: 'numeric', month: 'long' }))}
-      format={(v) => (v >= 60 ? formatDuration(v) : t('No playtime'))}
-    />
+    <div class="bars month" role="img" aria-label={t('Playtime over the last 30 days')} use:inview>
+      {#each days as d, i}
+        <div class="bcol" title={`${dayLabel(d.day, { weekday: 'long', day: 'numeric', month: 'long' })} · ${d.secs >= 60 ? formatDuration(d.secs) : t('No playtime')}`}>
+          <div class="btrack"><div class="bfill" class:top={d.secs === peak && d.secs > 0} style:--h="{d.secs ? Math.max(4, (d.secs / peak) * 100) : 0}%" style:--i={i}></div></div>
+        </div>
+      {/each}
+    </div>
     <div class="axis muted small">
       <span>{dayLabel(days[0].day, { day: 'numeric', month: 'short' })}</span>
       <span>{dayLabel(days[15].day, { day: 'numeric', month: 'short' })}</span>
@@ -252,8 +249,9 @@
   .hchip:nth-child(1) { animation-delay: 380ms; }
   .hchip:nth-child(2) { animation-delay: 460ms; }
   .hchip:nth-child(3) { animation-delay: 540ms; }
-  .trend.up { color: #2fbf63; border-color: rgba(62, 207, 110, 0.5); background: rgba(62, 207, 110, 0.12); }
-  .trend.down { color: #e5484d; border-color: rgba(229, 72, 77, 0.5); background: rgba(229, 72, 77, 0.12); }
+  .hchip.trend { padding: 0 4px; background: none; border-color: transparent; color: var(--muted); }
+  .trend.up { color: #2fbf63; }
+  .trend.down { color: #e5484d; }
   .hline { margin: 0 -32px; }
   .favcard { display: grid; gap: 14px; align-content: start; }
   .ringwrap { position: relative; width: 170px; height: 170px; justify-self: center; }
@@ -279,6 +277,9 @@
   .trio { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr) minmax(0, 1.3fr); gap: 16px; }
   .bars { display: grid; gap: 6px; height: 130px; align-items: end; }
   .bars.week { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  .bars.month { grid-template-columns: repeat(30, minmax(0, 1fr)); gap: 4px; height: 180px; }
+  .bars.month .bcol { grid-template-rows: 1fr; }
+  .bars.month .bfill { border-radius: 4px; transition-delay: calc(var(--i) * 14ms + 150ms), 0s; }
   .bars.hours { grid-template-columns: repeat(24, minmax(0, 1fr)); gap: 3px; }
   .bcol { display: grid; grid-template-rows: 1fr auto; gap: 6px; height: 100%; cursor: default; }
   .btrack { display: flex; align-items: flex-end; height: 100%; }

@@ -1,4 +1,5 @@
 mod accounts;
+mod aot;
 mod backup;
 mod cli;
 mod commands;
@@ -25,6 +26,7 @@ mod news;
 mod optimizer;
 mod options_sync;
 mod paths;
+mod power;
 mod presence;
 mod procs;
 mod runtime;
@@ -74,6 +76,13 @@ pub fn run() {
         .manage(Running::default())
         .setup(|app| {
             if let Some(w) = app.get_webview_window("main") {
+                let light = match settings::load().theme.as_str() {
+                    "light" => true,
+                    "dark" => false,
+                    _ => matches!(w.theme(), Ok(tauri::Theme::Light)),
+                };
+                let bg = if light { tauri::window::Color(252, 252, 252, 255) } else { tauri::window::Color(0, 0, 0, 255) };
+                let _ = w.set_background_color(Some(bg));
                 if let Ok(Some(m)) = w.primary_monitor() {
                     let scale = m.scale_factor();
                     let (sw, sh) = (m.size().width as f64 / scale, m.size().height as f64 / scale);
@@ -82,6 +91,7 @@ pub fn run() {
                     let _ = w.set_size(tauri::LogicalSize::new(width, height));
                     let _ = w.center();
                 }
+                let _ = w.show();
             }
             diag::started();
             presence::launcher();
@@ -116,6 +126,7 @@ pub fn run() {
             commands::modpack_updates,
             commands::modpack_diff,
             commands::gpu_info,
+            commands::power_info,
             commands::startup_report,
             commands::all_worlds,
             commands::transfer_world,

@@ -11,34 +11,51 @@ pub enum FlagProfile {
     None,
 }
 
-fn g1_aikar() -> Vec<String> {
+fn g1_client() -> Vec<String> {
     [
         "-XX:+UseG1GC",
         "-XX:+ParallelRefProcEnabled",
-        "-XX:MaxGCPauseMillis=200",
+        "-XX:MaxGCPauseMillis=50",
         "-XX:+UnlockExperimentalVMOptions",
         "-XX:+DisableExplicitGC",
-        "-XX:G1NewSizePercent=30",
+        "-XX:G1NewSizePercent=23",
         "-XX:G1MaxNewSizePercent=40",
         "-XX:G1HeapRegionSize=8M",
         "-XX:G1ReservePercent=20",
         "-XX:G1HeapWastePercent=5",
-        "-XX:G1MixedGCCountTarget=4",
+        "-XX:G1MixedGCCountTarget=3",
         "-XX:InitiatingHeapOccupancyPercent=15",
         "-XX:G1MixedGCLiveThresholdPercent=90",
-        "-XX:G1RSetUpdatingPauseTimePercent=5",
+        "-XX:G1RSetUpdatingPauseTimePercent=0",
         "-XX:SurvivorRatio=32",
         "-XX:MaxTenuringThreshold=1",
+        "-XX:G1SATBBufferEnqueueingThresholdPercent=30",
+        "-XX:G1ConcMarkStepDurationMillis=5.0",
         "-XX:-UsePerfData",
     ]
     .map(String::from)
     .to_vec()
 }
 
-pub fn jvm_flags(profile: FlagProfile, java_major: u32) -> Vec<String> {
-    match profile {
-        FlagProfile::None => vec![],
-        FlagProfile::Balanced => g1_aikar(),
+fn platform_flags(java_major: u32) -> Vec<String> {
+    let mut f = Vec::new();
+    if cfg!(target_os = "linux") {
+        f.push("-XX:+UseTransparentHugePages".into());
+    }
+    if java_major >= 25 {
+        f.push("-XX:+UseCompactObjectHeaders".into());
+    }
+    f
+}
+
+fn zgc_keeps_jit(java_major: u32, graal: bool) -> bool {
+    java_major >= 17 && (!graal || java_major >= 25)
+}
+
+pub fn jvm_flags(profile: FlagProfile, java_major: u32, graal: bool) -> Vec<String> {
+    let mut f = match profile {
+        FlagProfile::None => return vec![],
+        FlagProfile::Balanced => g1_client(),
         FlagProfile::Low => {
             let mut f: Vec<String> = [
                 "-XX:+UseG1GC",
@@ -58,10 +75,8 @@ pub fn jvm_flags(profile: FlagProfile, java_major: u32) -> Vec<String> {
             }
             f
         }
+        FlagProfile::Performance if !zgc_keeps_jit(java_major, graal) => g1_client(),
         FlagProfile::Performance => {
-            if java_major < 17 {
-                return g1_aikar();
-            }
             let mut f = vec!["-XX:+UseZGC".to_string()];
             if (21..=22).contains(&java_major) {
                 f.push("-XX:+ZGenerational".into());
@@ -70,7 +85,9 @@ pub fn jvm_flags(profile: FlagProfile, java_major: u32) -> Vec<String> {
             f.push("-XX:-UsePerfData".into());
             f
         }
-    }
+    };
+    f.extend(platform_flags(java_major));
+    f
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Default)]
@@ -109,8 +126,8 @@ fn selects_gc(flag: &str) -> bool {
     (flag.starts_with("-XX:+Use") && flag.ends_with("GC")) || flag.contains("G1") || flag.contains("ZGenerational")
 }
 
-pub fn launch_flags(profile: FlagProfile, tuning: &Tuning, java_major: u32) -> Vec<String> {
-    let mut flags = jvm_flags(profile, java_major);
+pub fn launch_flags(profile: FlagProfile, tuning: &Tuning, java_major: u32, graal: bool) -> Vec<String> {
+    let mut flags = jvm_flags(profile, java_major, graal);
     let mut gc = if flags.iter().any(|f| f == "-XX:+UseZGC") {
         Gc::Zgc
     } else if flags.iter().any(|f| f == "-XX:+UseG1GC") {
@@ -170,13 +187,13 @@ mod tests {
 
     #[test]
     fn auto_keeps_profile() {
-        assert_eq!(launch_flags(FlagProfile::Balanced, &Tuning::default(), 21), jvm_flags(FlagProfile::Balanced, 21));
+        assert_eq!(launch_flags(FlagProfile::Balanced, &Tuning::default(), 21, false), jvm_flags(FlagProfile::Balanced, 21, false));
     }
 
     #[test]
     fn override_replaces_gc() {
         let t = Tuning { gc: Gc::Parallel, pause_ms: 50, ..Tuning::default() };
-        let f = launch_flags(FlagProfile::Balanced, &t, 21);
+        let f = launch_flags(FlagProfile::Balanced, &t, 21, false);
         assert!(f.contains(&"-XX:+UseParallelGC".to_string()));
         assert!(!f.iter().any(|x| x.contains("G1")));
         assert_eq!(f.iter().filter(|x| x.starts_with("-XX:MaxGCPauseMillis=")).count(), 1);
@@ -185,6 +202,23 @@ mod tests {
     #[test]
     fn zgc_falls_back_on_old_java() {
         let t = Tuning { gc: Gc::Zgc, ..Tuning::default() };
-        assert!(launch_flags(FlagProfile::None, &t, 8).contains(&"-XX:+UseG1GC".to_string()));
+        assert!(launch_flags(FlagProfile::None, &t, 8, false).contains(&"-XX:+UseG1GC".to_string()));
+    }
+
+    #[test]
+    fn performance_keeps_graal_jit() {
+        let has = |f: &[String], x: &str| f.iter().any(|y| y == x);
+        let graal21 = jvm_flags(FlagProfile::Performance, 21, true);
+        assert!(has(&graal21, "-XX:+UseG1GC") && !has(&graal21, "-XX:+UseZGC"));
+        let temurin21 = jvm_flags(FlagProfile::Performance, 21, false);
+        assert!(has(&temurin21, "-XX:+UseZGC") && has(&temurin21, "-XX:+ZGenerational"));
+        let graal25 = jvm_flags(FlagProfile::Performance, 25, true);
+        assert!(has(&graal25, "-XX:+UseZGC") && has(&graal25, "-XX:+UseCompactObjectHeaders"));
+        assert!(!jvm_flags(FlagProfile::Balanced, 21, true).iter().any(|x| x.contains("CompactObjectHeaders")));
+    }
+
+    #[test]
+    fn none_adds_nothing() {
+        assert!(jvm_flags(FlagProfile::None, 25, true).is_empty());
     }
 }

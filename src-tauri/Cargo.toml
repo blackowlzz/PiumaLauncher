@@ -1,6 +1,6 @@
 [package]
 name = "piuma-launcher"
-version = "0.6.8"
+version = "0.6.9"
 description = "Lightweight open source Minecraft launcher"
 edition = "2021"
 license = "GPL-3.0-or-later"
@@ -45,3 +45,6 @@ lto = true
 codegen-units = 1
 panic = "abort"
 strip = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gio = "0.18"

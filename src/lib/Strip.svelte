@@ -3,12 +3,11 @@
   import Icon from './Icon.svelte'
   import { t } from './i18n.svelte'
 
-  let { title, icon, action, onAction, cols = 'minmax(250px, 290px)', children }: {
+  let { title, icon, action, onAction, children }: {
     title: string
     icon?: 'flame' | 'box' | 'clock'
     action?: string
     onAction?: () => void
-    cols?: string
     children: Snippet
   } = $props()
 
@@ -21,7 +20,8 @@
     canPrev = scroller.scrollLeft > 4
     canNext = scroller.scrollLeft + scroller.clientWidth < scroller.scrollWidth - 4
   }
-  const page = (dir: 1 | -1) => scroller?.scrollBy({ left: dir * scroller.clientWidth * 0.85, behavior: 'smooth' })
+  const GAP = 14
+  const page = (dir: 1 | -1) => scroller?.scrollBy({ left: dir * (scroller.clientWidth - 8 + GAP), behavior: 'smooth' })
 
   $effect(() => {
     if (!scroller) return
@@ -43,7 +43,7 @@
     </div>
   </div>
   <div class="frame" class:fade-l={canPrev} class:fade-r={canNext}>
-    <div class="scroller" bind:this={scroller} onscroll={update} style:--cols={cols}>
+    <div class="scroller" bind:this={scroller} onscroll={update}>
       {@render children()}
     </div>
   </div>
@@ -55,12 +55,16 @@
   .ctl { display: flex; align-items: center; gap: 8px; }
   .arrow { display: inline-grid; place-items: center; width: 34px; height: 34px; padding: 0; }
   .flip { display: inline-grid; transform: scaleX(-1); }
-  .frame { position: relative; margin: 0 -4px; }
-  .scroller { display: grid; grid-auto-flow: column; grid-auto-columns: var(--cols); gap: 14px; overflow-x: auto; padding: 4px 4px 14px; scroll-snap-type: x proximity; scrollbar-width: none; }
+  .frame { position: relative; margin: 0 -4px; container: strip / inline-size; }
+  .scroller { --n: 1; display: grid; grid-auto-flow: column; grid-auto-columns: calc((100% - (var(--n) - 1) * 14px) / var(--n)); gap: 14px; overflow-x: auto; padding: 4px 4px 14px; scroll-snap-type: x proximity; scrollbar-width: none; }
   .scroller::-webkit-scrollbar { display: none; }
   .scroller > :global(*) { scroll-snap-align: start; }
   .frame::before, .frame::after { content: ''; position: absolute; top: 0; bottom: 14px; width: 56px; pointer-events: none; z-index: 3; opacity: 0; transition: opacity 250ms; }
   .frame::before { left: 0; background: linear-gradient(to right, var(--bg), transparent); }
   .frame::after { right: 0; background: linear-gradient(to left, var(--bg), transparent); }
   .fade-l::before, .fade-r::after { opacity: 1; }
+  @container strip (min-width: 454px) { .scroller { --n: 2; } }
+  @container strip (min-width: 688px) { .scroller { --n: 3; } }
+  @container strip (min-width: 922px) { .scroller { --n: 4; } }
+  @container strip (min-width: 1156px) { .scroller { --n: 5; } }
 </style>

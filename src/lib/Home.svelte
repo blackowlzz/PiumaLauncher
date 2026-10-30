@@ -11,14 +11,13 @@
   import Strip from './Strip.svelte'
   import { reveal, spotlight } from './actions'
   import { locale, t } from './i18n.svelte'
-  import { onMount, tick } from 'svelte'
+  import { onMount } from 'svelte'
   import { activeAccount, app, installModpack, isBusy, openInstance, openProject, play, playedTodaySecs, refreshEffective, refreshStartup, seconds, selectedInstance, stop, weeklyPlaytime } from './store.svelte'
   import { formatDuration, loaderNames, profileName, relativeTime } from './meta'
 
   const inst = $derived(selectedInstance())
   const game = $derived(inst ? app.games[inst.id] : undefined)
   const running = $derived(game?.state === 'running')
-  const busy = $derived(isBusy(inst?.id ?? null))
   const samples = $derived(inst ? (app.stats[inst.id] ?? []) : [])
   const eff = $derived(inst ? app.effective[inst.id] : undefined)
   const ram = $derived(running && samples.length ? samples[samples.length - 1] : null)
@@ -31,10 +30,9 @@
   $effect(() => {
     if (inst?.id) refreshStartup(inst.id)
   })
-  async function openLimits() {
+  function openLimits() {
+    app.section = 'playtime'
     app.page = 'settings'
-    await tick()
-    document.getElementById('playtime')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
   let today = $state(0)
   $effect(() => {
@@ -110,13 +108,6 @@
         {#if app.packUpdates[inst.id]}<li><button class="updlink" onclick={() => openInstance(inst.id)}><Icon name="download" size={14} />{t('Update available')}: {app.packUpdates[inst.id].versionNumber}</button></li>{/if}
       </ul>
       <div class="cta" use:reveal={4}>
-        {#if running}
-          <button class="big glass" onclick={() => stop(inst.id)}>{t('Stop')}</button>
-        {:else}
-          <button class="primary big" onclick={() => play(inst.id)} disabled={busy}>
-            <span class="ic"><Icon name="play" size={15} /></span>{game?.state === 'preparing' ? t('Preparing…') : t('Play')}
-          </button>
-        {/if}
         <button class="big glass" onclick={() => openInstance(inst.id)}><Icon name="settings" size={16} />{t('Manage instance')}</button>
       </div>
     {:else}
@@ -144,7 +135,7 @@
 <div class="cols">
   <div class="main">
     {#if app.featured.length}
-      <Strip icon="flame" title={t('Popular modpacks')} action={t('View all')} onAction={() => (app.page = 'explore')} cols="minmax(236px, 262px)">
+      <Strip icon="flame" title={t('Popular modpacks')} action={t('View all')} onAction={() => (app.page = 'explore')}>
         {#each app.featured as h, n (h.projectId)}
           <div use:reveal={n}>
             <ProjectCard hit={h} busy={app.installingId === h.projectId} disabled={app.installingId !== null} onInstall={() => installModpack(h.projectId, undefined, h.latestMc)} onOpen={() => openProject(h)} />
@@ -243,7 +234,8 @@
   .hero .live { color: #fff; }
   .hero .dot { background: #fff; }
   .hero button { --text: #fff; --line-strong: rgba(255, 255, 255, 0.35); --faint: rgba(255, 255, 255, 0.6); }
-  .hero button.primary { background: var(--inv-bg); color: var(--inv-text); border-color: var(--inv-bg); }
+  .hero button.primary { --text: #000; background: #fff; color: #000; border-color: #fff; }
+  .hero button.primary:hover:not(:disabled) { background: #fff; border-color: #fff; }
   .glass { background: rgba(255, 255, 255, 0.1); color: #fff; backdrop-filter: blur(6px); }
   .glass:hover:not(:disabled) { background: rgba(255, 255, 255, 0.2); }
   .copy { display: grid; gap: 14px; max-width: 760px; min-width: 0; align-content: end; }
@@ -261,7 +253,6 @@
   .cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 4px; }
   .cta button { display: inline-flex; align-items: center; gap: 9px; }
   .cta .big { padding: 12px 30px; }
-  .ic { display: inline-grid; }
   .cta .primary:not(:disabled)::after { animation: glint 5s ease-in-out 2s infinite; }
   .cta .primary:not(:disabled):hover::after { animation: none; }
   @keyframes glint { 0%, 70% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }

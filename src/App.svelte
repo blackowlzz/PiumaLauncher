@@ -18,7 +18,6 @@
   import Servers from './lib/Servers.svelte'
   import Settings from './lib/Settings.svelte'
   import Performance from './lib/Performance.svelte'
-  import Intro from './lib/Intro.svelte'
   import ConfirmDialog from './lib/ConfirmDialog.svelte'
   import CrashDialog from './lib/CrashDialog.svelte'
   import InstanceChooser from './lib/InstanceChooser.svelte'
@@ -29,7 +28,7 @@
   import Wardrobe from './lib/Wardrobe.svelte'
   import Worlds from './lib/Worlds.svelte'
   import Stats from './lib/Stats.svelte'
-  import { applyTheme, isCustomized, resetTheme } from './lib/palette.svelte'
+  import { isCustomized, resetTheme } from './lib/palette.svelte'
   import UpdateBanner from './lib/UpdateBanner.svelte'
   import TitleBar from './lib/TitleBar.svelte'
   import { maybeBench } from './lib/bench'
@@ -58,15 +57,17 @@
   const theme = $derived(forced ?? app.settings.theme)
   const dark = $derived(theme === 'dark' || (theme === 'system' && systemDark))
 
-  onMount(applyTheme)
-
   $effect(() => {
     document.documentElement.toggleAttribute('data-reduce', app.settings.reduceEffects)
   })
 
   $effect(() => {
+    if (!app.loaded) return
     if (theme === 'system') delete document.documentElement.dataset.theme
     else document.documentElement.dataset.theme = theme
+    try {
+      localStorage.setItem('piuma-mode', app.settings.theme)
+    } catch {}
   })
 
   function toggleTheme() {
@@ -289,7 +290,6 @@
 <CrashDialog />
 <DropZone />
 <ConfirmDialog />
-<Intro />
 <Welcome />
 
 <style>

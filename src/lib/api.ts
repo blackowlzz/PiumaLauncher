@@ -350,6 +350,7 @@ export const api = {
   openUrl: (url: string) => call<void>('open_url', { url }),
   duplicateInstance: (instanceId: string, name?: string) => call<Instance>('duplicate_instance', { instanceId, name }),
   gpuInfo: () => call<{ name: string } | null>('gpu_info'),
+  powerInfo: () => call<{ active: string } | null>('power_info'),
   startupReport: (instanceId: string) => call<StartupReport>('startup_report', { instanceId }),
   allWorlds: () => call<WorldEntry[]>('all_worlds'),
   transferWorld: (fromInstance: string, folder: string, toInstance: string, removeSource: boolean) =>
@@ -600,6 +601,8 @@ export interface Settings {
   syncCategories: string[]
   defaultLaunch: LaunchOptions
   dedicatedGpu: boolean
+  performancePower: boolean
+  aotCache: boolean
   breakReminderMinutes: number
   dailyLimitMinutes: number
 }
@@ -628,6 +631,8 @@ export const defaultSettings = (): Settings => ({
   syncCategories: ['controls', 'audio', 'interface'],
   defaultLaunch: emptyLaunch(),
   dedicatedGpu: false,
+  performancePower: true,
+  aotCache: false,
   breakReminderMinutes: 0,
   dailyLimitMinutes: 0,
 })

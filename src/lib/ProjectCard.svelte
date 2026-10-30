@@ -7,6 +7,7 @@
   import { api } from './api'
   import { copyText, ctx, type MenuItem } from './contextmenu'
   import { notify, photoFor } from './store.svelte'
+  import { categoryName } from './meta'
 
   let { hit, busy = false, disabled = false, installed = false, update = false, index, onInstall, onOpen }: {
     hit: ProjectHit
@@ -30,7 +31,6 @@
     { label: t('Open on Modrinth'), icon: 'globe', onclick: () => void api.openUrl(link).catch(notify) },
     { label: t('Copy Modrinth link'), icon: 'copy', onclick: () => void copyText(link).then((ok) => ok && notify(t('Copied'))) },
   ]
-  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 </script>
 
 <article class="card" use:ctx={menu} class:rise={index !== undefined} style:--d="{(index ?? 0) * 35}ms">
@@ -50,7 +50,7 @@
     <div class="title">{hit.title}</div>
     <p class="desc">{hit.description}</p>
     <div class="tags">
-      {#each tags as c}<span class="tag">{cap(c)}</span>{/each}
+      {#each tags as c}<span class="tag">{categoryName(c)}</span>{/each}
     </div>
     <div class="foot">
       <button class="sm" class:primary={!installed || update} onclick={onInstall} {disabled}>{busy ? t('Installing…') : update ? t('Update') : installed ? t('Installed') : t('Install')}</button>

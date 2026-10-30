@@ -42,8 +42,7 @@ impl Flavor {
 fn plan(required: u32) -> Option<(Flavor, u32)> {
     match required {
         0..=8 => Some((Flavor::Temurin, 8)),
-        9..=17 => Some((Flavor::Temurin, 17)),
-        18..=21 => Some((Flavor::Graal, 21)),
+        9..=21 => Some((Flavor::Graal, 21)),
         22..=25 => Some((Flavor::Graal, 25)),
         _ => None,
     }
@@ -139,6 +138,7 @@ pub async fn ensure(
     if target().is_none() {
         return Ok(None);
     }
+    let flavor = if supported(flavor) { flavor } else { Flavor::Temurin };
     install(client, flavor, major, progress).await.map(Some)
 }
 
@@ -297,10 +297,14 @@ pub async fn install_by_id(
     install(client, flavor, major, progress).await
 }
 
+fn fits(major: u32, required: u32) -> bool {
+    if required <= 8 { major == 8 } else { major >= required }
+}
+
 pub async fn preferred(id: &str, required: u32) -> Option<JavaInstall> {
     let home = home_of(id)?;
     let found = java::probe(&java_bin(&home)).await?;
-    (found.major >= required).then_some(found)
+    fits(found.major, required).then_some(found)
 }
 
 fn stripped(path: &Path) -> Option<PathBuf> {
@@ -353,10 +357,19 @@ mod tests {
     #[test]
     fn plan_maps_mojang_versions() {
         assert_eq!(plan(8), Some((Flavor::Temurin, 8)));
-        assert_eq!(plan(16), Some((Flavor::Temurin, 17)));
+        assert_eq!(plan(16), Some((Flavor::Graal, 21)));
+        assert_eq!(plan(17), Some((Flavor::Graal, 21)));
         assert_eq!(plan(21), Some((Flavor::Graal, 21)));
         assert_eq!(plan(25), Some((Flavor::Graal, 25)));
         assert_eq!(plan(30), None);
+    }
+
+    #[test]
+    fn default_java_keeps_old_versions_on_java_8() {
+        assert!(fits(8, 8));
+        assert!(!fits(25, 8));
+        assert!(fits(25, 21));
+        assert!(!fits(21, 25));
     }
 
     #[test]

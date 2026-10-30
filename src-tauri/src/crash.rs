@@ -546,6 +546,21 @@ fn read_capped(path: &Path) -> Option<String> {
     Some(s)
 }
 
+const SHUTDOWN_HANG: &str = "Description: Client shutdown from post-main";
+
+fn is_shutdown_hang(report: &str) -> bool {
+    report.lines().take(12).any(|l| l.trim() == SHUTDOWN_HANG)
+}
+
+pub fn shutdown_hang(instance_id: &str, since: SystemTime) -> bool {
+    let game = paths::game_dir(instance_id);
+    newest(&game, since, |n| n.starts_with("hs_err_pid") && n.ends_with(".log")).is_none()
+        && newest(&game.join("crash-reports"), since, |n| n.ends_with(".txt"))
+            .as_deref()
+            .and_then(read_capped)
+            .is_some_and(|s| is_shutdown_hang(&s))
+}
+
 fn analyze(inst: Instance, code: Option<i32>, since: SystemTime, tail: Vec<String>) -> Option<Report> {
     let game = paths::game_dir(&inst.id);
     let report_file = newest(&game.join("crash-reports"), since, |n| n.ends_with(".txt"));
@@ -553,8 +568,12 @@ fn analyze(inst: Instance, code: Option<i32>, since: SystemTime, tail: Vec<Strin
     if code == Some(0) && report_file.is_none() && native_file.is_none() {
         return None;
     }
+    let report_text = report_file.as_deref().and_then(read_capped);
+    if native_file.is_none() && report_text.as_deref().is_some_and(is_shutdown_hang) {
+        return None;
+    }
     let mut text = tail;
-    if let Some(s) = report_file.as_deref().and_then(read_capped) {
+    if let Some(s) = report_text {
         text.extend(s.lines().map(String::from));
     }
     let native = native_file.as_deref().and_then(read_capped);
@@ -643,6 +662,13 @@ pub fn open_report(id: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn shutdown_watchdog_is_not_a_crash() {
+        let hang = "---- Minecraft Crash Report ----\n// Everything's going to plan.\n\nTime: 2026-10-30 11:05:39\nDescription: Client shutdown from post-main\n\njava.lang.Error: Watchdog (Client shutdown from post-main)";
+        assert!(is_shutdown_hang(hang));
+        assert!(!is_shutdown_hang("---- Minecraft Crash Report ----\nDescription: Rendering overlay\n"));
+    }
 
     #[test]
     fn crashes_are_remembered_newest_last_and_capped() {

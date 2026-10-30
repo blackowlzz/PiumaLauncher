@@ -42,6 +42,7 @@ export const app = $state({
   page: 'home' as Page,
   detailId: null as string | null,
   wardrobeId: null as string | null,
+  section: null as string | null,
   instances: [] as Instance[],
   accounts: { accounts: [], active: null } as AccountStore,
   versions: [] as VersionEntry[],
@@ -128,13 +129,16 @@ export const activeAccount = () =>
   app.accounts.accounts.find((a) => a.id === app.accounts.active) ?? null
 
 export async function init() {
-  const settings = await api.getSettings().catch(() => defaultSettings())
-  await loadLanguage(settings.language)
-  app.settings = { ...defaultSettings(), ...settings }
   api.versionImages().then((m) => (app.versionImages = m)).catch(() => {})
   api.gpuInfo().then((g) => (app.gpu = g)).catch(() => {})
-  if (inTauri) await listenToBackend()
-  await Promise.all([reloadInstances(), reloadAccounts()])
+  const [settings] = await Promise.all([
+    api.getSettings().catch(() => defaultSettings()),
+    inTauri ? listenToBackend() : null,
+    reloadInstances(),
+    reloadAccounts(),
+  ])
+  await loadLanguage(settings.language)
+  app.settings = { ...defaultSettings(), ...settings }
   const remembered = app.settings.lastInstance
   if (remembered && app.instances.some((i) => i.id === remembered)) app.selectedId = remembered
   app.loaded = true
@@ -165,30 +169,32 @@ export async function init() {
 }
 
 async function listenToBackend() {
-  await listen<{ instanceId: string }>('startup-measured', (e) => void refreshStartup(e.payload.instanceId))
-  await listen<GameStateEvent>('game-state', (e) => {
-    const ev = e.payload
-    app.games[ev.instanceId] = ev
-    if (ev.state === 'preparing') {
-      app.stats[ev.instanceId] = []
-    }
-    if (ev.state === 'error') notify(ev.message ?? t('Launch failed'))
-    if (ev.state === 'running' && ev.message) notify(t(ev.message))
-    if (ev.state === 'running') runningSince[ev.instanceId] ??= Date.now()
-    if (ev.state === 'exited' || ev.state === 'error') {
-      delete runningSince[ev.instanceId]
-      delete breaksShown[ev.instanceId]
-    }
-    if (ev.state === 'exited' || ev.state === 'running') reloadStats()
-  })
-  await listen<{ instanceId: string; rssMb: number }>('game-stats', (e) => {
-    const samples = (app.stats[e.payload.instanceId] ??= [])
-    samples.push(e.payload.rssMb)
-    if (samples.length > MAX_STAT_SAMPLES) samples.shift()
-  })
-  await listen<InstallProgress>('install-progress', (e) => (app.install = e.payload))
-  await listen<CrashReport>('game-crash', (e) => (app.crash = e.payload))
-  await listen('cli-request', () => handleCli())
+  await Promise.all([
+    listen<{ instanceId: string }>('startup-measured', (e) => void refreshStartup(e.payload.instanceId)),
+    listen<GameStateEvent>('game-state', (e) => {
+      const ev = e.payload
+      app.games[ev.instanceId] = ev
+      if (ev.state === 'preparing') {
+        app.stats[ev.instanceId] = []
+      }
+      if (ev.state === 'error') notify(ev.message ?? t('Launch failed'))
+      if (ev.state === 'running' && ev.message) notify(t(ev.message))
+      if (ev.state === 'running') runningSince[ev.instanceId] ??= Date.now()
+      if (ev.state === 'exited' || ev.state === 'error') {
+        delete runningSince[ev.instanceId]
+        delete breaksShown[ev.instanceId]
+      }
+      if (ev.state === 'exited' || ev.state === 'running') reloadStats()
+    }),
+    listen<{ instanceId: string; rssMb: number }>('game-stats', (e) => {
+      const samples = (app.stats[e.payload.instanceId] ??= [])
+      samples.push(e.payload.rssMb)
+      if (samples.length > MAX_STAT_SAMPLES) samples.shift()
+    }),
+    listen<InstallProgress>('install-progress', (e) => (app.install = e.payload)),
+    listen<CrashReport>('game-crash', (e) => (app.crash = e.payload)),
+    listen('cli-request', () => handleCli()),
+  ])
 }
 
 export function openProject(hit: ProjectHit, type: ProjectType = 'modpack') {

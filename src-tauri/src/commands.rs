@@ -448,6 +448,11 @@ pub fn gpu_info() -> Option<crate::gpu::Dedicated> {
     crate::gpu::dedicated()
 }
 
+#[tauri::command(async)]
+pub fn power_info() -> Option<crate::power::PowerInfo> {
+    crate::power::info()
+}
+
 #[tauri::command]
 pub fn cancel_install() -> bool {
     net::cancel()

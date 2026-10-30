@@ -14,7 +14,7 @@
   import Icon from './Icon.svelte'
   import ProjectCard from './ProjectCard.svelte'
   import Select from './Select.svelte'
-  import { contentKindOf, formatBytes } from './meta'
+  import { categoryName, contentKindOf, formatBytes } from './meta'
 
   const types: { id: ProjectType; label: string }[] = [
     { id: 'modpack', label: 'Modpack' },
@@ -317,7 +317,7 @@
         <h3>{t('Categories')}</h3>
         <div class="chips">
           {#each cats as c}
-            <button class="chip" aria-pressed={categories.includes(c)} onclick={() => (categories = toggle(categories, c))}>{c.replace(/-/g, ' ')}</button>
+            <button class="chip" aria-pressed={categories.includes(c)} onclick={() => (categories = toggle(categories, c))}>{categoryName(c)}</button>
           {/each}
         </div>
       </div>

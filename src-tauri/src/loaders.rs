@@ -131,6 +131,10 @@ fn is_stable(i: &Info) -> bool {
     }
 }
 
+fn numbers(v: &str) -> Vec<u64> {
+    v.split(|c: char| !c.is_ascii_digit()).filter(|p| !p.is_empty()).map(|p| p.parse().unwrap_or(0)).collect()
+}
+
 fn maven_versions(xml: &str, art: &Artifact) -> Vec<String> {
     let mut out: Vec<String> = xml
         .split("<version>")
@@ -139,7 +143,7 @@ fn maven_versions(xml: &str, art: &Artifact) -> Vec<String> {
         .filter(|v| v.starts_with(art.prefix.as_str()) && v.len() > art.prefix.len())
         .map(|v| if art.full { v[art.prefix.len()..].to_string() } else { v.to_string() })
         .collect();
-    out.reverse();
+    out.sort_by(|a, b| numbers(b).cmp(&numbers(a)));
     let (stable, other): (Vec<_>, Vec<_>) = out
         .into_iter()
         .partition(|v| !["alpha", "beta", "rc", "pre", "snapshot"].iter().any(|t| v.to_lowercase().contains(t)));
@@ -325,6 +329,12 @@ mod tests {
         let art = artifact(Loader::Forge, "1.21.1").unwrap();
         let xml = "<version>1.20.1-47.0.1</version><version>1.21.1-52.0.1</version><version>1.21.1-52.0.9</version><version>1.21.1-52.1.0-beta</version>";
         assert_eq!(maven_versions(xml, &art), vec!["52.0.9", "52.0.1", "52.1.0-beta"]);
+        let old = Artifact { base: "", group: "", name: "forge", prefix: "1.17.1-".into(), full: true };
+        let xml = "<version>1.17.1-37.1.1</version><version>1.17.1-37.1.0</version><version>1.17.1-37.0.127</version><version>1.17.1-37.0.9</version><version>1.17.1-37.0.0</version>";
+        assert_eq!(maven_versions(xml, &old)[..3], ["37.1.1", "37.1.0", "37.0.127"]);
+        let mixed = Artifact { base: "", group: "", name: "forge", prefix: "1.12.2-".into(), full: true };
+        let xml = "<version>1.12.2-14.23.5.2860</version><version>1.12.2-14.23.5.2864</version><version>1.12.2-14.23.0.2486</version>";
+        assert_eq!(maven_versions(xml, &mixed)[0], "14.23.5.2864");
     }
 
     #[test]

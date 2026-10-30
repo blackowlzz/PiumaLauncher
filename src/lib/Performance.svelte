@@ -5,14 +5,19 @@
   import Select from './Select.svelte'
   import PixelField from './PixelField.svelte'
   import Slider from './Slider.svelte'
-  import { profiles } from './meta'
+  import { profileName, profiles } from './meta'
   import { app, saveSettings } from './store.svelte'
+  import JavaRuntimes from './JavaRuntimes.svelte'
+  import SectionCards, { type SectionCard } from './SectionCards.svelte'
+  import SectionHead from './SectionHead.svelte'
 
   let sys = $state<SystemInfo | null>(null)
   let rec = $state<Recommendation | null>(null)
+  let power = $state<{ active: string } | null>(null)
   onMount(() => {
     api.systemInfo().then((s) => (sys = s)).catch(() => {})
     api.recommendPerformance().then((r) => (rec = r)).catch(() => {})
+    api.powerInfo().then((p) => (power = p)).catch(() => {})
   })
 
   const s = app.settings
@@ -84,17 +89,74 @@
     }[s.tuning.gc],
   )
 
+  type Section = 'optimizer' | 'java' | 'gpu' | 'power' | 'aot' | 'memory' | 'jvm' | 'launch' | 'launcher'
+  let open = $state<Section | null>((app.section as Section | null) ?? null)
+  app.section = null
+
+  function show(id: Section | null) {
+    open = id
+    document.querySelector('main')?.scrollTo({ top: 0 })
+  }
+
+  const forced = $derived.by(() => {
+    const id = s.preferredJava
+    if (!id) return null
+    const r = app.runtimes.find((x) => x.id === id)
+    if (!r || r.flavor === 'graalvm') return null
+    return `${r.label} ${r.major}`
+  })
+
+  function useOptimized() {
+    s.preferredJava = null
+    saveSettings()
+  }
+
+  const cards = $derived.by(() => {
+    const extras = Number(!!app.gpu) + Number(!!power)
+    const list: (SectionCard & { id: Section })[] = [
+      { id: 'optimizer', icon: 'cpu', title: t('Automatic optimizer'), sub: rec ? `${tierName} · ${gb(rec.memoryMaxMb)} · ${profileName(rec.flagProfile)}` : t('Picks memory and Java settings that fit your computer, so you do not have to.'), span: (3 - extras) as 1 | 2 | 3, field: level },
+      { id: 'java', icon: 'package', title: t('Java'), sub: forced ? t('Every instance is forced to use {name}.', { name: forced }) : t('GraalVM for modern versions'), tag: t('Recommended') },
+    ]
+    if (app.gpu) list.push({ id: 'gpu', icon: 'layout', title: t('Graphics card'), sub: app.gpu.name })
+    if (power) list.push({ id: 'power', icon: 'flame', title: t('Power profile'), sub: t('Performance mode while playing') })
+    list.push(
+      { id: 'aot', icon: 'clock', title: t('Faster launches'), sub: s.aotCache ? t('Launch cache') : `${t('Launch cache')} · ${t('Off')}` },
+      { id: 'memory', icon: 'box', title: t('Default memory and profile'), sub: `${gb(s.defaultMemoryMaxMb)} · ${profileName(s.defaultFlagProfile)}` },
+      { id: 'jvm', icon: 'wrench', title: t('JVM'), sub: [t('Garbage collector'), t('Collector threads'), t('Extra JVM arguments')].join(' · ') },
+      { id: 'launch', icon: 'maximize', title: t('Default launch options'), sub: [t('Start in fullscreen'), t('Window size'), t('Launch wrapper')].join(' · ') },
+      { id: 'launcher', icon: 'feather', title: t('Launcher'), sub: [t('Smooth scrolling'), t('Reduce visual effects')].join(' · ') },
+    )
+    return list
+  })
+  const current = $derived(cards.find((c) => c.id === open) ?? null)
+
   const pauseCapable = $derived(s.tuning.gc === 'g1' || s.tuning.gc === 'parallel' || s.tuning.gc === 'auto')
 </script>
 
-<header class="head">
-  <h1 class="shine">{t('Performance')}</h1>
-  <p class="muted">{t('Memory, Java and launcher tuning in one place.')}</p>
-</header>
+{#if current === null}
+  <header class="head">
+    <h1 class="shine">{t('Performance')}</h1>
+    <p class="muted">{t('Memory, Java and launcher tuning in one place.')}</p>
+  </header>
+
+  <SectionCards {cards} onselect={(id) => show(id as Section)} />
+{:else}
+  <SectionHead title={current.title} back={t('Performance')} onback={() => show(null)} />
 
 <div class="groups">
+  {#if open === 'java'}
+  <section class="group">
+    <div class="jbanner" class:forced={!!forced}>
+      <div class="n">{forced ? t('Every instance is forced to use {name}.', { name: forced }) : t('Optimized Java is on')}</div>
+      <p class="d">{t('From Minecraft 1.13 on, the launcher uses GraalVM, which compiles the busiest game code more aggressively for higher, steadier FPS. Versions up to 1.12, and Forge up to 1.16, keep Temurin 8, the Java they need.')}</p>
+      {#if forced}<div><button class="primary" onclick={useOptimized}>{t('Use optimized Java')}</button></div>{/if}
+    </div>
+    <JavaRuntimes />
+  </section>
+  {/if}
+
+  {#if open === 'optimizer'}
   <section class="group auto">
-    <h2>{t('Automatic optimizer')}</h2>
     <p class="muted small intro">{t('Picks memory and Java settings that fit your computer, so you do not have to.')}</p>
 
     {#if rec}
@@ -124,9 +186,10 @@
     </div>
     {#if s.autoOptimize}<p class="warn small">{t('The optimizer is on: at each launch it can raise memory and picks the Java flags. The values below are the minimum it starts from.')}</p>{/if}
   </section>
+  {/if}
   {#if app.gpu}
+    {#if open === 'gpu'}
     <section class="group">
-      <h2>{t('Graphics card')}</h2>
       <div class="item">
         <div class="txt">
           <div class="n">{t('Play on the {name} graphics card', { name: app.gpu.name })}</div>
@@ -138,10 +201,43 @@
         </label>
       </div>
     </section>
+    {/if}
+  {/if}
+  {#if power}
+    {#if open === 'power'}
+    <section class="group">
+      <div class="item">
+        <div class="txt">
+          <div class="n">{t('Performance mode while playing')}</div>
+          <div class="d">{t('Switches the computer to its performance power profile while Minecraft runs, then back when you close it.')}</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" bind:checked={s.performancePower} onchange={saveSettings} aria-label={t('Performance mode while playing')} />
+          <span class="track"></span>
+        </label>
+      </div>
+      {#if power.active === 'power-saver'}<p class="warn small">{t('Your computer is in power saver mode, which limits the launcher to 30 FPS. Pick the balanced profile in your system settings for smoother animations.')}</p>{/if}
+    </section>
+    {/if}
   {/if}
 
+  {#if open === 'aot'}
   <section class="group">
-    <h2>{t('Default memory and profile')}</h2>
+    <div class="item">
+      <div class="txt">
+        <div class="n">{t('Launch cache')}</div>
+        <div class="d">{t('Minecraft 26 and newer reach the menu about a second sooner. The first launch prepares the cache and takes a few extra seconds to close. It uses about 175 MB of disk per instance.')}</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" bind:checked={s.aotCache} onchange={saveSettings} aria-label={t('Launch cache')} />
+        <span class="track"></span>
+      </label>
+    </div>
+  </section>
+  {/if}
+
+  {#if open === 'memory'}
+  <section class="group">
     <p class="muted small intro">
       {#if sys}{t('Your computer has {ram} of RAM and {cores} threads.', { ram: gb(totalMb), cores })}{/if}
       {t('Used by every instance unless it has its own custom values.')}
@@ -182,9 +278,10 @@
       </div>
     </div>
   </section>
+  {/if}
 
+  {#if open === 'jvm'}
   <section class="group">
-    <h2>{t('JVM')}</h2>
     <p class="muted small intro">{t('Applies to every launch. Each instance can still pick its own profile and arguments in its settings.')}</p>
 
     <div class="item">
@@ -262,9 +359,10 @@
       <input class="wide" bind:value={s.defaultExtraJvmArgs} onchange={saveSettings} placeholder="-Dprop=value" aria-label={t('Extra JVM arguments')} />
     </div>
   </section>
+  {/if}
 
+  {#if open === 'launch'}
   <section class="group">
-    <h2>{t('Default launch options')}</h2>
     <p class="d intro">{t('Used by every instance that leaves these empty. An instance can also ignore them from its own settings.')}</p>
     <div class="item">
       <div class="txt">
@@ -301,9 +399,10 @@
       <textarea class="wide mono" rows="3" bind:value={s.defaultLaunch.env} onchange={saveSettings} placeholder="MESA_GL_VERSION_OVERRIDE=4.6" spellcheck="false" aria-label={t('Environment variables')}></textarea>
     </div>
   </section>
+  {/if}
 
+  {#if open === 'launcher'}
   <section class="group">
-    <h2>{t('Launcher')}</h2>
     <div class="item">
       <div class="txt">
         <div class="n">{t('Smooth scrolling')}</div>
@@ -325,14 +424,18 @@
       </label>
     </div>
   </section>
+  {/if}
 </div>
+{/if}
 
 <style>
   .head { display: grid; gap: 6px; }
   h1.shine { width: fit-content; color: transparent; -webkit-background-clip: text; background-clip: text; background-image: linear-gradient(100deg, var(--text) 38%, color-mix(in srgb, var(--text) 35%, #9b7bff) 50%, var(--text) 62%); background-size: 300% 100%; background-position: 100% 0; animation: shine 5s ease-in-out 1s infinite; }
   @keyframes shine { 0%, 60% { background-position: 100% 0; } 100% { background-position: 0% 0; } }
   .groups { display: grid; gap: 34px; max-width: 820px; }
-  .group h2 { margin: 0 0 4px; color: var(--text); font-size: 16px; font-weight: 600; letter-spacing: -0.02em; }
+  .jbanner { display: grid; gap: 8px; padding: 20px 22px; margin-bottom: 8px; border-radius: 16px; border: 1px solid var(--line); background: var(--surface); }
+  .jbanner.forced { border-color: var(--line-strong); }
+  .jbanner .d { margin: 0; max-width: 620px; }
   .intro { margin-bottom: 4px; }
   .item { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 16px 0; border-bottom: 1px solid var(--line); }
   .item.col { flex-direction: column; align-items: stretch; gap: 12px; }

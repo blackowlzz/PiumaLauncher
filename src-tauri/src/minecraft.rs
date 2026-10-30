@@ -417,6 +417,10 @@ impl Resolved {
         self.version.java_version.as_ref().map_or(8, |j| j.major_version)
     }
 
+    pub fn uses_lwjgl3(&self) -> bool {
+        self.version.libraries.iter().any(|l| l.name.starts_with("org.lwjgl:lwjgl:3"))
+    }
+
     pub fn classpath_files(&self) -> Vec<LibFile> {
         let mut seen = HashSet::new();
         self.version

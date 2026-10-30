@@ -138,18 +138,18 @@
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .empty { display: grid; gap: 12px; justify-items: start; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
-  .card { position: relative; }
+  .card { position: relative; display: flex; }
   .open { transition: transform 380ms var(--spring), border-color var(--ease); }
-  .card:hover .open { transform: translateY(-4px); }
+  .card:hover .open, .card:hover .dots { transform: translateY(-4px); }
   .cover :global(.photo) { transition: transform 900ms var(--spring); }
   .card:hover .cover :global(.photo) { transform: scale(1.06); }
-  .open { display: block; width: 100%; padding: 0; text-align: left; border-radius: 22px; border: 1px solid var(--line); background: var(--surface); overflow: hidden; }
+  .open { display: flex; flex-direction: column; width: 100%; padding: 0; text-align: left; border-radius: 22px; border: 1px solid var(--line); background: var(--surface); overflow: hidden; }
   .open:hover:not(:disabled) { border-color: var(--line-strong); background: var(--surface); }
   .card.sel .open { border-color: var(--text); }
   .cover { --fade: var(--surface); position: relative; overflow: hidden; aspect-ratio: 16 / 9; display: grid; place-items: center; }
   .when { position: absolute; left: 12px; bottom: 10px; display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: #fff; background: rgba(0, 0, 0, 0.55); border-radius: 999px; padding: 3px 10px; }
-  .dots { position: absolute; right: 8px; bottom: 8px; }
-  .body { padding: 12px 46px 14px 14px; display: grid; gap: 8px; }
+  .dots { position: absolute; right: 8px; bottom: 8px; transition: transform 380ms var(--spring); }
+  .body { flex: 1; padding: 12px 46px 14px 14px; display: grid; gap: 8px; align-content: start; }
   .title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .upd { display: inline-flex; align-items: center; gap: 4px; color: var(--inv-text); background: var(--inv-bg); border-color: var(--inv-bg); }

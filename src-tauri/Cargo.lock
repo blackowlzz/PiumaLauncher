@@ -2890,12 +2890,13 @@ dependencies = [
 
 [[package]]
 name = "piuma-launcher"
-version = "0.6.8"
+version = "0.6.9"
 dependencies = [
  "base64 0.23.1",
  "dirs",
  "flate2",
  "futures-util",
+ "gio",
  "hex",
  "image",
  "libc",

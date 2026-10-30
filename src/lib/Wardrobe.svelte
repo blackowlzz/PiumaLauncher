@@ -136,8 +136,11 @@
 </header>
 
 {#if premium.length === 0}
-  <p class="muted">{t('Add a Premium account to change your skin and cape.')}</p>
-  <div class="row"><button class="primary" onclick={() => (app.page = 'accounts')}>{t('Go to accounts')}</button></div>
+  <div class="panel empty">
+    <Icon name="feather" size={28} />
+    <p class="muted grow">{t('Add a Premium account to change your skin and cape.')}</p>
+    <button class="primary" onclick={() => (app.page = 'accounts')}>{t('Go to accounts')}</button>
+  </div>
 {:else}
   <div class="accs" role="group" aria-label={t('Account')}>
     {#each premium as a (a.id)}
@@ -210,7 +213,8 @@
 {/if}
 
 <style>
-  .row { display: flex; align-items: center; gap: 14px; margin-top: 14px; }
+  .empty { display: flex; align-items: center; gap: 18px; padding: 26px; }
+  .empty p { margin: 0; }
   .accs { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 22px; }
   .acc { display: flex; align-items: center; gap: 10px; padding: 6px 16px 6px 8px; border-radius: 999px; }
   .acc[aria-pressed='true'] { border-color: var(--text); background: var(--surface-2); }

@@ -32,6 +32,8 @@ pub struct Settings {
     pub sync_categories: Vec<String>,
     pub default_launch: LaunchOptions,
     pub dedicated_gpu: bool,
+    pub performance_power: bool,
+    pub aot_cache: bool,
     pub break_reminder_minutes: u32,
     pub daily_limit_minutes: u32,
 }
@@ -62,6 +64,8 @@ impl Default for Settings {
             sync_categories: vec!["controls".into(), "audio".into(), "interface".into()],
             default_launch: LaunchOptions::default(),
             dedicated_gpu: false,
+            performance_power: true,
+            aot_cache: false,
             break_reminder_minutes: 0,
             daily_limit_minutes: 0,
         }

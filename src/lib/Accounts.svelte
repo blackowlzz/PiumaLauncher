@@ -80,6 +80,7 @@
 
 <header class="head">
   <h1>{t('Accounts')}</h1>
+  <p class="muted">{t('Offline players and Microsoft accounts you can play with.')}</p>
 </header>
 
 <div class="grid">
@@ -95,7 +96,6 @@
       </div>
       <div>
         <div class="name"><span class="nm">{a.name}</span>{#if a.kind === 'microsoft'}<Verified size={22} />{/if}</div>
-        <div class="uuid" title={a.uuid}>{a.uuid}</div>
       </div>
       <div class="acts">
         {#if a.kind === 'microsoft'}<button onclick={() => openWardrobe(a.id)}>{t('Skin')}</button>{/if}
@@ -153,8 +153,8 @@
   .tag.on { background: var(--inv-bg); color: var(--inv-text); border-color: var(--inv-bg); }
   .name { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 24px; font-weight: 650; letter-spacing: -0.04em; }
   .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-  .uuid { margin-top: 4px; font-family: inherit; font-size: 11px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .acts { display: flex; gap: 8px; }
+  .acts { display: flex; align-items: center; gap: 8px; }
+  .acts .ghost { margin-left: auto; color: var(--muted); }
   .add { border-style: dashed; background: transparent; }
   .plus { display: grid; place-items: center; width: 68px; height: 68px; border-radius: 16px; border: 1px dashed var(--line-strong); font-size: 30px; color: var(--muted); font-weight: 300; }
   .soon { background: transparent; }
