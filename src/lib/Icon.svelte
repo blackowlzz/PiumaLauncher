@@ -1,5 +1,5 @@
 <script lang="ts">
-  type Name = 'play' | 'grid' | 'compass' | 'user' | 'sun' | 'moon' | 'feather' | 'search' | 'chevron' | 'home' | 'download' | 'list' | 'layout' | 'filter' | 'x' | 'clock' | 'check' | 'globe' | 'settings' | 'minimize' | 'maximize' | 'restore' | 'refresh' | 'trash' | 'file' | 'folder' | 'palette' | 'dots' | 'box' | 'flame' | 'news' | 'cpu' | 'wrench' | 'discord' | 'kofi' | 'server' | 'plus' | 'shortcut' | 'share' | 'package' | 'copy' | 'map' | 'chart'
+  type Name = 'play' | 'grid' | 'compass' | 'user' | 'sun' | 'moon' | 'feather' | 'search' | 'chevron' | 'home' | 'download' | 'list' | 'layout' | 'filter' | 'x' | 'clock' | 'check' | 'globe' | 'settings' | 'minimize' | 'maximize' | 'restore' | 'refresh' | 'trash' | 'file' | 'folder' | 'palette' | 'dots' | 'box' | 'flame' | 'cpu' | 'wrench' | 'discord' | 'kofi' | 'server' | 'plus' | 'shortcut' | 'share' | 'package' | 'copy' | 'map' | 'chart'
   let { name, size = 18 }: { name: Name; size?: number } = $props()
 </script>
 
@@ -69,8 +69,6 @@
     <path d="M21 8 12 3 3 8v8l9 5 9-5z" /><path d="m3 8 9 5 9-5M12 13v8" />
   {:else if name === 'flame'}
     <path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 .3 1.2 1 2 2 2-.5-3 0-5.5 1-8Z" />
-  {:else if name === 'news'}
-    <rect x="3" y="4" width="18" height="16" rx="2" /><path d="M7 9h10M7 13h10M7 17h6" />
   {:else if name === 'cpu'}
     <rect x="6" y="6" width="12" height="12" rx="2" /><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4" />
   {:else if name === 'wrench'}

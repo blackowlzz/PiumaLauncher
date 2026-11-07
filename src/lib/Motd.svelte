@@ -47,19 +47,21 @@
   }
 
   const lines = $derived(text.split('\n').slice(0, compact ? 1 : 2).map(parse))
+  const neutral: Record<string, string> = { '#ffffff': 'var(--text)', '#000000': 'var(--text)', '#aaaaaa': 'var(--muted)', '#555555': 'var(--faint)' }
+  const tint = (c: string | null) => (c === null ? c : (neutral[c.toLowerCase()] ?? `color-mix(in oklab, ${c} 78%, var(--text))`))
 </script>
 
 <div class="motd" class:compact>
   {#each lines as segs, n}
-    <div class="ln" style:--n={n}>{#each segs as s}<span class={s.cls} style:color={s.color}>{s.text}</span>{/each}</div>
+    <div class="ln" style:--n={n}>{#each segs as s}<span class={s.cls} style:color={tint(s.color)}>{s.text}</span>{/each}</div>
   {/each}
 </div>
 
 <style>
-  .motd { display: grid; gap: 1px; padding: 8px 12px; border-radius: 10px; background: #0b0b0b; border: 1px solid #1f1f1f; color: #aaaaaa; font: 12.5px/1.45 ui-monospace, 'JetBrains Mono', monospace; letter-spacing: 0; min-width: 0; }
+  .motd { display: grid; gap: 1px; min-width: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
   .motd.compact { padding: 0; background: none; border: 0; border-radius: 0; font: 13px/1.4 inherit; font-family: inherit; }
   .motd.compact .ln { animation: none; }
-  .ln { white-space: pre; overflow: hidden; text-overflow: ellipsis; animation: swapin 420ms var(--spring) calc(var(--n) * 90ms) backwards; }
+  .ln { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; animation: swapin 420ms var(--spring) calc(var(--n) * 90ms) backwards; }
   .fl { font-weight: 700; }
   .fo { font-style: italic; }
   .fn { text-decoration: underline; }

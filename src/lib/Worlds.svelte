@@ -3,7 +3,6 @@
   import { api, type Backup, type WorldEntry } from './api'
   import Art from './Art.svelte'
   import Icon from './Icon.svelte'
-  import Select from './Select.svelte'
   import { ctx, type MenuItem } from './contextmenu'
   import { locale, t } from './i18n.svelte'
   import { formatBytes, relativeTime } from './meta'
@@ -11,11 +10,10 @@
   import { app, askConfirm, isBusy, notify, openInstance, photoFor, play } from './store.svelte'
   import { thumb } from './img'
 
+  let { filter = '', instance = 'all', order = 'recent', onworlds }: { filter?: string; instance?: string; order?: 'recent' | 'name' | 'size'; onworlds?: (list: WorldEntry[]) => void } = $props()
+
   let worlds: WorldEntry[] = $state([])
   let loaded = $state(false)
-  let query = $state('')
-  let sort: 'recent' | 'name' | 'size' = $state('recent')
-  let only: string = $state('all')
   let open: string | null = $state(null)
   let backups: Record<string, Backup[]> = $state({})
   let working: string | null = $state(null)
@@ -29,6 +27,7 @@
   async function load() {
     worlds = await api.allWorlds().catch(() => [])
     loaded = true
+    onworlds?.(worlds)
   }
   $effect(() => {
     void app.sessions
@@ -36,14 +35,18 @@
     load()
   })
 
+  export function importWorld() {
+    picker?.click()
+  }
+  let all = $state(false)
   const shown = $derived.by(() => {
-    const q = query.trim().toLowerCase()
+    const q = filter.trim().toLowerCase()
     return worlds
-      .filter((w) => only === 'all' || w.instanceId === only)
+      .filter((w) => instance === 'all' || w.instanceId === instance)
       .filter((w) => !q || `${w.name} ${w.folder} ${instOf(w.instanceId)?.name ?? ''}`.toLowerCase().includes(q))
-      .sort((a, b) => (sort === 'name' ? a.name.localeCompare(b.name) : sort === 'size' ? b.size - a.size : b.modifiedMs - a.modifiedMs))
+      .sort((a, b) => (order === 'name' ? a.name.localeCompare(b.name) : order === 'size' ? b.size - a.size : b.modifiedMs - a.modifiedMs))
   })
-  const instanceCount = $derived(new Set(worlds.map((w) => w.instanceId)).size)
+  const visible = $derived(all ? shown : shown.slice(0, 6))
 
   async function loadBackups(w: WorldEntry) {
     const list = await api.listBackups(w.instanceId).catch(() => [] as Backup[])
@@ -174,37 +177,10 @@
   const when = (ms: number) => new Date(ms).toLocaleString(locale(), { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 </script>
 
-<header class="head">
-  <div class="grow">
-    <h1>{t('Worlds')}</h1>
-    <p class="muted">
-      {loaded && worlds.length ? t('{n} worlds in {m} instances', { n: worlds.length, m: instanceCount }) : t('Every singleplayer world from all your instances, in one place.')}
-    </p>
-  </div>
-  <div class="hacts">
-    <button onclick={() => picker?.click()} disabled={working === 'import'}><Icon name="download" size={15} />{working === 'import' ? t('Importing…') : t('Import world')}</button>
-  </div>
+<div class="shead">
+  <h2>{t('Worlds')}{#if worlds.length}<span class="count">{worlds.length}</span>{/if}</h2>
   <input bind:this={picker} type="file" accept=".zip" hidden onchange={chooseFile} />
-</header>
-
-{#if worlds.length}
-  <div class="toolbar">
-    <label class="search grow">
-      <span class="field"><Icon name="search" size={16} /><input type="search" bind:value={query} placeholder={t('Search worlds…')} aria-label={t('Search worlds…')} /></span>
-    </label>
-    <Select bind:value={only} width="auto" label={t('Instance')} options={[{ value: 'all', label: t('All instances') }, ...app.instances.filter((i) => worlds.some((w) => w.instanceId === i.id)).map((i) => ({ value: i.id, label: i.name }))]} />
-    <Select
-      bind:value={sort}
-      width="auto"
-      label={t('Sort by')}
-      options={[
-        { value: 'recent', label: t('Last played') },
-        { value: 'name', label: t('Name') },
-        { value: 'size', label: t('Size') },
-      ]}
-    />
-  </div>
-{/if}
+</div>
 
 {#if loaded && !worlds.length}
   <div class="empty">
@@ -216,10 +192,10 @@
     </div>
   </div>
 {:else if loaded && !shown.length}
-  <p class="muted">{t('No world matches "{query}".', { query })}</p>
+  <p class="muted">{t('No world matches "{query}".', { query: filter })}</p>
 {:else}
   <div class="grid">
-    {#each shown as w, n (keyOf(w))}
+    {#each visible as w, n (keyOf(w))}
       {@const inst = instOf(w.instanceId)}
       {@const key = keyOf(w)}
       {@const list = backups[key] ?? []}
@@ -270,6 +246,9 @@
       </article>
     {/each}
   </div>
+  {#if shown.length > 6}
+    <button class="ghost showall" onclick={() => (all = !all)}>{all ? t('Show less') : t('Show all {n}', { n: shown.length })}<span class="chev" class:up={all}><Icon name="chevron" size={13} /></span></button>
+  {/if}
 {/if}
 
 {#if picking}
@@ -298,22 +277,19 @@
 {/if}
 
 <style>
-  .head { display: flex; align-items: flex-start; gap: 16px; }
-  .head p { margin-top: 6px; }
-  .hacts { display: flex; gap: 8px; }
-  .hacts button { display: inline-flex; align-items: center; gap: 8px; }
-  .toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
-  .search { min-width: 220px; }
-  .field { position: relative; display: block; }
-  .field :global(svg) { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--faint); pointer-events: none; }
-  .field input { padding-left: 34px; }
-  .empty { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 28px; align-items: center; padding: 28px; border: 1px solid var(--line); border-radius: 22px; background: var(--surface); }
+  .shead { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .shead h2 { margin: 0; display: flex; align-items: center; gap: 10px; color: var(--text); font-size: 18px; font-weight: 600; letter-spacing: -0.03em; }
+  .count { font-size: 12px; font-weight: 500; color: var(--muted); border: 1px solid var(--line-strong); border-radius: 999px; padding: 1px 8px; }
+  .showall { justify-self: center; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+  .chev { display: inline-grid; transform: rotate(90deg); transition: transform 300ms var(--spring); }
+  .chev.up { transform: rotate(-90deg); }
+  .empty { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 28px; align-items: center; padding: 28px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); }
   .eart { position: relative; height: 160px; border-radius: 16px; overflow: hidden; }
   .etxt { display: grid; gap: 10px; justify-items: start; }
   .etxt h2 { margin: 0; color: var(--text); font-size: 20px; font-weight: 600; letter-spacing: -0.03em; }
   .etxt button { display: inline-flex; align-items: center; gap: 8px; margin-top: 6px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; align-items: start; }
-  .card { position: relative; display: grid; grid-template-rows: auto 1fr auto auto; border-radius: 22px; border: 1px solid var(--line); background: var(--surface); overflow: hidden; transition: border-color var(--ease), transform 380ms var(--spring); animation: cardin 460ms var(--spring) var(--d) backwards; min-width: 0; }
+  .card { position: relative; display: grid; grid-template-rows: auto 1fr auto auto; border-radius: 20px; border: 1px solid var(--line); background: var(--surface); overflow: hidden; transition: border-color var(--ease), transform 380ms var(--spring); animation: cardin 460ms var(--spring) var(--d) backwards; min-width: 0; }
   .card:hover { border-color: var(--line-strong); transform: translateY(-3px); }
   .card.wide { grid-column: 1 / -1; transform: none; }
   @keyframes cardin { from { opacity: 0; transform: translateY(12px); } }
@@ -323,7 +299,7 @@
   .bg { position: absolute; inset: -10%; width: 120%; height: 120%; object-fit: cover; opacity: 0.55; image-rendering: auto; }
   .photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 900ms var(--spring); }
   .card:hover .photo { transform: scale(1.05); }
-  .wicon { position: relative; z-index: 1; width: 64px; height: 64px; border-radius: 14px; image-rendering: pixelated; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45); }
+  .wicon { position: relative; z-index: 1; width: 64px; height: 64px; border-radius: 12px; image-rendering: pixelated; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45); }
   .shade { position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0, 0, 0, 0.3), transparent 45%, rgba(0, 0, 0, 0.35)); }
   .badge { position: absolute; z-index: 2; top: 10px; left: 10px; display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 999px; font-size: 11.5px; color: #fff; background: rgba(0, 0, 0, 0.55); }
   .badge.hc { left: auto; right: 10px; background: #c4262b; font-weight: 600; }
@@ -337,7 +313,7 @@
   .acts button.on { background: var(--surface-2); border-color: var(--faint); }
   .acts .more { width: 36px; padding: 0; margin-left: auto; }
   .sm { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; font-size: 13px; }
-  .backups { display: grid; gap: 4px; margin: 0 16px 16px; padding: 12px 14px; border-radius: 14px; background: var(--surface-2); }
+  .backups { display: grid; gap: 4px; margin: 0 16px 16px; padding: 12px 14px; border-radius: 16px; background: var(--surface-2); }
   .bhead { display: flex; align-items: center; gap: 10px; padding-bottom: 6px; }
   .brow { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); }
   .reason { margin-left: 8px; }
@@ -345,7 +321,7 @@
   .dialog { position: fixed; z-index: 51; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(480px, calc(100vw - 32px)); max-height: calc(100vh - 48px); display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; gap: 12px; padding: 22px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 20px; box-shadow: 0 30px 90px rgba(0, 0, 0, 0.55); animation: gopop 260ms var(--spring) both; }
   .dialog h2 { margin: 0; color: var(--text); font-size: 17px; font-weight: 600; letter-spacing: -0.02em; overflow-wrap: anywhere; }
   .targets { display: grid; gap: 6px; overflow-y: auto; min-height: 0; }
-  .target { display: flex; align-items: center; gap: 12px; text-align: left; padding: 10px 14px; border-radius: 14px; border-color: var(--line); }
+  .target { display: flex; align-items: center; gap: 12px; text-align: left; padding: 10px 14px; border-radius: 12px; border-color: var(--line); }
   .target .grow { display: grid; gap: 2px; min-width: 0; }
   .tn { font-weight: 500; }
   .warnv { flex: none; font-size: 11px; padding: 2px 8px; border-radius: 999px; color: #e5a03d; border: 1px solid rgba(229, 160, 61, 0.5); }

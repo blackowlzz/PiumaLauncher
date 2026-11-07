@@ -32,11 +32,6 @@
   })
 </script>
 
-<header class="head">
-  <h1>{t('Themes')}</h1>
-  <p class="muted">{t('Pick a preset or tune every color yourself.')}</p>
-</header>
-
 <div class="cols">
   <section class="group">
     <h2>{t('Presets')}</h2>
@@ -89,7 +84,6 @@
 </div>
 
 <style>
-  .head { display: grid; gap: 6px; }
   .cols { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 28px; align-items: start; }
   .group { display: grid; gap: 14px; }
   .group h2 { margin: 0; font-size: 16px; font-weight: 600; color: var(--text); }
@@ -113,7 +107,7 @@
   .n { font-weight: 500; }
   .hex { width: 96px; font-family: inherit; font-size: 13px; text-transform: lowercase; padding: 8px 12px; }
   .preview { border: 1px solid; border-radius: 16px; padding: 18px; }
-  .pcard { border: 1px solid; border-radius: 14px; padding: 16px; display: grid; gap: 4px; justify-items: start; }
+  .pcard { border: 1px solid; border-radius: 16px; padding: 16px; display: grid; gap: 4px; justify-items: start; }
   .pt { font-size: 18px; font-weight: 650; letter-spacing: -0.03em; }
   .ps { font-size: 12px; margin-bottom: 10px; }
   .pb { padding: 8px 20px; border-radius: 999px; font-weight: 600; font-size: 13px; }

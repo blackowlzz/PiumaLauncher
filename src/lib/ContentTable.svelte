@@ -363,7 +363,7 @@
   .upd { background: var(--inv-bg); color: var(--inv-text); border-color: var(--inv-bg); }
   .upd:hover:not(:disabled) { background: var(--inv-bg); border-color: var(--inv-bg); opacity: 0.85; }
   .pop { position: relative; display: flex; gap: 8px; }
-  .menu { position: absolute; z-index: 30; top: calc(100% + 8px); right: 0; min-width: 240px; max-height: 280px; overflow: auto; margin: 0; padding: 6px; list-style: none; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 14px; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45); }
+  .menu { position: absolute; z-index: 30; top: calc(100% + 8px); right: 0; min-width: 240px; max-height: 280px; overflow: auto; margin: 0; padding: 6px; list-style: none; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 16px; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45); }
   .menu button { display: flex; width: 100%; justify-content: space-between; gap: 16px; border-color: transparent; background: transparent; text-align: left; border-radius: 10px; padding: 9px 12px; }
   .menu button:hover { background: var(--surface-2); }
   .menu .none { padding: 10px 12px; font-size: 13px; }

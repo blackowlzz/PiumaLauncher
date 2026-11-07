@@ -4,10 +4,16 @@
   import { api, type Wardrobe } from './api'
   import { t } from './i18n.svelte'
   import Head from './Head.svelte'
-  import { app, notify } from './store.svelte'
-  import { refreshSkin } from './skins.svelte'
+  import { activeAccount, app, notify } from './store.svelte'
+  import { ensureSkin, refreshSkin, skinOf } from './skins.svelte'
+  import { makeSkin } from './skin'
 
   const premium = $derived(app.accounts.accounts.filter((a) => a.kind === 'microsoft'))
+  const player = $derived(activeAccount()?.name ?? 'Steve')
+  const playerSkin = $derived(skinOf(player))
+  $effect(() => {
+    if (premium.length === 0) void ensureSkin(player)
+  })
   const account = $derived(premium.find((a) => a.id === app.wardrobeId) ?? premium.find((a) => a.id === app.accounts.active) ?? premium[0] ?? null)
   const accountId = $derived(account?.id ?? '')
   const name = $derived(account?.name ?? '')
@@ -136,10 +142,16 @@
 </header>
 
 {#if premium.length === 0}
-  <div class="panel empty">
-    <Icon name="feather" size={28} />
-    <p class="muted grow">{t('Add a Premium account to change your skin and cape.')}</p>
-    <button class="primary" onclick={() => (app.page = 'accounts')}>{t('Go to accounts')}</button>
+  <div class="wrap">
+    <section class="stage">
+      <SkinViewer skin={playerSkin?.state === 'ready' ? playerSkin.png : makeSkin(player)} slim={playerSkin?.state === 'ready' && playerSkin.slim} arrive={false} size={340} />
+    </section>
+    <div class="panel pitch">
+      <Icon name="feather" size={26} />
+      <div class="pn">{player}</div>
+      <p class="muted">{t('Add a Premium account to change your skin and cape.')}</p>
+      <button class="primary" onclick={() => (app.page = 'accounts')}>{t('Go to accounts')}</button>
+    </div>
   </div>
 {:else}
   <div class="accs" role="group" aria-label={t('Account')}>
@@ -213,15 +225,16 @@
 {/if}
 
 <style>
-  .empty { display: flex; align-items: center; gap: 18px; padding: 26px; }
-  .empty p { margin: 0; }
+  .pitch { display: grid; justify-items: start; align-content: center; gap: 12px; min-height: 100%; padding: 28px; }
+  .pitch p { margin: 0; max-width: 360px; line-height: 1.5; }
+  .pn { font-size: 26px; font-weight: 650; letter-spacing: -0.04em; }
   .accs { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 22px; }
   .acc { display: flex; align-items: center; gap: 10px; padding: 6px 16px 6px 8px; border-radius: 999px; }
   .acc[aria-pressed='true'] { border-color: var(--text); background: var(--surface-2); }
   .wrap { display: grid; grid-template-columns: minmax(280px, 400px) minmax(0, 1fr); gap: 28px; align-items: start; }
-  .stage { display: grid; justify-items: center; gap: 14px; padding: 22px; border: 1px solid var(--line); border-radius: 26px; background: var(--surface); }
+  .stage { display: grid; justify-items: center; gap: 14px; padding: 22px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); }
   .side { display: grid; gap: 16px; }
-  .box { display: grid; gap: 12px; padding: 22px; border: 1px solid var(--line); border-radius: 26px; background: var(--surface); }
+  .box { display: grid; gap: 12px; padding: 22px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); }
   .box h2 { margin: 0; font-size: 15px; font-weight: 650; color: var(--text); }
   .box p { margin: 0; }
   .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }

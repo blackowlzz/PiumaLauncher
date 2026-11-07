@@ -478,18 +478,58 @@ pub fn set_mod_enabled(instance_id: &str, file_name: &str, enabled: bool) -> Res
     Ok(())
 }
 
-pub async fn categories(client: &reqwest::Client, project_type: &str) -> Result<Vec<String>> {
+#[derive(Debug, Serialize, Clone)]
+pub struct Tag {
+    pub name: String,
+    pub header: String,
+    pub icon: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Tags {
+    pub categories: Vec<Tag>,
+    pub loaders: Vec<Tag>,
+}
+
+const HEADERS: [&str; 4] = ["categories", "features", "resolutions", "performance impact"];
+
+fn tag_order(t: &Tag) -> (usize, u32, String) {
+    let group = HEADERS.iter().position(|h| *h == t.header).unwrap_or(HEADERS.len());
+    let digits: String = t.name.chars().take_while(|c| c.is_ascii_digit()).collect();
+    (group, digits.parse().unwrap_or(0), t.name.clone())
+}
+
+pub async fn tags(client: &reqwest::Client, project_type: &str) -> Result<Tags> {
     #[derive(Deserialize)]
     struct Cat {
         name: String,
         project_type: String,
+        header: String,
+        icon: String,
     }
-    let all: Vec<Cat> = serde_json::from_str(&net::get_text(client, &format!("{API}/tag/category")).await?)?;
-    let mut names: Vec<String> = all.into_iter().filter(|c| c.project_type == project_type).map(|c| c.name).collect();
-    names.sort();
-    Ok(names)
+    #[derive(Deserialize)]
+    struct Ld {
+        name: String,
+        icon: String,
+        supported_project_types: Vec<String>,
+    }
+    let (cat_url, loader_url) = (format!("{API}/tag/category"), format!("{API}/tag/loader"));
+    let (cats, lds) = tokio::try_join!(net::get_text(client, &cat_url), net::get_text(client, &loader_url))?;
+    let cats: Vec<Cat> = serde_json::from_str(&cats)?;
+    let lds: Vec<Ld> = serde_json::from_str(&lds)?;
+    let mut categories: Vec<Tag> = cats
+        .into_iter()
+        .filter(|c| c.project_type == project_type)
+        .map(|c| Tag { name: c.name, header: c.header, icon: c.icon })
+        .collect();
+    categories.sort_by_key(tag_order);
+    let loaders = lds
+        .into_iter()
+        .filter(|l| l.supported_project_types.iter().any(|t| t == project_type))
+        .map(|l| Tag { name: l.name, header: String::new(), icon: l.icon })
+        .collect();
+    Ok(Tags { categories, loaders })
 }
-
 
 static HASH_CACHE: std::sync::Mutex<Option<HashMap<(PathBuf, u64, u64), String>>> = std::sync::Mutex::new(None);
 
@@ -1519,6 +1559,15 @@ async fn disabled_mods(client: &reqwest::Client, game_dir: &Path, previous: &BTr
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn tags_group_by_header_then_number() {
+        let t = |name: &str, header: &str| Tag { name: name.into(), header: header.into(), icon: String::new() };
+        let mut v = vec![t("128x", "resolutions"), t("zebra", "features"), t("16x", "resolutions"), t("adventure", "categories"), t("8x-", "resolutions")];
+        v.sort_by_key(tag_order);
+        let names: Vec<&str> = v.iter().map(|x| x.name.as_str()).collect();
+        assert_eq!(names, ["adventure", "zebra", "8x-", "16x", "128x"]);
+    }
     use super::*;
 
     #[test]

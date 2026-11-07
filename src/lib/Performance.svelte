@@ -129,6 +129,21 @@
     return list
   })
   const current = $derived(cards.find((c) => c.id === open) ?? null)
+  const fill = <T extends SectionCard>(list: T[]): T[] => {
+    const n = list.length
+    const r = n % 3
+    const span = (i: number): SectionCard['span'] => {
+      if (r === 2 && i === n - 1) return 2
+      if (r === 1 && n === 1) return 3
+      if (r === 1 && (i === n - 4 || i === n - 1)) return 2
+      return undefined
+    }
+    return list.map((c, i) => ({ ...c, span: span(i) }))
+  }
+  const advancedIds = ['memory', 'jvm', 'launch', 'launcher']
+  const hero = $derived(cards.filter((c) => c.id === 'optimizer' || c.id === 'aot').map((c) => ({ ...c, span: c.id === 'optimizer' ? (2 as const) : (1 as const) })))
+  const basics = $derived(fill(cards.filter((c) => c.id !== 'optimizer' && c.id !== 'aot' && !advancedIds.includes(c.id))))
+  const advanced = $derived(fill(cards.filter((c) => advancedIds.includes(c.id))))
 
   const pauseCapable = $derived(s.tuning.gc === 'g1' || s.tuning.gc === 'parallel' || s.tuning.gc === 'auto')
 </script>
@@ -139,7 +154,10 @@
     <p class="muted">{t('Memory, Java and launcher tuning in one place.')}</p>
   </header>
 
-  <SectionCards {cards} onselect={(id) => show(id as Section)} />
+  <SectionCards cards={hero} onselect={(id) => show(id as Section)} />
+  <SectionCards cards={basics} onselect={(id) => show(id as Section)} />
+  <h2 class="adv">{t('Advanced')}</h2>
+  <SectionCards cards={advanced} onselect={(id) => show(id as Section)} />
 {:else}
   <SectionHead title={current.title} back={t('Performance')} onback={() => show(null)} />
 
@@ -429,6 +447,7 @@
 {/if}
 
 <style>
+  .adv { margin: 14px 0 0; font-size: 18px; font-weight: 600; letter-spacing: -0.03em; color: var(--text); }
   .head { display: grid; gap: 6px; }
   h1.shine { width: fit-content; color: transparent; -webkit-background-clip: text; background-clip: text; background-image: linear-gradient(100deg, var(--text) 38%, color-mix(in srgb, var(--text) 35%, #9b7bff) 50%, var(--text) 62%); background-size: 300% 100%; background-position: 100% 0; animation: shine 5s ease-in-out 1s infinite; }
   @keyframes shine { 0%, 60% { background-position: 100% 0; } 100% { background-position: 0% 0; } }

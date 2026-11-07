@@ -87,13 +87,13 @@
 </article>
 
 <style>
-  .card { position: relative; display: grid; grid-template-rows: auto 1fr auto; border-radius: 22px; border: 1px solid var(--line); background: var(--surface); overflow: hidden; transition: border-color var(--ease), transform 380ms var(--spring); animation: cardin 460ms var(--spring) var(--d) backwards; min-width: 0; }
+  .card { position: relative; display: grid; grid-template-rows: auto 1fr auto; border-radius: 20px; border: 1px solid var(--line); background: var(--surface); overflow: hidden; transition: border-color var(--ease), transform 380ms var(--spring); animation: cardin 460ms var(--spring) var(--d) backwards; min-width: 0; }
   .card:hover { border-color: var(--line-strong); transform: translateY(-3px); }
   @keyframes cardin { from { opacity: 0; transform: translateY(12px); } }
   .cover { position: relative; aspect-ratio: 16 / 7; display: grid; place-items: center; overflow: hidden; background: #000; }
   .cover :global(.art) { position: absolute; inset: 0; }
   .bg { position: absolute; inset: -10%; width: 120%; height: 120%; object-fit: cover; opacity: 0.55; image-rendering: auto; }
-  .fav { position: relative; z-index: 1; width: 64px; height: 64px; border-radius: 14px; image-rendering: pixelated; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45); }
+  .fav { position: relative; z-index: 1; width: 64px; height: 64px; border-radius: 12px; image-rendering: pixelated; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45); }
   .photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 900ms var(--spring); }
   .card:hover .photo { transform: scale(1.05); }
   .shade { position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0, 0, 0, 0.35), transparent 45%, rgba(0, 0, 0, 0.35)); }

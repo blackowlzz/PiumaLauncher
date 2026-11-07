@@ -8,6 +8,7 @@
   import JavaRuntimes from './JavaRuntimes.svelte'
   import SectionCards, { type SectionCard } from './SectionCards.svelte'
   import SectionHead from './SectionHead.svelte'
+  import Themes from './Themes.svelte'
 
   const minutes = (steps: number[], current: number) =>
     [0, ...new Set([...steps, current].filter((m) => m > 0))].sort((a, b) => a - b).map((m) => ({ value: m, label: m ? formatDuration(m * 60) : t('Off') }))
@@ -76,7 +77,7 @@
     { key: 'runtimes', label: () => t('Downloaded Java') },
     { key: 'skins', label: () => t('Skin cache') },
   ]
-  type Section = 'general' | 'playtime' | 'sync' | 'java' | 'privacy' | 'storage' | 'help' | 'about' | 'reset'
+  type Section = 'general' | 'themes' | 'playtime' | 'sync' | 'java' | 'privacy' | 'storage' | 'help' | 'reset'
   let open = $state<Section | null>((app.section as Section | null) ?? null)
   app.section = null
 
@@ -84,19 +85,29 @@
     open = id
     document.querySelector('main')?.scrollTo({ top: 0 })
   }
+  $effect(() => {
+    if (!app.section) return
+    show(app.section as Section)
+    app.section = null
+  })
 
   const cards = $derived<(SectionCard & { id: Section })[]>([
     { id: 'general', icon: 'settings', title: t('General'), sub: [t('Language'), t('Theme'), t('Interface size'), t('Back up worlds automatically'), t('Check for updates')].join(' · ') },
+    { id: 'themes', icon: 'palette', title: t('Themes'), sub: t('Pick a preset or tune every color yourself.') },
     { id: 'playtime', icon: 'clock', title: t('Playtime'), sub: [t('Break reminder'), t('Daily limit')].join(' · ') },
     { id: 'sync', icon: 'refresh', title: t('Synced game settings'), sub: [t('Share settings between instances'), t('Controls'), t('Audio'), t('Video')].join(' · ') },
     { id: 'java', icon: 'package', title: t('Java'), sub: app.runtimes.filter((r) => r.installed).map((r) => `${r.label} ${r.major}`).join(' · ') || t('No Java downloaded yet.') },
     { id: 'privacy', icon: 'globe', title: t('Privacy'), sub: [t('Discord Rich Presence'), t('Look up skins on Mojang')].join(' · ') },
     { id: 'storage', icon: 'folder', title: t('Storage'), sub: storage ? `${t('Total')}: ${formatBytes(total)} · ${t('Data folder')}` : t('Data folder') },
     { id: 'help', icon: 'wrench', title: t('Troubleshooting'), sub: [t('Copy diagnostics'), t('Launcher log'), t('Live console')].join(' · ') },
-    { id: 'about', icon: 'feather', title: t('About'), sub: `PiumaLauncher · ${t('Version {v}', { v: __APP_VERSION__ })}` },
     { id: 'reset', icon: 'trash', title: t('Reset launcher'), sub: t('Delete launcher data. After a restart, the launcher starts as if it were new.'), danger: true },
   ])
   const current = $derived(cards.find((c) => c.id === open) ?? null)
+  const gridCards = $derived.by(() => {
+    const list = cards.filter((c) => c.id !== 'reset')
+    const r = list.length % 3
+    return list.map((c, i) => (i === list.length - 1 && r ? { ...c, span: (r === 1 ? 3 : 2) as 2 | 3 } : c))
+  })
 
   let showReset = $state(false)
   let resetting = $state(false)
@@ -124,10 +135,18 @@
     <p class="muted">{t('Make the launcher yours.')}</p>
   </header>
 
-  <SectionCards {cards} onselect={(id) => show(id as Section)} />
+  <SectionCards cards={gridCards} onselect={(id) => show(id as Section)} />
+
+  <footer class="about">
+    PiumaLauncher · {t('Version {v}', { v: __APP_VERSION__ })} · {t('Open source · GPL-3.0')}
+    <button class="resetlink" onclick={() => show('reset')}>{t('Reset launcher')}</button>
+  </footer>
 {:else}
   <SectionHead title={current.title} back={t('Settings')} onback={() => show(null)} />
 
+{#if open === 'themes'}
+  <Themes />
+{:else}
 <div class="groups">
   {#if open === 'general'}
   <section class="group">
@@ -345,17 +364,6 @@
   </section>
   {/if}
 
-  {#if open === 'about'}
-  <section class="group">
-    <div class="item">
-      <div class="txt">
-        <div class="n">PiumaLauncher</div>
-        <div class="d">{t('Version {v}', { v: __APP_VERSION__ })} · {t('Open source · GPL-3.0')}</div>
-      </div>
-    </div>
-  </section>
-  {/if}
-
   {#if open === 'reset'}
   <section class="group danger">
     <div class="item">
@@ -365,6 +373,7 @@
   </section>
   {/if}
 </div>
+{/if}
 {/if}
 
 {#if showReset}
@@ -390,6 +399,9 @@
 
 <style>
   .head { display: grid; gap: 6px; }
+  .about { display: grid; justify-items: center; gap: 8px; margin-top: auto; padding-top: 24px; text-align: center; font-size: 12.5px; color: var(--faint); }
+  .resetlink { padding: 2px 8px; border: 0; font-size: 12.5px; color: #e5484d; background: transparent; }
+  .resetlink:hover:not(:disabled) { background: transparent; text-decoration: underline; }
   .groups { display: grid; gap: 34px; max-width: 820px; }
   .intro { margin-bottom: 4px; }
   .item { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 16px 0; border-bottom: 1px solid var(--line); }
@@ -410,7 +422,7 @@
 
   .backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.62); z-index: 20; animation: fade 200ms ease both; }
   @keyframes fade { from { opacity: 0; } }
-  .modal { position: fixed; z-index: 21; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; display: grid; gap: 16px; padding: 28px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 22px; box-shadow: 0 30px 90px rgba(0, 0, 0, 0.55); animation: pop 260ms var(--spring) both; }
+  .modal { position: fixed; z-index: 21; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; display: grid; gap: 16px; padding: 28px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 20px; box-shadow: 0 30px 90px rgba(0, 0, 0, 0.55); animation: pop 260ms var(--spring) both; }
   .modal h1 { font-size: 22px; }
   .opts { display: grid; gap: 10px; }
   .kinds { display: grid; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); }

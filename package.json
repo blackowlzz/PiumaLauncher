@@ -1,14 +1,15 @@
 {
   "name": "piuma-launcher",
   "private": true,
-  "version": "0.6.9",
+  "version": "0.6.10",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "build:local": "tauri build --bundles appimage --config '{\"bundle\":{\"createUpdaterArtifacts\":false}}' -- --profile local"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.0",

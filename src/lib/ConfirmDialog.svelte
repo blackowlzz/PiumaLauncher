@@ -34,7 +34,7 @@
 
 <style>
   .backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.62); z-index: 60; }
-  .dialog { position: fixed; z-index: 61; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(420px, calc(100vw - 32px)); display: grid; gap: 22px; padding: 26px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 18px; box-shadow: 0 30px 90px rgba(0, 0, 0, 0.55); animation: confirm-pop 260ms var(--spring) both; }
+  .dialog { position: fixed; z-index: 61; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(420px, calc(100vw - 32px)); display: grid; gap: 22px; padding: 26px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 20px; box-shadow: 0 30px 90px rgba(0, 0, 0, 0.55); animation: confirm-pop 260ms var(--spring) both; }
   p { margin: 0; font-size: 15px; line-height: 1.5; overflow-wrap: anywhere; }
   .actions { display: flex; justify-content: flex-end; gap: 8px; }
   .danger { background: #e5484d; border-color: #e5484d; color: #fff; }

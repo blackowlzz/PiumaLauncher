@@ -48,6 +48,14 @@ fn platform_flags(java_major: u32) -> Vec<String> {
     f
 }
 
+fn jit_flags(java_major: u32) -> Vec<String> {
+    let mut f = vec!["-XX:ReservedCodeCacheSize=400M".to_string()];
+    if java_major < 14 {
+        f.push("-XX:MaxInlineLevel=15".into());
+    }
+    f
+}
+
 fn zgc_keeps_jit(java_major: u32, graal: bool) -> bool {
     java_major >= 17 && (!graal || java_major >= 25)
 }
@@ -86,6 +94,7 @@ pub fn jvm_flags(profile: FlagProfile, java_major: u32, graal: bool) -> Vec<Stri
             f
         }
     };
+    f.extend(jit_flags(java_major));
     f.extend(platform_flags(java_major));
     f
 }
@@ -215,6 +224,16 @@ mod tests {
         let graal25 = jvm_flags(FlagProfile::Performance, 25, true);
         assert!(has(&graal25, "-XX:+UseZGC") && has(&graal25, "-XX:+UseCompactObjectHeaders"));
         assert!(!jvm_flags(FlagProfile::Balanced, 21, true).iter().any(|x| x.contains("CompactObjectHeaders")));
+    }
+
+    #[test]
+    fn jit_room_for_large_modpacks() {
+        let has = |f: &[String], x: &str| f.iter().any(|y| y == x);
+        for p in [FlagProfile::Low, FlagProfile::Balanced, FlagProfile::Performance] {
+            assert!(has(&jvm_flags(p, 21, true), "-XX:ReservedCodeCacheSize=400M"));
+        }
+        assert!(has(&jvm_flags(FlagProfile::Balanced, 8, false), "-XX:MaxInlineLevel=15"));
+        assert!(!has(&jvm_flags(FlagProfile::Balanced, 17, false), "-XX:MaxInlineLevel=15"));
     }
 
     #[test]

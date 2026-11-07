@@ -8,15 +8,20 @@
   import { copyText, ctx, type MenuItem } from './contextmenu'
   import AddServerModal from './AddServerModal.svelte'
   import ServerCard from './ServerCard.svelte'
+  import ServerRow from './ServerRow.svelte'
   import Icon from './Icon.svelte'
 
-  let { instanceId, heading, head, onload }: { instanceId?: string; heading?: string; head?: Snippet<[number]>; onload?: (count: number) => void } = $props()
+  let { instanceId, heading, head, onload, filter = '', instance = 'all', rows = false, controls = true }: { instanceId?: string; heading?: string; head?: Snippet<[number]>; onload?: (count: number) => void; filter?: string; instance?: string; rows?: boolean; controls?: boolean } = $props()
 
   let servers = $state<SavedServer[]>([])
   let loaded = $state(false)
   let adding = $state(false)
   let spin = $state(0)
 
+  const visible = $derived.by(() => {
+    const q = filter.trim().toLowerCase()
+    return servers.filter((s) => (instance === 'all' || s.instances.includes(instance)) && (!q || `${s.name} ${s.address}`.toLowerCase().includes(q)))
+  })
   const names = $derived(Object.fromEntries(app.instances.map((i) => [i.id, i.name])))
   const busy = $derived(instanceId ? isBusy(instanceId) : false)
   const ids = $derived(instanceId ? [instanceId] : app.instances.map((i) => i.id))
@@ -39,6 +44,14 @@
   function refresh() {
     spin++
     load(true)
+  }
+
+  export function add() {
+    adding = true
+  }
+
+  export function reload() {
+    refresh()
   }
 
   function join(s: SavedServer) {
@@ -76,7 +89,8 @@
 
 <section class="servers">
   <div class="shead">
-    {#if head}{@render head(servers.length)}{:else}<h2><Icon name="server" size={20} />{heading ?? t('Servers')}{#if servers.length}<span class="count">{servers.length}</span>{/if}</h2>{/if}
+    {#if head}{@render head(servers.length)}{:else}<h2>{#if !rows}<Icon name="server" size={20} />{/if}{heading ?? t('Servers')}{#if servers.length}<span class="count">{servers.length}</span>{/if}</h2>{/if}
+    {#if controls}
     <div class="row ctl">
       {#if servers.length}
         <button class="ghost iconbtn" onclick={refresh} aria-label={t('Refresh')} title={t('Refresh')}>
@@ -85,6 +99,7 @@
       {/if}
       <button onclick={() => (adding = true)} disabled={busy}><Icon name="plus" size={15} />{t('Add a server')}</button>
     </div>
+    {/if}
   </div>
 
   {#if loaded && !servers.length}
@@ -94,9 +109,17 @@
     </div>
   {/if}
 
-  {#if servers.length}
+  {#if servers.length && !visible.length}
+    <p class="muted">{t('No server matches "{query}".', { query: filter })}</p>
+  {:else if servers.length && rows}
+    <div class="rowsgrid">
+      {#each visible as s, n (s.address)}
+        <ServerRow name={s.name} address={s.address} icon={s.icon} index={n} menu={() => serverMenu(s)} onplay={() => join(s)} canPlay={!busy && app.instances.length > 0 && !!app.accounts.active} />
+      {/each}
+    </div>
+  {:else if servers.length}
     <div class="grid">
-      {#each servers as s, n (s.address)}
+      {#each visible as s, n (s.address)}
         <ServerCard
           name={s.name}
           address={s.address}
@@ -127,5 +150,6 @@
   .spin { display: grid; place-items: center; line-height: 0; transform: rotate(var(--r)); transition: transform 700ms var(--spring); }
   .spin :global(svg) { display: block; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 16px; }
+  .rowsgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr)); gap: 12px; }
   .empty { display: grid; justify-items: center; gap: 6px; text-align: center; padding: 34px 20px; border: 1px dashed var(--line-strong); border-radius: 20px; }
 </style>

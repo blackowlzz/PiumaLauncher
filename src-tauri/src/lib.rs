@@ -150,7 +150,6 @@ pub fn run() {
             commands::modrinth_categories,
             commands::sessions,
             commands::installed_versions,
-            commands::minecraft_news,
             commands::get_settings,
             commands::fetch_skin,
             commands::wardrobe_load,

@@ -240,7 +240,7 @@
   .head p { margin-top: 6px; }
   .empty { display: flex; align-items: center; gap: 18px; padding: 26px; }
   .et { font-weight: 600; font-size: 16px; margin-bottom: 4px; }
-  .hero { position: relative; display: grid; align-content: space-between; gap: 18px; min-height: 250px; padding: 28px 32px 0; border-radius: 24px; overflow: hidden; border: 1px solid var(--line); background: var(--surface); animation: heroin 700ms var(--spring) backwards; }
+  .hero { position: relative; display: grid; align-content: space-between; gap: 18px; min-height: 250px; padding: 28px 32px 0; border-radius: 20px; overflow: hidden; border: 1px solid var(--line); background: var(--surface); animation: heroin 700ms var(--spring) backwards; }
   @keyframes heroin { from { opacity: 0; transform: translateY(14px) scale(0.99); } }
   .heyebrow { font-size: 13px; color: var(--muted); animation: swapin 500ms var(--spring) 150ms backwards; }
   .hbig { font-size: clamp(44px, 6vw, 72px); font-weight: 700; letter-spacing: -0.055em; line-height: 1; margin-top: 6px; animation: swapin 600ms var(--spring) 250ms backwards; }

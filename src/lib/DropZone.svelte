@@ -54,7 +54,7 @@
   .frame rect { fill: none; stroke: var(--text); stroke-width: 2; stroke-dasharray: 10 8; animation: march 900ms linear infinite; }
   @keyframes march { to { stroke-dashoffset: -18; } }
   .center { display: grid; justify-items: center; gap: 8px; text-align: center; animation: gopop 360ms var(--spring) backwards; }
-  .pk { display: grid; place-items: center; width: 92px; height: 92px; border-radius: 26px; background: var(--inv-bg); color: var(--inv-text); margin-bottom: 10px; animation: bob 1.6s ease-in-out infinite; }
+  .pk { display: grid; place-items: center; width: 92px; height: 92px; border-radius: 20px; background: var(--inv-bg); color: var(--inv-text); margin-bottom: 10px; animation: bob 1.6s ease-in-out infinite; }
   @keyframes bob { 50% { transform: translateY(-8px) rotate(-4deg); } }
   .big { font-size: 22px; font-weight: 650; letter-spacing: -0.03em; }
 </style>

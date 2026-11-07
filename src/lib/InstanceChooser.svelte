@@ -89,7 +89,7 @@
   .ver { margin-left: 8px; font-size: 10.5px; padding: 1px 8px; vertical-align: 1px; }
   .list { list-style: none; margin: -4px -6px; padding: 4px 6px; display: grid; gap: 6px; overflow: auto; }
   .list li { animation: swapin 360ms var(--spring) calc(var(--n) * 40ms + 60ms) backwards; }
-  .opt { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 8px 12px 8px 8px; border-radius: 14px; border-color: var(--line); transition: background var(--ease), border-color var(--ease), opacity 260ms ease, transform 260ms var(--spring); }
+  .opt { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 8px 12px 8px 8px; border-radius: 12px; border-color: var(--line); transition: background var(--ease), border-color var(--ease), opacity 260ms ease, transform 260ms var(--spring); }
   .opt:disabled { color: inherit; }
   .picked .opt:not(.on) { opacity: 0.3; transform: scale(0.98); }
   .opt.on { border-color: var(--text); }

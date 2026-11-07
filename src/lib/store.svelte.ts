@@ -10,7 +10,6 @@ import {
   modrinth,
   stats,
   type EffectiveLaunch,
-  type NewsItem,
   defaultSettings,
   type PackUpdate,
   type StartupReport,
@@ -34,7 +33,7 @@ import {
   type VersionEntry,
 } from './api'
 
-export type Page = 'home' | 'library' | 'servers' | 'explore' | 'accounts' | 'instance' | 'settings' | 'themes' | 'performance' | 'wardrobe' | 'worlds' | 'stats'
+export type Page = 'home' | 'library' | 'servers' | 'explore' | 'accounts' | 'instance' | 'settings' | 'performance' | 'wardrobe' | 'stats'
 
 const MAX_STAT_SAMPLES = 90
 
@@ -61,7 +60,6 @@ export const app = $state({
   featured: [] as ProjectHit[],
   sessions: [] as Session[],
   installedVersions: [] as string[],
-  news: [] as NewsItem[],
   installingId: null as string | null,
   cancellable: false,
   packUpdates: {} as Record<string, PackUpdate>,
@@ -160,7 +158,6 @@ export async function init() {
   setTimeout(refreshPackUpdates, 2500)
   setInterval(checkPlaytime, 30_000)
   setInterval(checkUpdate, 30 * 60 * 1000)
-  stats.news().then((n) => (app.news = n)).catch(() => {})
   api.listVersions().then((v) => (app.versions = v)).catch((e) => notify(t('Version list unavailable: {error}', { error: e })))
   modrinth
     .search({ query: '', projectType: 'modpack', loaders: [], categories: [], sort: 'downloads', offset: 0 })

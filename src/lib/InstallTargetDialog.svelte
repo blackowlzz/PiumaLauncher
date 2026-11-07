@@ -107,7 +107,7 @@
   h3 { margin: 0 0 3px; font-size: 18px; font-weight: 650; letter-spacing: -0.03em; overflow-wrap: anywhere; }
   .list { list-style: none; margin: -4px -6px; padding: 4px 6px; display: grid; gap: 6px; overflow: auto; }
   .list li { animation: swapin 360ms var(--spring) calc(var(--n) * 40ms + 60ms) backwards; }
-  .opt { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 8px 12px 8px 8px; border-radius: 14px; border-color: var(--line); }
+  .opt { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 8px 12px 8px 8px; border-radius: 12px; border-color: var(--line); }
   .opt:hover:not(:disabled) { border-color: var(--line-strong); }
   .opt:disabled { color: inherit; opacity: 0.6; }
   .thumb { position: relative; width: 44px; height: 44px; border-radius: 10px; overflow: hidden; flex: none; }

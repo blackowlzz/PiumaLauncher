@@ -42,7 +42,7 @@
   .name { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .chev { display: inline-grid; color: var(--muted); transform: rotate(90deg); transition: transform 250ms var(--spring); }
   .chev.up { transform: rotate(-90deg); }
-  .menu { position: absolute; bottom: calc(100% + 10px); left: 0; z-index: 30; min-width: 240px; max-height: 320px; overflow: auto; margin: 0; padding: 6px; list-style: none; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 18px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); animation: pop 220ms var(--spring) both; transform-origin: bottom left; }
+  .menu { position: absolute; bottom: calc(100% + 10px); left: 0; z-index: 30; min-width: 240px; max-height: 320px; overflow: auto; margin: 0; padding: 6px; list-style: none; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 16px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); animation: pop 220ms var(--spring) both; transform-origin: bottom left; }
   .menu li { animation: item 260ms var(--spring) both; animation-delay: calc(var(--n) * 30ms); }
   .opt { display: flex; align-items: center; gap: 8px; width: 100%; border-color: transparent; text-align: left; padding: 9px 12px; border-radius: 12px; }
   .opt .small { margin-left: auto; }

@@ -101,7 +101,7 @@
           </div>
         </button>
         <span class="dots"><InstanceMenu {inst} /></span>
-        <button class="quick" onclick={() => play(inst.id)} disabled={isBusy(inst.id)} aria-label={t('Play {name}', { name: inst.name })} title={t('Play')}><Icon name="play" size={16} /></button>
+        <button class="quick" onclick={() => play(inst.id)} disabled={isBusy(inst.id)} aria-label={t('Play {name}', { name: inst.name })} title={t('Play')}><Icon name="play" size={13} />{t('Play')}</button>
       </article>
     {/each}
   </div>
@@ -140,25 +140,24 @@
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
   .card { position: relative; display: flex; }
   .open { transition: transform 380ms var(--spring), border-color var(--ease); }
-  .card:hover .open, .card:hover .dots { transform: translateY(-4px); }
+  .card:hover .open, .card:hover .dots, .card:hover .quick { transform: translateY(-3px); }
   .cover :global(.photo) { transition: transform 900ms var(--spring); }
   .card:hover .cover :global(.photo) { transform: scale(1.06); }
-  .open { display: flex; flex-direction: column; width: 100%; padding: 0; text-align: left; border-radius: 22px; border: 1px solid var(--line); background: var(--surface); overflow: hidden; }
+  .open { display: flex; flex-direction: column; width: 100%; padding: 0; text-align: left; border-radius: 20px; border: 1px solid var(--line); background: var(--surface); overflow: hidden; }
   .open:hover:not(:disabled) { border-color: var(--line-strong); background: var(--surface); }
   .card.sel .open { border-color: var(--text); }
   .cover { --fade: var(--surface); position: relative; overflow: hidden; aspect-ratio: 16 / 9; display: grid; place-items: center; }
   .when { position: absolute; left: 12px; bottom: 10px; display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: #fff; background: rgba(0, 0, 0, 0.55); border-radius: 999px; padding: 3px 10px; }
   .dots { position: absolute; right: 8px; bottom: 8px; transition: transform 380ms var(--spring); }
-  .body { flex: 1; padding: 12px 46px 14px 14px; display: grid; gap: 8px; align-content: start; }
+  .body { flex: 1; padding: 12px 46px 58px 14px; display: grid; gap: 8px; align-content: start; }
   .title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .upd { display: inline-flex; align-items: center; gap: 4px; color: var(--inv-text); background: var(--inv-bg); border-color: var(--inv-bg); }
   .live { position: absolute; left: 10px; top: 10px; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; background: var(--bg); border-radius: 999px; padding: 3px 9px; }
   .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text); animation: pulse 1.4s infinite; }
   @keyframes pulse { 50% { opacity: 0.25; } }
-  .quick { position: absolute; right: 10px; top: 10px; width: 34px; height: 34px; padding: 0; display: grid; place-items: center; border-radius: 50%; background: var(--inv-bg); color: var(--inv-text); border-color: var(--inv-bg); opacity: 0; transform: translateY(-4px); transition: opacity var(--ease), transform var(--ease); }
-  .quick:hover:not(:disabled) { background: var(--inv-bg); border-color: var(--inv-bg); opacity: 1; }
-  .card:hover .quick, .quick:focus-visible { opacity: 1; transform: none; }
+  .quick { position: absolute; left: 14px; bottom: 14px; height: 32px; padding: 0 16px; display: inline-flex; align-items: center; gap: 7px; border-radius: 999px; font-size: 13px; font-weight: 600; background: var(--inv-bg); color: var(--inv-text); border-color: var(--inv-bg); transition: transform 380ms var(--spring); }
+  .quick:hover:not(:disabled) { background: var(--inv-bg); border-color: var(--inv-bg); }
   .quick:disabled { display: none; }
   .rowopen { display: flex; align-items: center; gap: 12px; text-align: left; padding: 4px 8px; }
   .thumb { position: relative; width: 40px; height: 40px; border-radius: 10px; overflow: hidden; flex: none; display: grid; place-items: center; border: 1px solid var(--line); }

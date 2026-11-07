@@ -110,13 +110,13 @@
 
 <style>
   .backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.62); z-index: 50; }
-  .modal { position: fixed; z-index: 51; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 26px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 18px; box-shadow: 0 30px 90px rgba(0, 0, 0, 0.55); animation: as-pop 280ms var(--spring) both; }
+  .modal { position: fixed; z-index: 51; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 26px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 20px; box-shadow: 0 30px 90px rgba(0, 0, 0, 0.55); animation: as-pop 280ms var(--spring) both; }
   @keyframes as-pop { from { opacity: 0; transform: translate(-50%, -47%) scale(0.97); } }
   .mform { display: grid; gap: 16px; }
   h1 { font-size: 20px; }
   .field { display: grid; gap: 8px; }
   .lbl { font-size: 12px; color: var(--muted); }
-  .preview { border: 1px solid var(--line); border-radius: 14px; padding: 12px; background: var(--surface-2); }
+  .preview { border: 1px solid var(--line); border-radius: 16px; padding: 12px; background: var(--surface-2); }
   .scan { display: flex; align-items: center; gap: 10px; }
   .radar { position: relative; width: 10px; height: 10px; border-radius: 50%; background: var(--text); }
   .radar::after { content: ''; position: absolute; inset: 0; border-radius: 50%; border: 1px solid var(--text); animation: ring 1.1s ease-out infinite; }

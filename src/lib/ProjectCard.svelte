@@ -60,10 +60,10 @@
 </article>
 
 <style>
-  .card { position: relative; contain: paint; display: grid; grid-template-rows: 120px 1fr; height: 100%; border-radius: 18px; overflow: hidden; border: 1px solid var(--line); background: var(--surface); transition: transform 380ms var(--spring), border-color var(--ease); }
+  .card { position: relative; contain: paint; display: grid; grid-template-rows: 120px 1fr; height: 100%; border-radius: 20px; overflow: hidden; border: 1px solid var(--line); background: var(--surface); transition: transform 380ms var(--spring), border-color var(--ease); }
   .card.rise { animation: rise 520ms var(--spring) backwards var(--d); }
   @keyframes rise { from { opacity: 0; transform: translateY(22px) scale(0.97); } }
-  .card:hover { transform: translateY(-4px); border-color: var(--line-strong); }
+  .card:hover { transform: translateY(-3px); border-color: var(--line-strong); }
   .media { position: relative; overflow: hidden; background: #0a0a0a; }
   .photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 900ms var(--spring); }
   .card:hover .photo { transform: scale(1.06); }
@@ -74,7 +74,7 @@
   .body { display: grid; align-content: start; gap: 6px; padding: 14px 14px 14px; pointer-events: none; }
   .title { font-size: 15.5px; font-weight: 650; letter-spacing: -0.025em; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.4em; }
   .desc { font-size: 12.5px; line-height: 1.4; color: var(--muted); margin: 0; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.8em; }
-  .tags { display: flex; flex-wrap: wrap; gap: 6px; min-height: 22px; margin-top: 2px; }
+  .tags { display: flex; flex-wrap: wrap; align-items: flex-start; align-content: flex-start; gap: 6px; min-height: 22px; margin-top: 2px; }
   .foot { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
   .foot button { pointer-events: auto; }
   .ver { font-size: 12.5px; color: var(--muted); }

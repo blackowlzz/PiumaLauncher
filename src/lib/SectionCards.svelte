@@ -36,7 +36,7 @@
 <style>
   .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-flow: dense; gap: 16px; }
   .scard { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-height: 172px; padding: 24px 52px 24px 24px; text-align: left; border-radius: 20px; border: 1px solid var(--line); background: var(--surface); overflow: hidden; isolation: isolate; transition: border-color var(--ease), transform 300ms var(--spring); }
-  .scard:hover:not(:disabled) { border-color: var(--line-strong); background: var(--surface); transform: translateY(-2px); }
+  .scard:hover:not(:disabled) { border-color: var(--line-strong); background: var(--surface); transform: translateY(-3px); }
   .s2 { grid-column: span 2; }
   .s3 { grid-column: span 3; }
   .art .ss { max-width: 52%; }

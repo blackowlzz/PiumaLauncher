@@ -306,7 +306,7 @@
 <style>
   .backdrop { position: fixed; top: 40px; left: 0; right: 0; bottom: 0; padding: 0; border: 0; border-radius: 0; cursor: default; background: rgba(0, 0, 0, 0.66); z-index: 20; animation: fade 200ms ease both; }
   .backdrop:hover:not(:disabled) { background: rgba(0, 0, 0, 0.66); }
-  .modal { position: fixed; z-index: 21; top: calc(50% + 20px); left: 50%; transform: translate(-50%, -50%); width: min(880px, calc(100vw - 40px)); height: min(740px, calc(100vh - 40px - 32px)); display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 26px; box-shadow: 0 30px 90px rgba(0, 0, 0, 0.55); overflow: hidden; animation: enter 320ms var(--spring) both; }
+  .modal { position: fixed; z-index: 21; top: calc(50% + 20px); left: 50%; transform: translate(-50%, -50%); width: min(880px, calc(100vw - 40px)); height: min(740px, calc(100vh - 40px - 32px)); display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 20px; box-shadow: 0 30px 90px rgba(0, 0, 0, 0.55); overflow: hidden; animation: enter 320ms var(--spring) both; }
   .closing .backdrop { animation: unfade 180ms ease both; }
   .closing .modal { animation: leave 180ms ease-in both; }
   @keyframes unfade { to { opacity: 0; } }
@@ -354,7 +354,7 @@
   .field input { padding-left: 38px; }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 
-  .table { border: 1px solid var(--line); border-radius: 18px; overflow: hidden; background: var(--bg); }
+  .table { border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background: var(--bg); }
   .tr { display: grid; grid-template-columns: 40px minmax(0, 1fr) minmax(0, 150px); align-items: center; gap: 14px; padding: 10px 16px; border-bottom: 1px solid var(--line); content-visibility: auto; contain-intrinsic-size: auto 62px; }
   .tr:last-child { border-bottom: 0; }
   .tr img, .ico { width: 40px; height: 40px; border-radius: 11px; background: var(--surface-2); object-fit: cover; }

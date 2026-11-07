@@ -1,7 +1,7 @@
 
 use std::collections::HashMap;
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use tokio::sync::OnceCell;
 
 use crate::error::Result;
@@ -17,15 +17,8 @@ struct Feed {
 
 #[derive(Deserialize)]
 struct Entry {
-    title: String,
     #[serde(default)]
     version: String,
-    #[serde(default, rename = "type")]
-    kind: String,
-    #[serde(default)]
-    date: String,
-    #[serde(default, rename = "shortText")]
-    short_text: String,
     #[serde(default)]
     image: Option<Image>,
 }
@@ -33,38 +26,6 @@ struct Entry {
 #[derive(Deserialize)]
 struct Image {
     url: String,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NewsItem {
-    pub title: String,
-    pub version: String,
-    pub kind: String,
-    pub date: String,
-    pub summary: String,
-    pub image_url: Option<String>,
-}
-
-pub async fn latest(client: &reqwest::Client) -> Result<Vec<NewsItem>> {
-    let feed: Feed = serde_json::from_str(&net::get_text(client, FEED).await?)?;
-    Ok(feed
-        .entries
-        .into_iter()
-        .take(8)
-        .map(|e| NewsItem {
-            image_url: e
-                .image
-                .map(|i| i.url)
-                .filter(|u| u.starts_with('/'))
-                .map(|u| format!("{IMAGE_BASE}{u}")),
-            title: e.title,
-            version: e.version,
-            kind: e.kind,
-            date: e.date,
-            summary: e.short_text,
-        })
-        .collect())
 }
 
 static IMAGES: OnceCell<HashMap<String, String>> = OnceCell::const_new();

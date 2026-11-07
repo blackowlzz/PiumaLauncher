@@ -158,8 +158,15 @@ export async function mock(cmd: string, args: Record<string, unknown>): Promise<
     case 'update_content':
       return String(args.fileName)
     case 'modrinth_categories': {
-      const all = await (await fetch('https://api.modrinth.com/v2/tag/category')).json()
-      return all.filter((c: any) => c.project_type === args.projectType).map((c: any) => c.name).sort()
+      const [cats, lds] = await Promise.all(['category', 'loader'].map(async (k) => (await fetch(`https://api.modrinth.com/v2/tag/${k}`)).json()))
+      const order = ['categories', 'features', 'resolutions', 'performance impact']
+      const key = (c: any) => [order.indexOf(c.header), parseInt(c.name) || 0, c.name] as const
+      const categories = cats
+        .filter((c: any) => c.project_type === args.projectType)
+        .map((c: any) => ({ name: c.name, header: c.header, icon: c.icon }))
+        .sort((a: any, b: any) => { const [x, y] = [key(a), key(b)]; return x[0] - y[0] || x[1] - y[1] || x[2].localeCompare(y[2]) })
+      const loaders = lds.filter((l: any) => l.supported_project_types.includes(args.projectType)).map((l: any) => ({ name: l.name, header: '', icon: l.icon }))
+      return { categories, loaders }
     }
     case 'sessions': {
       const day = 86_400_000
@@ -285,19 +292,6 @@ export async function mock(cmd: string, args: Record<string, unknown>): Promise<
     case 'set_language':
       try { localStorage.setItem('mock-lang', String(args.code)) } catch {  }
       return null
-    case 'minecraft_news': {
-      const feed = await (await fetch('https://launchercontent.mojang.com/v2/javaPatchNotes.json')).json()
-      return feed.entries.slice(0, 8).map((e: Record<string, any>) => ({
-        title: e.title, version: e.version, kind: e.type, date: e.date, summary: e.shortText,
-        imageUrl: e.image?.url?.startsWith('/') ? `https://launchercontent.mojang.com${e.image.url}` : null,
-      }))
-    }
-    case 'minecraft_news_static':
-      return [
-        { title: 'Minecraft 26.4 Snapshot 3', version: '26.4-snapshot-3', kind: 'snapshot', date: '2026-10-06T12:54:26Z', summary: 'Brr! Does it feel colder all of a sudden? Ice caves filled with glittering icicles.', imageUrl: null },
-        { title: 'Minecraft 26.3', version: '26.3', kind: 'release', date: '2026-09-23T10:00:00Z', summary: 'The latest game drop is here.', imageUrl: null },
-        { title: 'Minecraft 26.3 Release Candidate 1', version: '26.3-rc-1', kind: 'snapshot', date: '2026-09-18T10:00:00Z', summary: 'Final fixes before release.', imageUrl: null },
-      ]
     case 'list_worlds':
       return [{ folder: 'Nuovo mondo', name: 'Nuovo mondo', size: 48_000_000, modifiedMs: Date.now() - 3_600_000 }]
     case 'list_servers':

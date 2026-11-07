@@ -472,19 +472,21 @@ export interface InstallProgress {
 export type ContentKind = 'mods' | 'resourcepacks' | 'shaderpacks'
 export type ProjectType = 'modpack' | 'mod' | 'resourcepack' | 'shader'
 
+export interface Tag {
+  name: string
+  header: string
+  icon: string
+}
+
+export interface Tags {
+  categories: Tag[]
+  loaders: Tag[]
+}
+
 export interface Session {
   instanceId: string
   startMs: number
   secs: number
-}
-
-export interface NewsItem {
-  title: string
-  version: string
-  kind: string
-  date: string
-  summary: string
-  imageUrl: string | null
 }
 
 export const modrinth = {
@@ -497,7 +499,7 @@ export const modrinth = {
     sort: string
     offset: number
   }) => call<SearchResult>('modrinth_search', args),
-  categories: (projectType: ProjectType) => call<string[]>('modrinth_categories', { projectType }),
+  tags: (projectType: ProjectType) => call<Tags>('modrinth_categories', { projectType }),
   modpackDetails: (projectId: string, versionId?: string) => call<PackDetails>('modpack_details', { projectId, versionId }),
   projectPage: (projectId: string) => call<ProjectPage>('project_page', { projectId }),
   installModpack: (projectId: string, versionId?: string, mcVersion?: string) =>
@@ -605,6 +607,7 @@ export interface Settings {
   aotCache: boolean
   breakReminderMinutes: number
   dailyLimitMinutes: number
+  hideDiscordCard: boolean
 }
 
 export const defaultSettings = (): Settings => ({
@@ -635,6 +638,7 @@ export const defaultSettings = (): Settings => ({
   aotCache: false,
   breakReminderMinutes: 0,
   dailyLimitMinutes: 0,
+  hideDiscordCard: false,
 })
 
 export interface RuntimeEntry {
@@ -656,5 +660,4 @@ export interface StorageInfo {
 export const stats = {
   sessions: () => call<Session[]>('sessions'),
   installedVersions: () => call<string[]>('installed_versions'),
-  news: () => call<NewsItem[]>('minecraft_news'),
 }

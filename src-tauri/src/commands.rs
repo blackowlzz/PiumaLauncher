@@ -20,7 +20,7 @@ use crate::migrate;
 use crate::presence;
 use crate::minecraft::{self, VersionEntry};
 use crate::modrinth::{self, Content, ModFile, SearchResult};
-use crate::news::{self, NewsItem};
+use crate::news;
 use crate::settings;
 use crate::storage;
 use crate::skin;
@@ -366,8 +366,8 @@ pub async fn modrinth_search(
 }
 
 #[tauri::command]
-pub async fn modrinth_categories(project_type: String) -> Result<Vec<String>> {
-    modrinth::categories(&net::client(), &project_type).await
+pub async fn modrinth_categories(project_type: String) -> Result<modrinth::Tags> {
+    modrinth::tags(&net::client(), &project_type).await
 }
 
 #[tauri::command]
@@ -633,11 +633,6 @@ pub fn installed_versions() -> Vec<String> {
             e.path().join(format!("{id}.jar")).is_file().then_some(id)
         })
         .collect()
-}
-
-#[tauri::command]
-pub async fn minecraft_news() -> Result<Vec<NewsItem>> {
-    news::latest(&net::client()).await
 }
 
 #[tauri::command]

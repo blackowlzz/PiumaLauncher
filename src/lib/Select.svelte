@@ -101,7 +101,7 @@
   .cur { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .chev { display: inline-grid; flex: none; color: var(--muted); transform: rotate(90deg); transition: transform 220ms var(--spring); }
   .chev.open { transform: rotate(-90deg); }
-  .menu { position: absolute; left: 0; top: calc(100% + 8px); z-index: 60; min-width: 100%; width: max-content; max-width: min(420px, 90vw); max-height: 300px; overflow-y: auto; margin: 0; padding: 6px; list-style: none; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 18px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); animation: pop 180ms var(--spring) both; transform-origin: top left; }
+  .menu { position: absolute; left: 0; top: calc(100% + 8px); z-index: 60; min-width: 100%; width: max-content; max-width: min(420px, 90vw); max-height: 300px; overflow-y: auto; margin: 0; padding: 6px; list-style: none; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 16px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); animation: pop 180ms var(--spring) both; transform-origin: top left; }
   .menu.up { top: auto; bottom: calc(100% + 8px); transform-origin: bottom left; }
   .opt { display: flex; align-items: center; justify-content: space-between; gap: 14px; width: 100%; border-color: transparent; border-radius: 12px; padding: 9px 12px; text-align: left; color: var(--text); }
   .opt.on { background: var(--surface-2); border-color: transparent; }

@@ -145,8 +145,8 @@
 <style>
   .head { display: grid; gap: 6px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
-  .acard { display: grid; gap: 22px; align-content: space-between; min-height: 230px; padding: 22px; border: 1px solid var(--line); border-radius: 26px; background: var(--surface); transition: border-color var(--ease), transform 300ms var(--spring); }
-  .acard:hover { transform: translateY(-3px); }
+  .acard { display: grid; gap: 22px; align-content: space-between; min-height: 230px; padding: 22px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); transition: border-color var(--ease), transform 300ms var(--spring); }
+  .acard:hover { transform: translateY(-3px); border-color: var(--line-strong); }
   .acard.active { border-color: var(--text); }
   .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
   .tags { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
@@ -154,12 +154,13 @@
   .name { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 24px; font-weight: 650; letter-spacing: -0.04em; }
   .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .acts { display: flex; align-items: center; gap: 8px; }
-  .acts .ghost { margin-left: auto; color: var(--muted); }
-  .add { border-style: dashed; background: transparent; }
-  .plus { display: grid; place-items: center; width: 68px; height: 68px; border-radius: 16px; border: 1px dashed var(--line-strong); font-size: 30px; color: var(--muted); font-weight: 300; }
+  .acts .ghost { color: var(--muted); }
+  .add { background: transparent; }
+  .plus { display: grid; place-items: center; width: 68px; height: 68px; border-radius: 16px; border: 1px solid var(--line); font-size: 30px; color: var(--muted); font-weight: 300; }
   .soon { background: transparent; }
   .soon.waiting { border-color: var(--text); }
   .code { margin-bottom: 8px; }
   .codebtn { font-size: 26px; font-weight: 650; letter-spacing: 0.12em; padding: 6px 12px; }
+  .soon .name + p { margin: 6px 0 0; }
   .ms { display: grid; place-items: center; width: 68px; height: 68px; border-radius: 16px; border: 1px solid var(--line-strong); color: var(--muted); }
 </style>

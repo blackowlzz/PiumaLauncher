@@ -8,7 +8,7 @@
 <script lang="ts">
   import { thumb } from './img'
   import { onMount } from 'svelte'
-  import { modrinth, type InstalledProject, type ModFile, type ProjectHit, type ProjectType, type SearchResult } from './api'
+  import { modrinth, type InstalledProject, type ModFile, type ProjectHit, type ProjectType, type SearchResult, type Tags } from './api'
   import { locale, stageText, t } from './i18n.svelte'
   import { app, installProject, notify, openProject, updateInstalled } from './store.svelte'
   import Icon from './Icon.svelte'
@@ -16,11 +16,11 @@
   import Select from './Select.svelte'
   import { categoryName, contentKindOf, formatBytes } from './meta'
 
-  const types: { id: ProjectType; label: string }[] = [
-    { id: 'modpack', label: 'Modpack' },
-    { id: 'mod', label: 'Mod' },
-    { id: 'resourcepack', label: 'Resource pack' },
-    { id: 'shader', label: 'Shader' },
+  const types: { id: ProjectType; label: string; icon: 'box' | 'package' | 'palette' | 'sun' }[] = [
+    { id: 'modpack', label: 'Modpack', icon: 'box' },
+    { id: 'mod', label: 'Mod', icon: 'package' },
+    { id: 'resourcepack', label: 'Resource pack', icon: 'palette' },
+    { id: 'shader', label: 'Shader', icon: 'sun' },
   ]
   const loaderChoices = ['fabric', 'quilt', 'forge', 'neoforge']
 
@@ -35,10 +35,11 @@
   let categories: string[] = $state(restore?.categories ?? [])
   let view: 'grid' | 'list' = $state(restore?.view ?? 'grid')
   let showFilters = $state(false)
+  let expanded = $state<Record<string, boolean>>({})
   let hits: ProjectHit[] = $state([])
   let total = $state(0)
   let loading = $state(false)
-  let catalog: Partial<Record<ProjectType, string[]>> = $state({})
+  let catalog: Partial<Record<ProjectType, Tags>> = $state({})
   let installed: ModFile[] = $state([])
   let installedMap: Map<string, InstalledProject> = $state(new Map())
 
@@ -47,7 +48,25 @@
   const releases = $derived(app.versions.filter((v) => v.kind === 'release').slice(0, 80))
   const targets = $derived(type === 'mod' ? app.instances.filter((i) => i.loader !== 'vanilla') : app.instances)
   const target = $derived(targets.find((i) => i.id === targetId) ?? targets[0] ?? null)
-  const cats = $derived(catalog[type] ?? [])
+  const groups = $derived.by(() => {
+    const out: { header: string; tags: Tags['categories'] }[] = []
+    for (const c of catalog[type]?.categories ?? []) {
+      const g = out.find((x) => x.header === c.header)
+      if (g) g.tags.push(c)
+      else out.push({ header: c.header, tags: [c] })
+    }
+    return out
+  })
+  const loaderIcons = $derived(new Map((catalog[type]?.loaders ?? []).map((l) => [l.name, l.icon])))
+  const headerName = (h: string) => ({ categories: t('Categories'), features: t('Features'), resolutions: t('Resolutions'), 'performance impact': t('Performance impact') })[h] ?? h
+  const mask = (svg: string | undefined) => {
+    if (!svg) return undefined
+    const full = svg.includes('xmlns=') ? svg : svg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"')
+    return `url("data:image/svg+xml;utf8,${encodeURIComponent(full)}")`
+  }
+  const LIMIT = 6
+  const quickVersions = $derived([...new Set([releases[0]?.id, '1.21.1', '1.20.1', '1.19.2', '1.12.2'])].filter((v): v is string => !!v && releases.some((r) => r.id === v)).slice(0, 5))
+  const active = $derived((mcVersion ? 1 : 0) + loaders.length + categories.length)
   const cantInstall = $derived(type !== 'modpack' && !target)
 
   $effect(() => {
@@ -73,7 +92,7 @@
 
   $effect(() => {
     const ty = type
-    if (!catalog[ty]) modrinth.categories(ty).then((c) => (catalog[ty] = c)).catch(() => {})
+    if (!catalog[ty]) modrinth.tags(ty).then((c) => (catalog[ty] = c)).catch(() => {})
   })
 
   let requestSeq = 0
@@ -189,6 +208,12 @@
 
 <div class="layout">
   <section class="results">
+    <div class="kinds" role="tablist" aria-label={t('Type')}>
+      {#each types as ty}
+        <button class="kind" role="tab" aria-selected={type === ty.id} onclick={() => (type = ty.id)}><Icon name={ty.icon} size={15} />{ty.label}</button>
+      {/each}
+    </div>
+
     <div class="toolbar">
       <label class="search grow">
         <span class="sr">{t('Search Modrinth')}</span>
@@ -276,17 +301,8 @@
 
   <aside class="filters" class:open={showFilters} aria-label={t('Filters')}>
     <div class="fhead">
-      <span class="ft"><Icon name="filter" size={15} /> {t('Filters')}</span>
-      <button class="ghost small" onclick={reset}>{t('Reset')}</button>
-    </div>
-
-    <div class="fsec">
-      <h3>{t('Type')}</h3>
-      <div class="chips">
-        {#each types as ty}
-          <button class="chip" aria-pressed={type === ty.id} onclick={() => (type = ty.id)}>{ty.label}</button>
-        {/each}
-      </div>
+      <span class="ft">{t('Filters')}{#if active}<span class="badge">{active}</span>{/if}</span>
+      {#if active || query}<button class="ghost small reset" onclick={reset}>{t('Reset')}</button>{/if}
     </div>
 
     {#if type !== 'modpack'}
@@ -298,36 +314,58 @@
 
     <div class="fsec">
       <h3>{t('Game version')}</h3>
-      <Select bind:value={mcVersion} label={t('Game version')} options={[{ value: '', label: t('Any') }, ...releases.map((v) => ({ value: v.id, label: v.id }))]} />
+      <Select bind:value={mcVersion} label={t('Game version')} options={[{ value: '', label: t('All versions') }, ...releases.map((v) => ({ value: v.id, label: v.id }))]} />
+      {#if quickVersions.length}
+        <div class="chips">
+          {#each quickVersions as v}
+            <button class="chip" aria-pressed={mcVersion === v} onclick={() => (mcVersion = mcVersion === v ? '' : v)}>{v}</button>
+          {/each}
+        </div>
+      {/if}
     </div>
 
     {#if type === 'modpack' || type === 'mod'}
       <div class="fsec">
         <h3>{t('Loader')}</h3>
-        <div class="chips">
+        <div class="opts">
           {#each loaderChoices as l}
-            <button class="chip" aria-pressed={loaders.includes(l)} onclick={() => (loaders = toggle(loaders, l))}>{l[0].toUpperCase() + l.slice(1)}</button>
+            {@const on = loaders.includes(l)}
+            <button class="opt" aria-pressed={on} onclick={() => (loaders = toggle(loaders, l))}>
+              <span class="ico" style:--icon={mask(loaderIcons.get(l))}></span>
+              <span class="on">{l === 'neoforge' ? 'NeoForge' : l[0].toUpperCase() + l.slice(1)}</span>
+              <span class="box">{#if on}<Icon name="check" size={11} />{/if}</span>
+            </button>
           {/each}
         </div>
       </div>
     {/if}
 
-    {#if cats.length}
+    {#each groups as g (g.header)}
+      {@const open = expanded[g.header] || g.tags.length <= LIMIT + 1}
+      {@const shown = open ? g.tags : g.tags.filter((c, i) => i < LIMIT || categories.includes(c.name))}
       <div class="fsec">
-        <h3>{t('Categories')}</h3>
-        <div class="chips">
-          {#each cats as c}
-            <button class="chip" aria-pressed={categories.includes(c)} onclick={() => (categories = toggle(categories, c))}>{categoryName(c)}</button>
+        <h3>{headerName(g.header)}</h3>
+        <div class="opts">
+          {#each shown as c (c.name)}
+            {@const on = categories.includes(c.name)}
+            <button class="opt" aria-pressed={on} onclick={() => (categories = toggle(categories, c.name))}>
+              <span class="ico" style:--icon={mask(c.icon)}></span>
+              <span class="on">{categoryName(c.name)}</span>
+              <span class="box">{#if on}<Icon name="check" size={11} />{/if}</span>
+            </button>
           {/each}
         </div>
+        {#if g.tags.length > LIMIT + 1}
+          <button class="ghost small showall" onclick={() => (expanded[g.header] = !expanded[g.header])}>{expanded[g.header] ? t('Show less') : t('Show more ({n})', { n: g.tags.length - shown.length })}</button>
+        {/if}
       </div>
-    {/if}
+    {/each}
   </aside>
 </div>
 
 <style>
   .head { display: grid; gap: 6px; }
-  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 28px; align-items: start; }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 28px; align-items: start; }
   .results { display: grid; gap: 14px; min-width: 0; }
   .toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
   .search { min-width: 200px; }
@@ -339,7 +377,7 @@
   .count, .note { margin: 0; }
   .progress { display: grid; gap: 8px; max-width: 560px; }
   .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
-  .sk { position: relative; overflow: hidden; aspect-ratio: 4 / 5; border-radius: 24px; background: var(--surface); border: 1px solid var(--line); animation: skin 400ms ease both var(--d); }
+  .sk { position: relative; overflow: hidden; aspect-ratio: 4 / 5; border-radius: 20px; background: var(--surface); border: 1px solid var(--line); animation: skin 400ms ease both var(--d); }
   .sk::after { content: ''; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(128, 128, 128, 0.14) 50%, transparent 70%); animation: shimmer 1.5s infinite; }
   .rise { animation: rowrise 450ms var(--spring) backwards var(--d); }
   @keyframes rowrise { from { opacity: 0; transform: translateY(10px); } }
@@ -350,17 +388,34 @@
   .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .more { justify-self: center; }
 
-  .filters { position: sticky; top: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; padding: 18px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); max-height: calc(100vh - 170px); overflow: auto; }
-  .fhead { display: flex; align-items: center; justify-content: space-between; }
-  .ft { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; }
-  .fsec { display: grid; gap: 10px; }
-  .fsec h3 { margin: 0; font-size: 13px; font-weight: 500; color: var(--muted); }
+  .kinds { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; justify-self: start; border: 1px solid var(--line); border-radius: 999px; }
+  .kind { display: inline-flex; align-items: center; gap: 8px; padding: 7px 16px; border: 0; color: var(--muted); font-size: 13.5px; }
+  .kind:hover:not(:disabled) { color: var(--text); background: var(--surface-2); }
+  .kind[aria-selected='true'], .kind[aria-selected='true']:hover:not(:disabled) { color: var(--text); background: var(--surface-2); }
+
+  .filters { position: sticky; top: 0; display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 26px; margin: 0 -10px; padding: 0 10px; max-height: calc(100vh - 170px); overflow: auto; scrollbar-width: none; }
+  .fhead { display: flex; align-items: center; justify-content: space-between; min-height: 30px; }
+  .ft { display: inline-flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 600; letter-spacing: -0.02em; }
+  .badge { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; font-size: 11.5px; font-weight: 600; color: var(--inv-text); background: var(--inv-bg); }
+  .reset { padding: 4px 10px; }
+  .fsec { display: grid; gap: 8px; }
+  .fsec h3 { margin: 0 0 2px; font-size: 12.5px; font-weight: 500; color: var(--muted); }
+  .opts { display: grid; gap: 1px; margin: 0 -10px; }
+  .opt { display: flex; align-items: center; gap: 11px; width: 100%; padding: 7px 10px; border: 0; border-radius: 10px; font-size: 13.5px; color: var(--muted); text-align: left; }
+  .opt:hover:not(:disabled) { color: var(--text); background: var(--surface-2); }
+  .opt[aria-pressed='true'] { color: var(--text); }
+  .ico { width: 16px; height: 16px; flex: none; background: currentColor; -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat; }
+  .on { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .box { display: grid; place-items: center; width: 16px; height: 16px; flex: none; border: 1.5px solid var(--line-strong); border-radius: 5px; color: var(--inv-text); transition: background var(--ease), border-color var(--ease); }
+  .opt[aria-pressed='true'] .box { background: var(--inv-bg); border-color: var(--inv-bg); }
   .chip { text-transform: none; }
+  .showall { justify-self: start; padding: 2px 0; font-size: 12.5px; }
+  .showall:hover:not(:disabled) { background: transparent; }
 
   @media (max-width: 1050px) {
     .layout { grid-template-columns: minmax(0, 1fr); }
     .fbtn { display: inline-flex; }
-    .filters { display: none; position: static; max-height: none; }
+    .filters { display: none; position: static; max-height: none; margin: 0; padding: 18px; border: 1px solid var(--line); border-radius: 16px; }
     .filters.open { display: grid; order: -1; }
   }
 </style>

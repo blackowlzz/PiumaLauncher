@@ -24,6 +24,7 @@
   })
 
   let term = $state('')
+  const mac = /Mac|iPhone|iPad/.test(navigator.platform)
   async function search(e: SubmitEvent) {
     e.preventDefault()
     const q = term.trim()
@@ -53,13 +54,12 @@
   <form class="find" onsubmit={search} role="search">
     <Icon name="search" size={15} />
     <input type="text" bind:value={term} placeholder={t('Search instances, modpacks, servers…')} aria-label={t('Search')} />
+    {#if !term}<kbd class="kbd">{mac ? '⌘K' : 'Ctrl K'}</kbd>{/if}
   </form>
 
   <div class="tools">
     <button class="iconbtn ghost" onclick={() => api.openUrl('https://discord.gg/abHWHuybYY').catch(notify)} aria-label="Discord" title="Discord"><Icon name="discord" size={17} /></button>
     <button class="iconbtn ghost" onclick={() => api.openUrl('https://ko-fi.com/blackowlzz').catch(notify)} aria-label="Ko-fi" title="Ko-fi"><Icon name="kofi" size={18} /></button>
-    <button class="iconbtn ghost" onclick={() => (app.page = 'themes')} aria-label={t('Themes')} title={t('Themes')}><Icon name="palette" size={17} /></button>
-    <button class="iconbtn ghost" onclick={() => (app.page = 'settings')} aria-label={t('Settings')} title={t('Settings')}><Icon name="settings" size={17} /></button>
   </div>
 
   {#if inTauri}
@@ -80,7 +80,7 @@
 {/if}
 
 <style>
-  .bar { position: relative; z-index: 150; display: flex; align-items: center; gap: 14px; height: 44px; padding-left: 16px; border-bottom: 1px solid var(--line); background: var(--bg); user-select: none; -webkit-user-select: none; }
+  .bar { position: relative; z-index: 150; display: flex; align-items: center; gap: 14px; height: 44px; padding-left: 16px; background: var(--bg); user-select: none; -webkit-user-select: none; }
   .id { display: flex; align-items: center; gap: 10px; flex: 1; height: 100%; }
   .id > * { pointer-events: none; }
   .mark { width: 19px; height: 19px; background: var(--text); -webkit-mask: var(--m) center / contain no-repeat; mask: var(--m) center / contain no-repeat; }
@@ -90,6 +90,8 @@
   .find:focus-within { border-color: var(--muted); color: var(--muted); }
   .find input { border: 0; background: transparent; padding: 0; height: 100%; font-size: 13px; border-radius: 0; }
   .find input:focus { background: transparent; }
+  .kbd { flex: none; padding: 1px 6px; border: 1px solid var(--line); border-radius: 6px; font: inherit; font-size: 11px; color: var(--faint); }
+  .find:focus-within .kbd { display: none; }
   .tools { display: flex; gap: 2px; }
   .tools button { width: 32px; height: 32px; }
   .ctl { display: flex; height: 100%; }

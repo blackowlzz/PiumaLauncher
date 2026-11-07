@@ -1,8 +1,8 @@
 <script lang="ts">
   import { api, modrinth, type Backup, type Instance, type JavaInstall, type PackDiff, type World } from './api'
   import { locale, stageText, t } from './i18n.svelte'
-  import { app, askConfirm, cancelInstall, createShortcut, installedJavas, isBusy, notify, play, refreshEffective, refreshPackUpdate, refreshStartup, reloadInstances, seconds, stop, updateModpack } from './store.svelte'
-  import { formatBytes, loaderNames, profileName, profiles } from './meta'
+  import { app, askConfirm, cancelInstall, createShortcut, installedJavas, isBusy, notify, play, playInfo, refreshEffective, refreshPackUpdate, refreshStartup, reloadInstances, seconds, stop, updateModpack } from './store.svelte'
+  import { formatBytes, formatDuration, loaderNames, profileName, profiles, relativeTime } from './meta'
   import Cover from './Cover.svelte'
   import ContentTable from './ContentTable.svelte'
   import Select from './Select.svelte'
@@ -67,6 +67,8 @@
   })
   const current = $derived(running && samples.length ? samples[samples.length - 1] : null)
   const peak = $derived(samples.length ? Math.max(...samples) : null)
+  const played = $derived(inst ? playInfo(inst.id) : null)
+  const idle = $derived(!running && !samples.length)
 
   $effect(() => {
     draft = inst ? { ...inst, launch: { ...inst.launch } } : null
@@ -248,7 +250,7 @@
   <button onclick={() => (app.page = 'library')}>{t('Back to the library')}</button>
 {:else}
   <header class="head">
-    <button class="ghost back" onclick={() => (app.page = 'library')}>← {t('Library')}</button>
+    <button class="ghost back" onclick={() => (app.page = 'library')}><span class="flip"><Icon name="chevron" size={15} /></span>{t('Library')}</button>
     <div class="banner">
       <Cover {inst} big />
       <div class="shade"></div>
@@ -325,14 +327,25 @@
   <div class="swap">
   {#if tab === 'overview'}
     <section class="stats">
-      <div>
-        <div class="eyebrow">{t('Memory now')}</div>
-        <div class="num">{current !== null ? `${current} MB` : '—'}</div>
-      </div>
-      <div>
-        <div class="eyebrow">{t('Peak')}</div>
-        <div class="num">{peak !== null ? `${peak} MB` : '—'}</div>
-      </div>
+      {#if idle}
+        <div>
+          <div class="eyebrow">{t('Playtime')}</div>
+          <div class="num">{played?.secs ? formatDuration(played.secs) : '—'}</div>
+        </div>
+        <div>
+          <div class="eyebrow">{t('Last played')}</div>
+          <div class="num sm">{played?.last ? relativeTime(played.last) : t('Never played')}</div>
+        </div>
+      {:else}
+        <div>
+          <div class="eyebrow">{t('Memory now')}</div>
+          <div class="num">{current !== null ? `${current} MB` : '—'}</div>
+        </div>
+        <div>
+          <div class="eyebrow">{t('Peak')}</div>
+          <div class="num">{peak !== null ? `${peak} MB` : '—'}</div>
+        </div>
+      {/if}
       <div>
         <div class="eyebrow">{t('Limit')}</div>
         <div class="num">{eff?.memoryMaxMb ?? inst.memoryMaxMb} MB</div>
@@ -361,10 +374,12 @@
     {:else if !startup?.lastMs}
       <p class="muted small">{t('The launcher measures how long the game takes to reach the main menu, and tells you if it gets slower.')}</p>
     {/if}
-    <div class="chart">
-      <Sparkline values={samples} limit={eff?.memoryMaxMb ?? inst.memoryMaxMb} />
-      {#if !samples.length}<p class="muted small hint">{t('The chart fills in while the game is running.')}</p>{/if}
-    </div>
+    {#if !idle}
+      <div class="chart">
+        <Sparkline values={samples} limit={eff?.memoryMaxMb ?? inst.memoryMaxMb} />
+        {#if !samples.length}<p class="muted small hint">{t('The chart fills in while the game is running.')}</p>{/if}
+      </div>
+    {/if}
 
   {:else if tab === 'mods'}
     <ContentTable {inst} {busy} />
@@ -526,8 +541,10 @@
 
 <style>
   .head { display: grid; gap: 14px; }
-  .back { justify-self: start; padding-left: 0; }
-  .banner { position: relative; overflow: hidden; border-radius: 18px; border: 1px solid var(--line); min-height: 150px; display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; padding: 22px 24px; }
+  .back { justify-self: start; display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px 5px 8px; margin-left: -8px; font-size: 13px; color: var(--muted); }
+  .back:hover:not(:disabled) { color: var(--text); }
+  .flip { display: inline-grid; transform: scaleX(-1); }
+  .banner { position: relative; overflow: hidden; border-radius: 20px; border: 1px solid var(--line); min-height: 150px; display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; padding: 22px 24px; }
   .shade { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0,0,0,.8), rgba(0,0,0,.2)); }
   .banner { color: #fff; }
   .bin { position: relative; display: grid; gap: 10px; }
@@ -537,7 +554,7 @@
   .live { border-color: #fff; }
   .stopbtn { position: relative; }
   .acts { position: relative; display: flex; gap: 8px; }
-  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+  .tabs { display: flex; gap: 2px; align-self: flex-start; justify-self: start; width: fit-content; padding: 4px; border: 1px solid var(--line); border-radius: 999px; }
   .upd { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--surface); animation: swapin 320ms var(--spring) backwards; }
   .uic { display: grid; place-items: center; width: 38px; height: 38px; flex: none; border-radius: 50%; background: var(--inv-bg); color: var(--inv-text); }
   .ut { font-weight: 600; margin-bottom: 2px; }
@@ -558,11 +575,9 @@
   .swap { display: flex; flex-direction: column; gap: 22px; animation: swap 300ms var(--spring) both; }
   .swap > * { flex-shrink: 0; }
   @keyframes swap { from { opacity: 0; transform: translateY(8px); } }
-  .tabs button { overflow: visible; border: 0; border-radius: 0; margin-bottom: -1px; color: var(--muted); padding: 10px 14px; background: transparent; }
-  .tabs button:hover:not(:disabled) { color: var(--text); background: transparent; }
-  .tabs button::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: 0; height: 2px; background: var(--text); transform: scaleX(0); transition: transform 320ms var(--spring); }
-  .tabs button.on { color: var(--text); }
-  .tabs button.on::after { transform: none; }
+  .tabs button { border: 0; border-radius: 999px; color: var(--muted); padding: 8px 16px; background: transparent; }
+  .tabs button:hover:not(:disabled) { color: var(--text); background: var(--surface-2); }
+  .tabs button.on { color: var(--text); background: var(--surface-2); }
   .slow { display: flex; align-items: center; gap: 14px; padding: 12px 16px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--surface-2); }
   .slow .st { font-weight: 600; }
   .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 24px; }
@@ -578,7 +593,7 @@
   .wrow { display: grid; gap: 10px; }
   .bk { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; font-size: 13px; color: var(--muted); }
   .bk.on { color: var(--text); background: var(--surface-2); }
-  .backups { display: grid; gap: 2px; padding: 10px 14px; border-radius: 14px; background: var(--surface-2); animation: swapin 260ms var(--spring) backwards; }
+  .backups { display: grid; gap: 2px; padding: 10px 14px; border-radius: 16px; background: var(--surface-2); animation: swapin 260ms var(--spring) backwards; }
   .bhead { padding-bottom: 6px; }
   .brow { gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 14px; }
   .reason { margin-left: 10px; }
@@ -605,7 +620,7 @@
 
   .perf { display: grid; gap: 14px; }
   .own { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-  .adv { border: 1px solid var(--line); border-radius: 14px; padding: 4px 14px; }
+  .adv { border: 1px solid var(--line); border-radius: 16px; padding: 4px 14px; }
   .adv summary { cursor: pointer; padding: 10px 0; color: var(--text); font-weight: 600; }
   .advbody { display: grid; gap: 14px; padding: 4px 0 14px; }
   .inh { color: var(--text); font-size: 12px; font-weight: 500; }

@@ -85,7 +85,7 @@
 {/if}
 
 <style>
-  .menu { position: fixed; z-index: 400; min-width: 220px; max-width: 320px; max-height: calc(100vh - 16px); overflow: auto; padding: 6px; display: grid; gap: 2px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 14px; box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5); animation: pop 140ms var(--spring) both; }
+  .menu { position: fixed; z-index: 400; min-width: 220px; max-width: 320px; max-height: calc(100vh - 16px); overflow: auto; padding: 6px; display: grid; gap: 2px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 16px; box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5); animation: pop 140ms var(--spring) both; }
   .menu button { display: flex; align-items: center; gap: 10px; width: 100%; border-color: transparent; border-radius: 10px; padding: 9px 12px; text-align: left; font-size: 13.5px; }
   .menu button:focus-visible { background: var(--surface-2); outline: none; }
   .menu .danger { color: #e5484d; }

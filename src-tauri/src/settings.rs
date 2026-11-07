@@ -36,6 +36,7 @@ pub struct Settings {
     pub aot_cache: bool,
     pub break_reminder_minutes: u32,
     pub daily_limit_minutes: u32,
+    pub hide_discord_card: bool,
 }
 
 impl Default for Settings {
@@ -68,6 +69,7 @@ impl Default for Settings {
             aot_cache: false,
             break_reminder_minutes: 0,
             daily_limit_minutes: 0,
+            hide_discord_card: false,
         }
     }
 }

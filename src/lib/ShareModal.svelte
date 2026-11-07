@@ -176,7 +176,7 @@
   .box { width: 52px; height: 52px; display: grid; place-items: center; border-radius: 14px; background: var(--inv-bg); color: var(--inv-text); flex: none; animation: drop 700ms var(--spring) backwards; }
   @keyframes drop { 0% { transform: translateY(-26px) rotate(-12deg) scale(0.6); opacity: 0; } 55% { transform: translateY(3px) rotate(3deg) scale(1.04); opacity: 1; } 75% { transform: translateY(-2px) rotate(-1deg); } }
   .fn { font-weight: 600; overflow-wrap: anywhere; }
-  .codewrap { position: relative; border-radius: 14px; overflow: hidden; }
+  .codewrap { position: relative; border-radius: 16px; overflow: hidden; }
   .codebox { display: block; resize: none; font: 12px/1.55 ui-monospace, 'JetBrains Mono', monospace; letter-spacing: 0; word-break: break-all; background: var(--bg); border-color: var(--line-strong); border-radius: 14px; padding: 12px 14px; }
   .sweep { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, transparent, var(--surface) 12%, var(--surface)); animation: reveal 900ms cubic-bezier(0.6, 0, 0.2, 1) forwards; }
   @keyframes reveal { from { transform: translateX(0); } to { transform: translateX(105%); } }
@@ -185,7 +185,7 @@
   .copyb.ok { animation: bump 420ms var(--spring); }
   @keyframes bump { 40% { transform: scale(1.06); } }
   .ci { display: inline-flex; align-items: center; gap: 8px; animation: swapin 260ms var(--spring) backwards; }
-  .warn { display: grid; gap: 8px; padding: 12px 14px; border-radius: 14px; border: 1px dashed var(--line-strong); }
+  .warn { display: grid; gap: 8px; padding: 12px 14px; border-radius: 16px; border: 1px dashed var(--line-strong); }
   .warn .chips { gap: 6px; }
   .warn .tag { font-size: 11px; animation: gopop 320ms var(--spring) calc(var(--n) * 40ms) backwards; }
   .foot { display: flex; align-items: center; gap: 10px; }
