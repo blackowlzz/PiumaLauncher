@@ -863,4 +863,9 @@ export const sr: Record<string, string> = {
   "Show all {n}": "Prikaži sve ({n})",
   "{time} a day on average": "U proseku {time} dnevno",
   "No games in the last 7 days": "Nema igara u poslednjih 7 dana",
+  "New Java version available": "Dostupna je nova verzija Jave",
+  "{name} is out, with better performance and security fixes.": "Izašla je {name}, sa boljim performansama i bezbednosnim ispravkama.",
+  "{n} Java versions can be updated, with better performance and security fixes.": "Verzije Jave za ažuriranje: {n}. Donose bolje performanse i bezbednosne ispravke.",
+  "Close the game before updating Java": "Zatvori igru pre ažuriranja Jave",
+  "Learn more": "Saznaj više",
 }

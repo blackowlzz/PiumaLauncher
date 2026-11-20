@@ -863,4 +863,9 @@ export const bg: Record<string, string> = {
   "Show all {n}": "Покажи всички ({n})",
   "{time} a day on average": "Средно {time} на ден",
   "No games in the last 7 days": "Няма игри през последните 7 дни",
+  "New Java version available": "Налична е нова версия на Java",
+  "{name} is out, with better performance and security fixes.": "Излезе {name}, с по-добра производителност и поправки по сигурността.",
+  "{n} Java versions can be updated, with better performance and security fixes.": "Версии на Java за обновяване: {n}. Носят по-добра производителност и поправки по сигурността.",
+  "Close the game before updating Java": "Затвори играта, преди да обновиш Java",
+  "Learn more": "Научи повече",
 }

@@ -28,6 +28,7 @@ import {
   type Imported,
   type InstallProgress,
   type RuntimeEntry,
+  type RuntimeUpdate,
   type JavaInstall,
   type Instance,
   type VersionEntry,
@@ -55,6 +56,8 @@ export const app = $state({
   install: null as InstallProgress | null,
   runtimes: [] as RuntimeEntry[],
   javaBusy: null as string | null,
+  javaUpdates: [] as RuntimeUpdate[],
+  javaUpdatesDismissed: false,
   stats: {} as Record<string, number[]>,
   effective: {} as Record<string, EffectiveLaunch>,
   featured: [] as ProjectHit[],
@@ -156,6 +159,8 @@ export async function init() {
       .catch(() => {})
   setTimeout(checkUpdate, 4000)
   setTimeout(refreshPackUpdates, 2500)
+  setTimeout(checkJavaUpdates, 6000)
+  setInterval(checkJavaUpdates, 6 * 60 * 60 * 1000)
   setInterval(checkPlaytime, 30_000)
   setInterval(checkUpdate, 30 * 60 * 1000)
   api.listVersions().then((v) => (app.versions = v)).catch((e) => notify(t('Version list unavailable: {error}', { error: e })))
@@ -533,6 +538,31 @@ export async function installRuntime(r: RuntimeEntry): Promise<boolean> {
   app.install = null
   try {
     await api.installRuntime(r.flavor, r.major)
+    await reloadRuntimes()
+    return true
+  } catch (e) {
+    notify(e)
+    return false
+  } finally {
+    app.javaBusy = null
+    app.install = null
+  }
+}
+
+export async function checkJavaUpdates() {
+  const found = await api.runtimeUpdates().catch(() => null)
+  if (!found) return
+  if (found.some((u) => !app.javaUpdates.some((o) => o.id === u.id && o.latest === u.latest))) app.javaUpdatesDismissed = false
+  app.javaUpdates = found
+}
+
+export async function updateRuntime(u: RuntimeUpdate): Promise<boolean> {
+  if (app.javaBusy) return false
+  app.javaBusy = u.id
+  app.install = null
+  try {
+    await api.updateRuntime(u.flavor, u.major)
+    app.javaUpdates = app.javaUpdates.filter((x) => x.id !== u.id)
     await reloadRuntimes()
     return true
   } catch (e) {

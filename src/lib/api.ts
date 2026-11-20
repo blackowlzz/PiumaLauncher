@@ -295,6 +295,9 @@ export const api = {
   detectJava: () => call<JavaInstall[]>('detect_java'),
   listRuntimes: () => call<RuntimeEntry[]>('list_runtimes'),
   installRuntime: (flavor: string, major: number) => call<JavaInstall>('install_runtime', { flavor, major }),
+  runtimeUpdates: () => call<RuntimeUpdate[]>('runtime_updates'),
+  updateRuntime: (flavor: string, major: number) => call<JavaInstall>('update_runtime', { flavor, major }),
+  notice: (lang: string) => call<Notice | null>('notice', { lang }),
   launch: (id: string, quickPlay?: QuickPlay, closeLeftovers = false) => call<void>('launch_instance', { id, quickPlay: quickPlay ?? null, closeLeftovers }),
   leftoverProcesses: (instanceId: string) => call<number>('leftover_processes', { instanceId }),
   diagnostics: () => call<string>('diagnostics'),
@@ -649,6 +652,22 @@ export interface RuntimeEntry {
   installed: boolean
   version: string | null
   path: string | null
+}
+
+export interface RuntimeUpdate {
+  id: string
+  flavor: string
+  label: string
+  major: number
+  current: string
+  latest: string | null
+}
+
+export interface Notice {
+  id: string
+  title: string
+  description: string
+  link: string | null
 }
 
 export interface StorageInfo {

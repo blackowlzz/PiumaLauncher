@@ -863,4 +863,9 @@ export const hu: Record<string, string> = {
   "Show all {n}": "Összes megjelenítése ({n})",
   "{time} a day on average": "Átlagosan napi {time}",
   "No games in the last 7 days": "Nincs játék az elmúlt 7 napban",
+  "New Java version available": "Új Java-verzió érhető el",
+  "{name} is out, with better performance and security fixes.": "Megjelent a(z) {name}, jobb teljesítménnyel és biztonsági javításokkal.",
+  "{n} Java versions can be updated, with better performance and security fixes.": "{n} Java-verzió frissíthető, jobb teljesítménnyel és biztonsági javításokkal.",
+  "Close the game before updating Java": "Zárd be a játékot a Java frissítése előtt",
+  "Learn more": "További információ",
 }

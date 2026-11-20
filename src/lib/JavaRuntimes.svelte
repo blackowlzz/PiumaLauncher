@@ -2,7 +2,7 @@
   import { onMount } from 'svelte'
   import { api, type RuntimeEntry } from './api'
   import { stageText, t } from './i18n.svelte'
-  import { app, askConfirm, installRuntime, notify, reloadRuntimes, saveSettings } from './store.svelte'
+  import { app, askConfirm, installRuntime, notify, reloadRuntimes, saveSettings, updateRuntime } from './store.svelte'
 
   let { onchange }: { onchange?: () => void } = $props()
 
@@ -22,8 +22,15 @@
   const others = $derived(app.runtimes.filter((r) => !shown(r)).sort((a, b) => rank(b) - rank(a)))
   let showOthers = $state(false)
 
+  const pending = (r: RuntimeEntry) => app.javaUpdates.find((u) => u.id === r.id)
+
   async function install(r: RuntimeEntry) {
     if (await installRuntime(r)) onchange?.()
+  }
+
+  async function update(r: RuntimeEntry) {
+    const u = pending(r)
+    if (u && (await updateRuntime(u))) onchange?.()
   }
 
   async function remove(r: RuntimeEntry) {
@@ -48,18 +55,20 @@
 </script>
 
 {#snippet runtime(r: RuntimeEntry)}
+  {@const u = r.installed ? pending(r) : undefined}
   <div class="item">
     <div class="txt">
       <div class="n">
         {r.label} {r.major}
         {#if r.flavor === 'graalvm' && ESSENTIAL.has(r.id)}<span class="tag rec">{t('Recommended')}</span>{/if}
         {#if app.settings.preferredJava === r.id}<span class="tag def">{t('Default')}</span>{/if}
+        {#if u}<span class="tag new">{t('Update available')}</span>{/if}
       </div>
       <div class="d">
         {#if app.javaBusy === r.id}
           {app.install ? `${stageText(app.install.stage)}${app.install.total > 0 ? ` · ${Math.round((app.install.done / app.install.total) * 100)}%` : ''}` : t('Installing…')}
         {:else if r.installed}
-          {r.version} · {note(r)}
+          {r.version}{#if u?.latest}<span class="to"> → {u.latest}</span>{/if} · {note(r)}
         {:else}
           {note(r)}
         {/if}
@@ -67,7 +76,8 @@
     </div>
     <div class="acts">
       {#if r.installed}
-        <button class:primary={app.settings.preferredJava !== r.id} onclick={() => toggleDefault(r)}>
+        {#if u}<button class="primary" onclick={() => update(r)} disabled={app.javaBusy !== null}>{app.javaBusy === r.id ? t('Installing…') : t('Update')}</button>{/if}
+        <button class:primary={!u && app.settings.preferredJava !== r.id} onclick={() => toggleDefault(r)}>
           {app.settings.preferredJava === r.id ? t('Remove default') : t('Set as default')}
         </button>
         <button class="ghost" onclick={() => remove(r)}>{t('Delete')}</button>
@@ -103,6 +113,9 @@
   .tag { margin-left: 8px; }
   .def { color: var(--text); }
   .rec { color: var(--inv-text); background: var(--inv-bg); border-color: var(--inv-bg); }
+  .new { color: var(--text); border-color: var(--line-strong); animation: pop 420ms var(--spring) both; }
+  .to { color: var(--text); }
+  @keyframes pop { from { transform: scale(0.7); opacity: 0; } }
   .more { justify-self: start; margin-top: 10px; padding: 6px 12px; margin-left: -12px; font-size: 13px; color: var(--muted); }
   .more:hover:not(:disabled) { color: var(--text); }
   .hint { margin: 4px 0 0; }

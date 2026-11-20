@@ -863,4 +863,9 @@ export const uk: Record<string, string> = {
   "Show all {n}": "Показати всі ({n})",
   "{time} a day on average": "У середньому {time} на день",
   "No games in the last 7 days": "Немає ігор за останні 7 днів",
+  "New Java version available": "Доступна нова версія Java",
+  "{name} is out, with better performance and security fixes.": "Вийшла {name}: вища продуктивність і виправлення безпеки.",
+  "{n} Java versions can be updated, with better performance and security fixes.": "Можна оновити версії Java ({n}): вища продуктивність і виправлення безпеки.",
+  "Close the game before updating Java": "Закрийте гру перед оновленням Java",
+  "Learn more": "Докладніше",
 }

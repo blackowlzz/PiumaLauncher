@@ -863,4 +863,9 @@ export const el: Record<string, string> = {
   "Show all {n}": "Εμφάνιση όλων ({n})",
   "{time} a day on average": "Κατά μέσο όρο {time} την ημέρα",
   "No games in the last 7 days": "Κανένα παιχνίδι τις τελευταίες 7 ημέρες",
+  "New Java version available": "Διαθέσιμη νέα έκδοση Java",
+  "{name} is out, with better performance and security fixes.": "Κυκλοφόρησε η {name}, με καλύτερες επιδόσεις και διορθώσεις ασφαλείας.",
+  "{n} Java versions can be updated, with better performance and security fixes.": "Εκδόσεις Java προς ενημέρωση: {n}. Φέρνουν καλύτερες επιδόσεις και διορθώσεις ασφαλείας.",
+  "Close the game before updating Java": "Κλείσε το παιχνίδι πριν ενημερώσεις τη Java",
+  "Learn more": "Μάθε περισσότερα",
 }

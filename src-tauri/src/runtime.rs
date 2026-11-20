@@ -70,15 +70,23 @@ fn home_dir(flavor: Flavor, major: u32) -> PathBuf {
     paths::runtimes().join(format!("{}-{major}", flavor.slug()))
 }
 
+const STAMP: &str = ".piuma-sha256";
+
 struct Download {
     url: String,
     sha256: String,
     size: Option<u64>,
+    version: Option<String>,
 }
 
 #[derive(Deserialize)]
 struct AdoptiumAsset {
     binary: AdoptiumBinary,
+    version: AdoptiumVersion,
+}
+#[derive(Deserialize)]
+struct AdoptiumVersion {
+    openjdk_version: String,
 }
 #[derive(Deserialize)]
 struct AdoptiumBinary {
@@ -91,36 +99,43 @@ struct AdoptiumPackage {
     size: Option<u64>,
 }
 
+fn graal_url(major: u32, channel: &str, release: &str) -> Result<String> {
+    let (os, arch) = target().ok_or_else(|| Error::msg("this system isn't supported for automatic Java download"))?;
+    if os == "windows" && arch != "x64" {
+        return Err(Error::msg("GraalVM for Windows is only available for x64"));
+    }
+    let ext = if os == "windows" { "zip" } else { "tar.gz" };
+    Ok(format!("https://download.oracle.com/graalvm/{major}/{channel}/graalvm-jdk-{release}_{os}-{arch}_bin.{ext}"))
+}
+
+async fn graal_sum(client: &reqwest::Client, url: &str) -> Result<String> {
+    let sum = net::get_text(client, &format!("{url}.sha256")).await?;
+    let sha256 = sum.split_whitespace().next().unwrap_or_default().to_lowercase();
+    if sha256.len() != 64 || !sha256.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err(Error::msg("invalid GraalVM checksum"));
+    }
+    Ok(sha256)
+}
+
 async fn resolve(client: &reqwest::Client, flavor: Flavor, major: u32) -> Result<Download> {
     let (os, arch) = target().ok_or_else(|| Error::msg("this system isn't supported for automatic Java download"))?;
     match flavor {
         Flavor::Graal => {
-            if os == "windows" && arch != "x64" {
-                return Err(Error::msg("GraalVM for Windows is only available for x64"));
-            }
-            let ext = if os == "windows" { "zip" } else { "tar.gz" };
-            let url = format!(
-                "https://download.oracle.com/graalvm/{major}/latest/graalvm-jdk-{major}_{os}-{arch}_bin.{ext}"
-            );
-            let sum = net::get_text(client, &format!("{url}.sha256")).await?;
-            let sha256 = sum.split_whitespace().next().unwrap_or_default().to_lowercase();
-            if sha256.len() != 64 || !sha256.chars().all(|c| c.is_ascii_hexdigit()) {
-                return Err(Error::msg("invalid GraalVM checksum"));
-            }
-            Ok(Download { url, sha256, size: None })
+            let url = graal_url(major, "latest", &major.to_string())?;
+            let sha256 = graal_sum(client, &url).await?;
+            Ok(Download { url, sha256, size: None, version: None })
         }
         Flavor::Temurin => {
             let api = format!(
                 "https://api.adoptium.net/v3/assets/latest/{major}/hotspot?architecture={arch}&image_type=jre&os={os}"
             );
             let assets: Vec<AdoptiumAsset> = serde_json::from_str(&net::get_text(client, &api).await?)?;
-            let pkg = assets
+            let asset = assets
                 .into_iter()
                 .next()
-                .ok_or_else(|| Error::msg(format!("Temurin {major} isn't available for this system")))?
-                .binary
-                .package;
-            Ok(Download { url: pkg.link, sha256: pkg.checksum, size: pkg.size })
+                .ok_or_else(|| Error::msg(format!("Temurin {major} isn't available for this system")))?;
+            let pkg = asset.binary.package;
+            Ok(Download { url: pkg.link, sha256: pkg.checksum, size: pkg.size, version: Some(asset.version.openjdk_version) })
         }
     }
 }
@@ -139,7 +154,7 @@ pub async fn ensure(
         return Ok(None);
     }
     let flavor = if supported(flavor) { flavor } else { Flavor::Temurin };
-    install(client, flavor, major, progress).await.map(Some)
+    install(client, flavor, major, false, progress).await.map(Some)
 }
 
 pub async fn ensure_temurin(
@@ -150,17 +165,18 @@ pub async fn ensure_temurin(
     if target().is_none() {
         return Err(Error::msg("this system isn't supported for automatic Java download"));
     }
-    install(client, Flavor::Temurin, major, progress).await
+    install(client, Flavor::Temurin, major, false, progress).await
 }
 
 async fn install(
     client: &reqwest::Client,
     flavor: Flavor,
     major: u32,
+    force: bool,
     progress: &(dyn Fn(&str, u32, u32) + Sync),
 ) -> Result<JavaInstall> {
     let home = home_dir(flavor, major);
-    if java_bin(&home).is_file() {
+    if !force && java_bin(&home).is_file() {
         if let Some(found) = java::probe(&java_bin(&home)).await {
             return Ok(found);
         }
@@ -171,7 +187,7 @@ async fn install(
     let dl = resolve(client, flavor, major).await?;
     let ext = if dl.url.ends_with(".zip") { "zip" } else { "tar.gz" };
     let archive = paths::runtimes().join(".download").join(format!("{}-{major}.{ext}", flavor.slug()));
-    let job = Job { url: dl.url, path: archive.clone(), check: Check::Sha256(dl.sha256), size: dl.size };
+    let job = Job { url: dl.url, path: archive.clone(), check: Check::Sha256(dl.sha256.clone()), size: dl.size };
     let _ = tokio::fs::remove_file(&archive).await;
     let shown = AtomicU32::new(u32::MAX);
     net::download_with_progress(client, &job, Some(&|got, total| {
@@ -186,7 +202,7 @@ async fn install(
 
     progress(&format!("Installing {} {major}", flavor.label()), 0, 0);
     let staging = paths::runtimes().join(format!(".{}-{major}.tmp", flavor.slug()));
-    let (src, dst, final_home) = (archive.clone(), staging.clone(), home.clone());
+    let (src, dst, final_home, stamp) = (archive.clone(), staging.clone(), home.clone(), dl.sha256);
     tokio::task::spawn_blocking(move || -> Result<()> {
         let _ = crate::fsx::retry(|| std::fs::remove_dir_all(&dst));
         std::fs::create_dir_all(&dst).map_err(Error::at(&dst))?;
@@ -199,6 +215,7 @@ async fn install(
             crate::fsx::retry(|| std::fs::remove_dir_all(&final_home)).map_err(Error::at(&final_home))?;
         }
         crate::fsx::retry(|| std::fs::rename(&dst, &final_home)).map_err(Error::at(&final_home))?;
+        let _ = std::fs::write(final_home.join(STAMP), stamp);
         let _ = std::fs::remove_file(&src);
         Ok(())
     })
@@ -272,6 +289,7 @@ pub async fn install_by_id(
     client: &reqwest::Client,
     flavor: &str,
     major: u32,
+    force: bool,
     progress: &(dyn Fn(&str, u32, u32) + Sync),
 ) -> Result<JavaInstall> {
     let flavor = Flavor::parse(flavor).ok_or_else(|| Error::msg("unknown Java distribution"))?;
@@ -294,7 +312,61 @@ pub async fn install_by_id(
         busy.push(id.clone());
     }
     let _slot = Slot(id);
-    install(client, flavor, major, progress).await
+    install(client, flavor, major, force, progress).await
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeUpdate {
+    pub id: String,
+    pub flavor: String,
+    pub label: String,
+    pub major: u32,
+    pub current: String,
+    pub latest: Option<String>,
+}
+
+fn version_key(version: &str) -> Vec<u32> {
+    version.split(['+', '-']).next().unwrap_or_default().split(['.', '_']).map_while(|p| p.parse().ok()).collect()
+}
+
+async fn outdated(client: &reqwest::Client, flavor: Flavor, major: u32) -> Option<RuntimeUpdate> {
+    let home = home_dir(flavor, major);
+    let bin = java_bin(&home);
+    if !bin.is_file() {
+        return None;
+    }
+    let current = java::probe(&bin).await?;
+    let latest = resolve(client, flavor, major).await.ok()?;
+    let newer = match &latest.version {
+        Some(v) => version_key(v) > version_key(&current.version),
+        None => {
+            let have = match std::fs::read_to_string(home.join(STAMP)) {
+                Ok(s) => s.trim().to_lowercase(),
+                Err(_) => {
+                    let sum = graal_sum(client, &graal_url(major, "archive", &current.version).ok()?).await.ok()?;
+                    if sum == latest.sha256 {
+                        let _ = std::fs::write(home.join(STAMP), &sum);
+                    }
+                    sum
+                }
+            };
+            have != latest.sha256
+        }
+    };
+    newer.then(|| RuntimeUpdate {
+        id: runtime_id(flavor, major),
+        flavor: flavor.slug().into(),
+        label: flavor.label().into(),
+        major,
+        current: current.version,
+        latest: latest.version.map(|v| v.split(['+', '-']).next().unwrap_or_default().to_string()),
+    })
+}
+
+pub async fn updates(client: &reqwest::Client) -> Vec<RuntimeUpdate> {
+    let checks = CATALOG.iter().filter(|(f, _)| supported(*f)).map(|&(f, m)| outdated(client, f, m));
+    futures_util::future::join_all(checks).await.into_iter().flatten().collect()
 }
 
 fn fits(major: u32, required: u32) -> bool {
@@ -373,10 +445,31 @@ mod tests {
     }
 
     #[test]
+    fn versions_compare_numerically() {
+        assert!(version_key("21.0.13.1+2-LTS") > version_key("21.0.13"));
+        assert!(version_key("21.0.13") > version_key("21.0.9"));
+        assert!(version_key("1.8.0_514-b01") > version_key("1.8.0_502"));
+        assert_eq!(version_key("25.0.5.1+2-LTS"), version_key("25.0.5.1"));
+    }
+
+    #[test]
     fn strip_rejects_traversal() {
         assert_eq!(stripped(Path::new("jdk-21/bin/java")), Some(PathBuf::from("bin/java")));
         assert_eq!(stripped(Path::new("jdk-21")), None);
         assert_eq!(stripped(Path::new("jdk-21/../evil")), None);
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn runtime_updates_live() {
+        let client = net::client();
+        let found = updates(&client).await;
+        eprintln!("{found:#?}");
+        for u in found.iter().filter(|u| u.flavor == "temurin") {
+            let java = install_by_id(&client, &u.flavor, u.major, true, &|_, _, _| {}).await.unwrap();
+            eprintln!("updated to {}", java.version);
+        }
+        assert!(updates(&client).await.iter().all(|u| u.flavor != "temurin"));
     }
 
     #[tokio::test]

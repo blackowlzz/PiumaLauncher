@@ -863,4 +863,9 @@ export const ru: Record<string, string> = {
   "Show all {n}": "Показать все ({n})",
   "{time} a day on average": "В среднем {time} в день",
   "No games in the last 7 days": "Нет игр за последние 7 дней",
+  "New Java version available": "Доступна новая версия Java",
+  "{name} is out, with better performance and security fixes.": "Вышла {name}: выше производительность и исправления безопасности.",
+  "{n} Java versions can be updated, with better performance and security fixes.": "Можно обновить версии Java ({n}): выше производительность и исправления безопасности.",
+  "Close the game before updating Java": "Закройте игру перед обновлением Java",
+  "Learn more": "Подробнее",
 }

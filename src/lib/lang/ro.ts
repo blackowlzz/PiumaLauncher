@@ -863,4 +863,9 @@ export const ro: Record<string, string> = {
   "Show all {n}": "Arată toate ({n})",
   "{time} a day on average": "În medie {time} pe zi",
   "No games in the last 7 days": "Nicio sesiune de joc în ultimele 7 zile",
+  "New Java version available": "Versiune nouă de Java disponibilă",
+  "{name} is out, with better performance and security fixes.": "A apărut {name}, cu performanță mai bună și remedieri de securitate.",
+  "{n} Java versions can be updated, with better performance and security fixes.": "Versiuni Java care pot fi actualizate: {n}. Aduc performanță mai bună și remedieri de securitate.",
+  "Close the game before updating Java": "Închide jocul înainte de a actualiza Java",
+  "Learn more": "Află mai multe",
 }

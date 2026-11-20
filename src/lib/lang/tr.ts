@@ -863,4 +863,9 @@ export const tr: Record<string, string> = {
   "Show all {n}": "Tümünü göster ({n})",
   "{time} a day on average": "Günde ortalama {time}",
   "No games in the last 7 days": "Son 7 günde oyun yok",
+  "New Java version available": "Yeni Java sürümü var",
+  "{name} is out, with better performance and security fixes.": "{name} çıktı: daha iyi performans ve güvenlik düzeltmeleri.",
+  "{n} Java versions can be updated, with better performance and security fixes.": "{n} Java sürümü güncellenebilir: daha iyi performans ve güvenlik düzeltmeleri.",
+  "Close the game before updating Java": "Java'yı güncellemeden önce oyunu kapat",
+  "Learn more": "Daha fazla bilgi",
 }

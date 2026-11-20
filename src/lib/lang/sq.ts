@@ -863,4 +863,9 @@ export const sq: Record<string, string> = {
   "Show all {n}": "Shfaqi të gjitha ({n})",
   "{time} a day on average": "Mesatarisht {time} në ditë",
   "No games in the last 7 days": "Asnjë lojë në 7 ditët e fundit",
+  "New Java version available": "Version i ri i Java-s i disponueshëm",
+  "{name} is out, with better performance and security fixes.": "Doli {name}, me performancë më të mirë dhe rregullime sigurie.",
+  "{n} Java versions can be updated, with better performance and security fixes.": "{n} versione të Java-s mund të përditësohen, me performancë më të mirë dhe rregullime sigurie.",
+  "Close the game before updating Java": "Mbyll lojën para se të përditësosh Java-n",
+  "Learn more": "Mëso më shumë",
 }

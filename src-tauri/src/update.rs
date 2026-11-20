@@ -54,7 +54,7 @@ pub async fn check_app(app: &AppHandle, client: &reqwest::Client) -> Option<Upda
     }
 }
 
-fn games_running(app: &AppHandle) -> bool {
+pub fn games_running(app: &AppHandle) -> bool {
     app.try_state::<Running>().is_some_and(|r| !r.0.lock().unwrap().is_empty())
 }
 

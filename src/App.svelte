@@ -28,6 +28,8 @@
   import Stats from './lib/Stats.svelte'
   import { isCustomized, resetTheme } from './lib/palette.svelte'
   import UpdateBanner from './lib/UpdateBanner.svelte'
+  import NoticeBanner from './lib/NoticeBanner.svelte'
+  import JavaUpdateBanner from './lib/JavaUpdateBanner.svelte'
   import TitleBar from './lib/TitleBar.svelte'
   import { maybeBench } from './lib/bench'
   import { watchFades } from './lib/fades'
@@ -305,7 +307,9 @@
   </nav>
 
   <div class="content">
+    <NoticeBanner />
     <UpdateBanner />
+    <JavaUpdateBanner />
     <div class="scrollwrap">
     <main use:smoothScroll={app.settings.smoothScroll && !app.settings.reduceEffects} use:edges onscroll={(e) => measureEdges(e.currentTarget)}>
       {#key `${app.page}:${app.detailId ?? ''}`}

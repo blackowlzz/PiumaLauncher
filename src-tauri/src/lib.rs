@@ -25,6 +25,7 @@ mod net;
 mod news;
 mod optimizer;
 mod options_sync;
+mod notice;
 mod paths;
 mod power;
 mod presence;
@@ -117,6 +118,9 @@ pub fn run() {
             commands::effective_launch,
             commands::list_runtimes,
             commands::install_runtime,
+            commands::runtime_updates,
+            commands::update_runtime,
+            commands::notice,
             commands::launch_instance,
             commands::stop_instance,
             commands::running_instances,

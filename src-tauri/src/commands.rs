@@ -153,7 +153,28 @@ pub async fn list_runtimes() -> Vec<runtime::RuntimeEntry> {
 
 #[tauri::command]
 pub async fn install_runtime(app: AppHandle, flavor: String, major: u32) -> Result<JavaInstall> {
-    runtime::install_by_id(&net::client(), &flavor, major, &progress_emitter(&app)).await
+    runtime::install_by_id(&net::client(), &flavor, major, false, &progress_emitter(&app)).await
+}
+
+#[tauri::command]
+pub async fn runtime_updates() -> Vec<runtime::RuntimeUpdate> {
+    if !settings::load().check_updates {
+        return vec![];
+    }
+    runtime::updates(&net::client()).await
+}
+
+#[tauri::command]
+pub async fn update_runtime(app: AppHandle, flavor: String, major: u32) -> Result<JavaInstall> {
+    if update::games_running(&app) {
+        return Err(Error::msg("Close the game before updating Java"));
+    }
+    runtime::install_by_id(&net::client(), &flavor, major, true, &progress_emitter(&app)).await
+}
+
+#[tauri::command]
+pub async fn notice(lang: String) -> Option<crate::notice::Notice> {
+    crate::notice::fetch(&net::client(), &lang).await
 }
 
 #[tauri::command]

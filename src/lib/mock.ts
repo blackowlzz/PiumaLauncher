@@ -259,6 +259,13 @@ export async function mock(cmd: string, args: Record<string, unknown>): Promise<
       try { localStorage.setItem('mock-runtimes', JSON.stringify([...have, `${args.flavor}-${args.major}`])) } catch {  }
       return { path: '', major: args.major, version: `${args.major}.0.1`, isGraal: args.flavor === 'graalvm' }
     }
+    case 'runtime_updates':
+      return new URLSearchParams(location.search).has('javaupdate') ? [{ id: 'graalvm-21', flavor: 'graalvm', label: 'GraalVM', major: 21, current: '21.0.1', latest: null }, { id: 'temurin-21', flavor: 'temurin', label: 'Temurin', major: 21, current: '21.0.12.1', latest: '21.0.13.1' }] : []
+    case 'update_runtime':
+      await new Promise((r) => setTimeout(r, 900))
+      return { path: '', major: args.major, version: `${args.major}.0.2`, isGraal: args.flavor === 'graalvm' }
+    case 'notice':
+      return new URLSearchParams(location.search).has('notice') ? { id: 'mock', title: 'Java security warning', description: 'A flaw in Java 17 and newer (CVE-2026-114938) lets attackers run code on your PC.\nUntil GraalVM is fixed, use Temurin: Settings, Java, install Temurin 21 or 25 and set it as default.', link: 'https://github.com/blackowlzz/PiumaLauncher' } : null
     case 'delete_runtime': {
       try { localStorage.setItem('mock-runtimes', JSON.stringify((JSON.parse(localStorage.getItem('mock-runtimes') ?? '["graalvm-21"]') as string[]).filter((x) => x !== args.name))) } catch {  }
       return null

@@ -1,11 +1,13 @@
 <script lang="ts">
-  type Name = 'play' | 'grid' | 'compass' | 'user' | 'sun' | 'moon' | 'feather' | 'search' | 'chevron' | 'home' | 'download' | 'list' | 'layout' | 'filter' | 'x' | 'clock' | 'check' | 'globe' | 'settings' | 'minimize' | 'maximize' | 'restore' | 'refresh' | 'trash' | 'file' | 'folder' | 'palette' | 'dots' | 'box' | 'flame' | 'cpu' | 'wrench' | 'discord' | 'kofi' | 'server' | 'plus' | 'shortcut' | 'share' | 'package' | 'copy' | 'map' | 'chart'
+  type Name = 'play' | 'grid' | 'compass' | 'user' | 'sun' | 'moon' | 'feather' | 'search' | 'chevron' | 'home' | 'download' | 'list' | 'layout' | 'filter' | 'x' | 'clock' | 'check' | 'globe' | 'settings' | 'minimize' | 'maximize' | 'restore' | 'refresh' | 'trash' | 'file' | 'folder' | 'palette' | 'dots' | 'box' | 'flame' | 'cpu' | 'wrench' | 'discord' | 'kofi' | 'server' | 'plus' | 'shortcut' | 'share' | 'package' | 'copy' | 'map' | 'chart' | 'alert'
   let { name, size = 18 }: { name: Name; size?: number } = $props()
 </script>
 
 <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
   stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-  {#if name === 'play'}
+  {#if name === 'alert'}
+    <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /><path d="M12 9v4" /><path d="M12 17h.01" />
+  {:else if name === 'play'}
     <polygon points="7 4 20 12 7 20 7 4" />
   {:else if name === 'map'}
     <path d="M9 4 3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5z" /><path d="M9 4v13.5M15 6.5V20" />
