@@ -1,0 +1,48 @@
+TITLE: Java security warning (Java4Shell)
+DESCRIPTION: A flaw in Java 17 and newer can let attackers run code on your PC. GraalVM isn't fixed yet: switch to Temurin 25 in Settings, Java, Other Java versions.
+LINK: https://github.com/blackowlzz/PiumaLauncher/blob/main/notices/java4shell.md
+
+TITLE_IT: Avviso di sicurezza Java (Java4Shell)
+DESCRIPTION_IT: Una falla in Java 17 e successivi può permettere di eseguire codice sul tuo PC. GraalVM non è ancora corretto: passa a Temurin 25 in Impostazioni, Java, Altre versioni di Java.
+
+TITLE_ES: Aviso de seguridad de Java (Java4Shell)
+DESCRIPTION_ES: Un fallo en Java 17 y posteriores puede permitir ejecutar código en tu PC. GraalVM aún no está corregido: cambia a Temurin 25 en Ajustes, Java, Otras versiones de Java.
+
+TITLE_FR: Alerte de sécurité Java (Java4Shell)
+DESCRIPTION_FR: Une faille dans Java 17 et plus récent peut permettre d'exécuter du code sur ton PC. GraalVM n'est pas encore corrigé : passe à Temurin 25 dans Paramètres, Java, Autres versions de Java.
+
+TITLE_DE: Java-Sicherheitswarnung (Java4Shell)
+DESCRIPTION_DE: Eine Lücke in Java 17 und neuer kann Angreifern erlauben, Code auf deinem PC auszuführen. GraalVM ist noch nicht behoben: Wechsle zu Temurin 25 unter Einstellungen, Java, Weitere Java-Versionen.
+
+TITLE_PT: Aviso de segurança do Java (Java4Shell)
+DESCRIPTION_PT: Uma falha no Java 17 e mais recentes pode permitir executar código no teu PC. O GraalVM ainda não foi corrigido: muda para o Temurin 25 em Configurações, Java, Outras versões do Java.
+
+TITLE_SQ: Paralajmërim sigurie për Java (Java4Shell)
+DESCRIPTION_SQ: Një dobësi në Java 17 e më të reja mund të lejojë ekzekutimin e kodit në PC-në tënde. GraalVM ende nuk është rregulluar: kalo te Temurin 25 te Cilësimet, Java, Versione të tjera të Java.
+
+TITLE_HU: Java biztonsági figyelmeztetés (Java4Shell)
+DESCRIPTION_HU: A Java 17 és újabb verziók egy hibája kódfuttatást tehet lehetővé a gépeden. A GraalVM még nincs javítva: válts Temurin 25-re a Beállítások, Java, További Java-verziók alatt.
+
+TITLE_RU: Предупреждение о безопасности Java (Java4Shell)
+DESCRIPTION_RU: Уязвимость в Java 17 и новее может позволить выполнить код на вашем ПК. GraalVM ещё не исправлена: перейдите на Temurin 25 в Настройки, Java, Другие версии Java.
+
+TITLE_BG: Предупреждение за сигурността на Java (Java4Shell)
+DESCRIPTION_BG: Уязвимост в Java 17 и по-нови може да позволи изпълнение на код на компютъра ти. GraalVM още не е поправена: премини към Temurin 25 в Настройки, Java, Други версии на Java.
+
+TITLE_UK: Попередження про безпеку Java (Java4Shell)
+DESCRIPTION_UK: Вразливість у Java 17 і новіших може дозволити виконати код на вашому ПК. GraalVM ще не виправлена: перейдіть на Temurin 25 у Налаштування, Java, Інші версії Java.
+
+TITLE_PL: Ostrzeżenie bezpieczeństwa Javy (Java4Shell)
+DESCRIPTION_PL: Luka w Javie 17 i nowszych może pozwolić na uruchomienie kodu na twoim PC. GraalVM nie jest jeszcze poprawiona: przełącz się na Temurin 25 w Ustawienia, Java, Inne wersje Javy.
+
+TITLE_RO: Avertisment de securitate Java (Java4Shell)
+DESCRIPTION_RO: O vulnerabilitate în Java 17 și mai nou poate permite rularea de cod pe PC-ul tău. GraalVM nu este încă remediat: treci la Temurin 25 din Setări, Java, Alte versiuni de Java.
+
+TITLE_SR: Bezbednosno upozorenje za Javu (Java4Shell)
+DESCRIPTION_SR: Propust u Javi 17 i novijim može omogućiti pokretanje koda na tvom računaru. GraalVM još nije ispravljen: pređi na Temurin 25 u Podešavanja, Java, Druge verzije Jave.
+
+TITLE_EL: Προειδοποίηση ασφαλείας Java (Java4Shell)
+DESCRIPTION_EL: Ένα κενό ασφαλείας στη Java 17 και νεότερες μπορεί να επιτρέψει εκτέλεση κώδικα στον υπολογιστή σου. Η GraalVM δεν έχει διορθωθεί ακόμα: πέρασε στη Temurin 25 από Ρυθμίσεις, Java, Άλλες εκδόσεις Java.
+
+TITLE_TR: Java güvenlik uyarısı (Java4Shell)
+DESCRIPTION_TR: Java 17 ve sonrasındaki bir açık, bilgisayarında kod çalıştırılmasına izin verebilir. GraalVM henüz düzeltilmedi: Ayarlar, Java, Diğer Java sürümleri bölümünden Temurin 25'e geç.
